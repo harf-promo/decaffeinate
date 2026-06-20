@@ -4,26 +4,18 @@ import XCTest
 @MainActor
 final class RulesEngineTests: XCTestCase {
 
-    private var defaults: UserDefaults!
-    private var engine: RulesEngine!
-    private var suiteName: String!
-
-    override func setUp() {
-        super.setUp()
-        suiteName = "decaffeinate.tests.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
-        engine = RulesEngine(defaults: defaults)
-    }
-
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
-        engine = nil
-        defaults = nil
-        suiteName = nil
-        super.tearDown()
+    /// Build an isolated engine on the main actor (avoids constructing the
+    /// `@MainActor` engine from XCTest's nonisolated `setUp`, which would send a
+    /// non-Sendable `UserDefaults` across isolation under strict concurrency).
+    private func makeEngine() -> (engine: RulesEngine, defaults: UserDefaults, cleanup: () -> Void) {
+        let suite = "decaffeinate.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let engine = RulesEngine(defaults: defaults)
+        return (engine, defaults, { defaults.removePersistentDomain(forName: suite) })
     }
 
     func testSetAndReadPolicy() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
         engine.setPolicy(.allow, for: a)
         XCTAssertEqual(engine.policy(for: a), .allow)
@@ -31,12 +23,14 @@ final class RulesEngineTests: XCTestCase {
     }
 
     func testIgnorePolicyIsNotAllowing() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
         engine.setPolicy(.ignore, for: a)
         XCTAssertFalse(engine.isActivelyAllowed(a))
     }
 
     func testAllowUntilExpiry() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
         engine.setPolicy(.allowUntil(Date().addingTimeInterval(3600)), for: a)
         XCTAssertTrue(engine.isActivelyAllowed(a))
@@ -46,6 +40,7 @@ final class RulesEngineTests: XCTestCase {
     }
 
     func testMatchesByBundleIdentifierCaseInsensitive() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion(bundle: "com.example.App")
         engine.setPolicy(.allow, for: a)
         let other = Fixtures.assertion(process: "Different", bundle: "COM.EXAMPLE.APP")
@@ -53,6 +48,7 @@ final class RulesEngineTests: XCTestCase {
     }
 
     func testMatchesByProcessNameWhenNoBundle() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion(process: "node", bundle: nil)
         engine.setPolicy(.ignore, for: a)
         let other = Fixtures.assertion(process: "NODE", bundle: nil)
@@ -60,6 +56,7 @@ final class RulesEngineTests: XCTestCase {
     }
 
     func testUpsertReplacesSameTarget() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
         engine.setPolicy(.allow, for: a)
         engine.setPolicy(.ignore, for: a)
@@ -67,16 +64,18 @@ final class RulesEngineTests: XCTestCase {
         XCTAssertEqual(engine.policy(for: a), .ignore)
     }
 
-    func testRemove() {
+    func testRemove() throws {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
         engine.setPolicy(.allow, for: a)
-        let rule = try! XCTUnwrap(engine.rule(for: a))
+        let rule = try XCTUnwrap(engine.rule(for: a))
         engine.remove(rule)
         XCTAssertTrue(engine.rules.isEmpty)
         XCTAssertNil(engine.policy(for: a))
     }
 
     func testPersistenceAcrossInstances() {
+        let (engine, defaults, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
         engine.setPolicy(.allow, for: a)
         let reloaded = RulesEngine(defaults: defaults)
@@ -84,10 +83,12 @@ final class RulesEngineTests: XCTestCase {
     }
 
     func testUnclassifiedReturnsNil() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         XCTAssertNil(engine.policy(for: Fixtures.assertion(bundle: "com.unknown.app")))
     }
 
     func testHasEffectiveDecision() {
+        let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
         XCTAssertFalse(engine.hasEffectiveDecision(for: a)) // unclassified
 
