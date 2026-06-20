@@ -55,7 +55,8 @@ enum CLI {
     @MainActor
     private static func printRow(_ a: PowerAssertion) {
         let name = a.name.isEmpty || a.name == "Unnamed" ? "—" : a.name
-        print("  • \(a.displayName)  (pid \(a.pid))")
+        let via = a.attribution.map { " (\($0))" } ?? ""
+        print("  • \(a.displayName)\(via)  (pid \(a.pid))")
         print("      \(a.assertionType): “\(name)”")
     }
 

@@ -24,6 +24,13 @@ enum AssertionKind: String, Sendable, Codable {
     }
 }
 
+/// The real application behind an assertion that was routed through a shared
+/// daemon (e.g. a browser tab's audio surfacing under `coreaudiod`).
+struct AssertionOwner: Hashable, Sendable {
+    let name: String
+    let bundleIdentifier: String?
+}
+
 /// A single live power assertion attributed to the process that owns it.
 ///
 /// This is the unit of "truth" Decaffeinate reports: exactly who is holding the
@@ -40,16 +47,53 @@ struct PowerAssertion: Identifiable, Hashable, Sendable {
     let kind: AssertionKind
     /// When the assertion was first created, if IOKit reported it.
     let createdAt: Date?
+    /// The real app behind a hold routed through a shared daemon, if resolved.
+    let realOwner: AssertionOwner?
+
+    init(
+        id: String,
+        pid: pid_t,
+        processName: String,
+        bundleIdentifier: String?,
+        assertionType: String,
+        name: String,
+        kind: AssertionKind,
+        createdAt: Date?,
+        realOwner: AssertionOwner? = nil
+    ) {
+        self.id = id
+        self.pid = pid
+        self.processName = processName
+        self.bundleIdentifier = bundleIdentifier
+        self.assertionType = assertionType
+        self.name = name
+        self.kind = kind
+        self.createdAt = createdAt
+        self.realOwner = realOwner
+    }
 
     /// Whether this assertion is one of the ones that prevents the *machine*
     /// from sleeping (as opposed to merely keeping the screen on).
     var blocksSystemSleep: Bool { kind == .systemSleep }
 
-    var displayName: String {
+    /// The owning process's own friendly name (no attribution applied).
+    var ownerName: String {
         if let bundleIdentifier, let app = localizedAppName(forBundleID: bundleIdentifier) {
             return app
         }
         return processName
+    }
+
+    /// The best name to show the user: the attributed real owner when known,
+    /// otherwise the owning process.
+    var displayName: String {
+        realOwner?.name ?? ownerName
+    }
+
+    /// "via coreaudiod" when this hold was attributed to a different real owner.
+    var attribution: String? {
+        guard realOwner != nil else { return nil }
+        return "via \(ownerName)"
     }
 }
 

@@ -10,6 +10,8 @@ enum AssertionDetailKey {
     static let assertionID = "AssertionId"
     static let globalUniqueID = "GlobalUniqueID"
     static let processName = "Process Name"
+    static let onBehalfOfPID = "AssertionOnBehalfOfPID"
+    static let bundlePath = "BundlePath"
 }
 
 /// Reads the live set of power assertions on the system and attributes each one
@@ -44,6 +46,8 @@ struct TelemetryEngine {
                 let assertionID =
                     (detail[AssertionDetailKey.assertionID] as? Int)
                     ?? (detail[AssertionDetailKey.globalUniqueID] as? Int)
+                let onBehalfOfPID = (detail[AssertionDetailKey.onBehalfOfPID] as? Int).map(
+                    pid_t.init)
 
                 result.append(
                     PowerAssertion(
@@ -54,7 +58,13 @@ struct TelemetryEngine {
                         assertionType: type,
                         name: assertionName,
                         kind: AssertionType.classify(type),
-                        createdAt: created
+                        createdAt: created,
+                        realOwner: resolveRealOwner(
+                            ownerProcessName: name,
+                            ownerPID: pid,
+                            onBehalfOfPID: onBehalfOfPID,
+                            assertionName: assertionName
+                        )
                     )
                 )
             }
@@ -68,5 +78,36 @@ struct TelemetryEngine {
             return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
                 == .orderedAscending
         }
+    }
+
+    /// Resolve the real app behind a hold routed through a shared daemon. Only
+    /// attributes when the owner is a known shared daemon AND the resolved owner
+    /// is a real installed app — so system holds (e.g. coreaudiod's built-in
+    /// speaker) are left attributed to the daemon, not mislabelled.
+    private func resolveRealOwner(
+        ownerProcessName: String,
+        ownerPID: pid_t,
+        onBehalfOfPID: pid_t?,
+        assertionName: String
+    ) -> AssertionOwner? {
+        guard AssertionAttributor.isSharedDaemon(ownerProcessName) else { return nil }
+
+        // Prefer the explicit on-behalf-of PID when present and distinct.
+        if let behalf = onBehalfOfPID, behalf > 0, behalf != ownerPID {
+            let resolvedName = processName(forPID: behalf)
+            let resolvedBundle = bundleIdentifier(forPID: behalf)
+            if !resolvedName.hasPrefix("PID ") {
+                return AssertionOwner(name: resolvedName, bundleIdentifier: resolvedBundle)
+            }
+        }
+
+        // Otherwise parse the assertion name, and trust it only if it resolves
+        // to a real installed app.
+        if let hint = AssertionAttributor.bundleIDHint(inName: assertionName),
+            let app = localizedAppName(forBundleID: hint)
+        {
+            return AssertionOwner(name: app, bundleIdentifier: hint)
+        }
+        return nil
     }
 }

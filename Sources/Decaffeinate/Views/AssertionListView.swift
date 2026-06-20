@@ -81,6 +81,9 @@ struct AssertionRow: View {
 
     private var subtitle: String {
         var parts: [String] = [assertion.kind.label]
+        if let attribution = assertion.attribution {
+            parts.append(attribution)
+        }
         if assertion.name != "Unnamed", !assertion.name.isEmpty {
             parts.append("“\(assertion.name)”")
         }
