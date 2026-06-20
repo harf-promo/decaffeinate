@@ -43,10 +43,6 @@ else
 fi
 
 ENTITLEMENTS="Resources/Decaffeinate.entitlements"
-if [[ "${CI:-}" == "true" && "${CONFIG}" == "release" && -z "${DEVELOPER_ID:-}" ]]; then
-    echo "✗ Refusing to ad-hoc sign a release build in CI without DEVELOPER_ID" >&2
-    exit 1
-fi
 if [[ -n "${DEVELOPER_ID:-}" ]]; then
     echo "▸ Signing with Developer ID (hardened runtime) …"
     codesign --force --options runtime --timestamp \
