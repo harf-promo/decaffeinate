@@ -41,29 +41,26 @@ struct FirewallPromptSection: View {
             ForEach(appState.pendingClassification) { assertion in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
-                        Image(systemName: "bell.badge.fill").foregroundStyle(.orange)
-                        Text("\(assertion.displayName) wants to keep your Mac awake")
+                        Image(systemName: "sun.max.fill").foregroundStyle(.orange)
+                        Text("\(assertion.displayName) is keeping your Mac awake")
                             .font(.callout.weight(.medium))
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     HStack(spacing: 6) {
                         Button("Allow") { appState.setPolicy(.allow, for: assertion) }
-                        Menu("For…") {
-                            ForEach(AllowDuration.allCases, id: \.self) { duration in
-                                Button(duration.label) {
-                                    appState.setPolicy(
-                                        .allowUntil(duration.expiry(from: Date())), for: assertion)
-                                }
-                            }
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                        Button("Block") { appState.setPolicy(.ignore, for: assertion) }
+                            .buttonStyle(.borderedProminent)
+                            .help("Let this app keep the Mac awake whenever it needs to.")
+                        AllowForMenu(title: "For…", assertion: assertion)
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                        Button("Let it sleep") { appState.setPolicy(.ignore, for: assertion) }
+                            .help("Ignore this app's hold — the Mac may sleep while it runs.")
                         Spacer()
-                        Button("Ignore") { appState.dismissPending(assertion) }
+                        Button("Not now") { appState.dismissPending(assertion) }
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
+                            .help("Dismiss without making a rule.")
                     }
                     .font(.caption)
                 }
@@ -99,25 +96,37 @@ struct QuickActions: View {
                     Label("Auto-sleep", systemImage: "zzz")
                 }
                 .toggleStyle(.button)
+                .disabled(appState.settings.caffeinateEnabled)
                 .help("Force sleep after you've been idle, even if apps try to keep it awake.")
 
                 Toggle(isOn: settings.caffeinateEnabled) {
                     Label("Keep awake", systemImage: "bolt")
                 }
                 .toggleStyle(.button)
-                .help("Hold the Mac awake on purpose (the opposite of this app's job).")
+                .help("Hold the Mac awake on purpose — the same safety rails still apply.")
 
                 Spacer()
 
-                if appState.settings.decaffeinateEnabled, !appState.settings.caffeinateEnabled,
-                    let remaining = appState.secondsUntilForcedSleep, appState.idleSeconds >= 30
-                {
+                if let remaining = appState.secondsUntilForcedSleep {
                     Text(Format.countdown(remaining))
                         .font(.system(.callout, design: .monospaced))
                         .foregroundStyle(.secondary)
+                        .help("Time until the Mac is put to sleep.")
                 }
             }
             .font(.caption)
+
+            // Make the core promise legible even when no live countdown is up.
+            if appState.settings.caffeinateEnabled {
+                Text("Auto-sleep is paused while keeping awake")
+                    .explanatory()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if appState.settings.decaffeinateEnabled, appState.secondsUntilForcedSleep == nil
+            {
+                Text(appState.idleSleepHint)
+                    .explanatory()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             if let error = appState.lastError {
                 Text(error)
@@ -153,12 +162,14 @@ struct FooterView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Check for Updates…")
+                .accessibilityLabel("Check for updates")
             }
             SettingsLink {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(.plain)
             .help("Settings")
+            .accessibilityLabel("Settings")
 
             Button {
                 NSApp.terminate(nil)
@@ -167,6 +178,7 @@ struct FooterView: View {
             }
             .buttonStyle(.plain)
             .help("Quit Decaffeinate")
+            .accessibilityLabel("Quit Decaffeinate")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -185,22 +197,28 @@ struct WatchSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SectionHeader("Sleep when finished")
+            SectionHeader("Sleep when a task finishes")
 
             switch appState.watchStatus {
             case .idle:
                 Menu {
-                    ForEach(appState.watchCandidates, id: \.self) { name in
-                        Button(name) { appState.setWatchTarget(.processName(name)) }
+                    if !appState.runningWatchCandidates.isEmpty {
+                        Section("Running now") {
+                            ForEach(appState.runningWatchCandidates, id: \.self) { name in
+                                Button(name) { appState.setWatchTarget(.processName(name)) }
+                            }
+                        }
+                    }
+                    Section("Common tools") {
+                        ForEach(appState.commonWatchCandidates, id: \.self) { name in
+                            Button(name) { appState.setWatchTarget(.processName(name)) }
+                        }
                     }
                 } label: {
-                    Label("Watch an app or agent…", systemImage: "binoculars")
+                    Label("Pick a build or agent…", systemImage: "binoculars")
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
-                Text("The Mac sleeps once the chosen build/agent goes quiet and you step away.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
 
             case .waiting(let label):
                 statusRow("hourglass", "Waiting for \(label) to start…")
@@ -210,6 +228,14 @@ struct WatchSection: View {
             case .completed(let label, _):
                 statusRow("checkmark.circle.fill", "\(label) finished — sleeping soon")
             }
+
+            // Always explain the feature (it's the headline differentiator).
+            Text(
+                "Leave a long build or AI agent running, walk away — the Mac sleeps once it goes quiet."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             if isActive {
                 Button("Stop watching") { appState.setWatchTarget(nil) }

@@ -13,6 +13,19 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// Minutes of human inactivity before Decaffeinate forces the Mac to sleep,
     /// overriding any rogue assertion that would otherwise keep it awake.
     var idleThresholdMinutes: Double = 10
+    /// On battery, use a shorter idle threshold — save power harder when unplugged.
+    var sleepSoonerOnBattery: Bool = true
+    /// The shorter idle threshold (minutes) applied on battery when the above is on.
+    var batteryIdleThresholdMinutes: Double = 3
+
+    /// The idle threshold in effect for the current power state, clamped to ≥ 1 min.
+    func effectiveIdleSeconds(onBattery: Bool) -> TimeInterval {
+        let minutes =
+            (onBattery && sleepSoonerOnBattery)
+            ? Swift.min(idleThresholdMinutes, batteryIdleThresholdMinutes)
+            : idleThresholdMinutes
+        return max(1, minutes) * 60
+    }
 
     // MARK: Caffeinate (the secondary, opt-in feature)
 

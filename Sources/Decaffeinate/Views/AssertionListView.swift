@@ -67,31 +67,17 @@ struct AssertionRow: View {
                         .lineLimit(1)
                     policyBadge
                 }
-                Text(subtitle)
+                Text(assertion.subtitle(held: appState.heldDuration(assertion), includePID: false))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
             Spacer(minLength: 4)
             policyMenu
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
-    }
-
-    private var subtitle: String {
-        var parts: [String] = [assertion.kind.label]
-        if let attribution = assertion.attribution {
-            parts.append(attribution)
-        }
-        if assertion.name != "Unnamed", !assertion.name.isEmpty {
-            parts.append("“\(assertion.name)”")
-        }
-        if let held = appState.heldDuration(assertion) {
-            parts.append(held)
-        }
-        parts.append("PID \(assertion.pid)")
-        return parts.joined(separator: " · ")
+        .help("PID \(assertion.pid) · \(assertion.assertionType)")
     }
 
     @ViewBuilder private var policyBadge: some View {
@@ -99,7 +85,7 @@ struct AssertionRow: View {
         case .allow:
             tag("Allowed", .green)
         case .allowUntil:
-            tag("Allowed ⏱", .green)
+            tag("Allowed · timed", .green)
         case .ignore:
             tag("Blocked", .orange)
         case .none:
@@ -121,14 +107,7 @@ struct AssertionRow: View {
             Button("Always allow to keep awake") {
                 appState.setPolicy(.allow, for: assertion)
             }
-            Menu("Allow for…") {
-                ForEach(AllowDuration.allCases, id: \.self) { duration in
-                    Button(duration.label) {
-                        appState.setPolicy(
-                            .allowUntil(duration.expiry(from: Date())), for: assertion)
-                    }
-                }
-            }
+            AllowForMenu(title: "Allow for…", assertion: assertion)
             Button("Block (let Mac sleep)") {
                 appState.setPolicy(.ignore, for: assertion)
             }
@@ -144,5 +123,6 @@ struct AssertionRow: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+        .accessibilityLabel("Rules for \(assertion.displayName)")
     }
 }

@@ -39,6 +39,18 @@ private struct GeneralSettings: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                Toggle("Sleep sooner on battery", isOn: s.sleepSoonerOnBattery)
+                    .disabled(!store.settings.decaffeinateEnabled)
+                HStack {
+                    Text("On battery, sleep after")
+                    Slider(value: s.batteryIdleThresholdMinutes, in: 1...30, step: 1)
+                    Text("\(Int(store.settings.batteryIdleThresholdMinutes)) min")
+                        .monospacedDigit()
+                        .frame(width: 52, alignment: .trailing)
+                }
+                .disabled(
+                    !store.settings.decaffeinateEnabled || !store.settings.sleepSoonerOnBattery)
             }
 
             Section("Keep awake (optional)") {

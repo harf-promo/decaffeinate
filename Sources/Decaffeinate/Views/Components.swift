@@ -36,7 +36,7 @@ struct SectionHeader: View {
         HStack {
             Text(title.uppercased())
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             Spacer()
             if let trailing {
                 Text(trailing)
@@ -65,5 +65,30 @@ extension AssertionKind {
         case .displaySleep: return "display"
         case .other: return "circle.dotted"
         }
+    }
+}
+
+/// A reusable "Allow for…" submenu offering the standard duration presets.
+/// Used by both the firewall prompt and the per-app row menu.
+struct AllowForMenu: View {
+    let title: String
+    let assertion: PowerAssertion
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        Menu(title) {
+            ForEach(AllowDuration.allCases, id: \.self) { duration in
+                Button(duration.label) {
+                    appState.setPolicy(.allowUntil(duration.expiry(from: Date())), for: assertion)
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    /// The small muted explanatory text style used under settings/menu controls.
+    func explanatory() -> some View {
+        font(.caption).foregroundStyle(.secondary)
     }
 }

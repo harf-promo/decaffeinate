@@ -156,16 +156,6 @@ final class AppState: ObservableObject {
         pendingClassification.removeAll { $0.id == assertion.id }
     }
 
-    func toggleCaffeinate() {
-        settingsStore.settings.caffeinateEnabled.toggle()
-        tick()
-    }
-
-    func setDecaffeinate(_ enabled: Bool) {
-        settingsStore.settings.decaffeinateEnabled = enabled
-        tick()
-    }
-
     // MARK: Agent watcher
 
     /// Watch a process (tree) and let the Mac sleep once it finishes. Pass `nil`
@@ -176,16 +166,16 @@ final class AppState: ObservableObject {
         tick()
     }
 
-    var isWatchingAgent: Bool { agentWatcher.isActive }
+    /// Processes currently holding the Mac awake — the best "sleep when this
+    /// finishes" picks because they're real and running right now.
+    var runningWatchCandidates: [String] {
+        assertions.filter(\.blocksSystemSleep).map(\.processName).removingDuplicates()
+    }
 
-    /// Quick "sleep when this finishes" picks: common long-running dev/agent
-    /// tools plus whatever is currently holding the Mac awake.
-    var watchCandidates: [String] {
-        let common = [
-            "claude", "node", "python3", "xcodebuild", "cargo", "make", "swift", "docker",
-        ]
-        let fromBlockers = assertions.filter(\.blocksSystemSleep).map(\.processName)
-        return (common + fromBlockers).removingDuplicates()
+    /// Common long-running dev/agent tools to watch even if not (yet) running.
+    var commonWatchCandidates: [String] {
+        ["claude", "node", "python3", "xcodebuild", "cargo", "make", "swift", "docker"]
+            .filter { !runningWatchCandidates.contains($0) }
     }
 
     // MARK: The tick
@@ -252,17 +242,15 @@ final class AppState: ObservableObject {
         //    Suppressed while the user is intentionally caffeinating.
         var remaining: TimeInterval?
         if s.decaffeinateEnabled, !s.caffeinateEnabled {
-            let threshold =
-                agentFinished
-                ? min(s.idleThresholdSeconds, completionGraceSeconds)
-                : s.idleThresholdSeconds
+            let base = s.effectiveIdleSeconds(onBattery: power.onBattery)
+            let threshold = agentFinished ? min(base, completionGraceSeconds) : base
             let r = threshold - idleSeconds
             remaining = r
             if decision.canForceSleep, r <= 0 {
                 let reason =
                     agentFinished
                     ? "Watched work finished — putting Mac to sleep"
-                    : "Idle \(Int(s.idleThresholdMinutes)) min — putting Mac to sleep"
+                    : "Idle \(Int(threshold / 60)) min — putting Mac to sleep"
                 if forceSleep(reason: reason, bypassCooldown: false) {
                     // The agent-completion sleep is one-shot: clear the watch so
                     // it doesn't turn into a permanent 60s-idle aggressive-sleep
@@ -412,11 +400,11 @@ final class AppState: ObservableObject {
         // Nothing holding the Mac awake.
         mug = .free
         if !s.decaffeinateEnabled {
-            headline = "Free to sleep"
-            detail = "Monitoring only"
+            headline = "Monitoring only"
+            detail = "Auto-sleep is off — turn it on to force sleep when idle"
         } else {
             headline = "Free to sleep"
-            detail = "Nothing is blocking sleep"
+            detail = idleHint(for: s)
         }
         secondsUntilForcedSleep = nil
     }
@@ -424,7 +412,19 @@ final class AppState: ObservableObject {
     // MARK: Convenience for the UI
 
     var systemBlockerCount: Int { assertions.filter(\.blocksSystemSleep).count }
-    var displayBlockerCount: Int { assertions.filter { $0.kind == .displaySleep }.count }
+
+    /// A glanceable, always-true promise (shown when no live countdown is up):
+    /// how long after you step away the Mac will sleep.
+    var idleSleepHint: String {
+        let minutes = Int(settings.effectiveIdleSeconds(onBattery: power.onBattery) / 60)
+        let onBatteryNote =
+            (power.onBattery && settings.sleepSoonerOnBattery
+                && settings.batteryIdleThresholdMinutes < settings.idleThresholdMinutes)
+            ? " (on battery)" : ""
+        return "Sleeps ~\(minutes) min after you step away\(onBatteryNote)"
+    }
+
+    private func idleHint(for settings: DecaffeinateSettings) -> String { idleSleepHint }
 
     /// "for 12m" since the assertion was created, if known.
     func heldDuration(_ assertion: PowerAssertion) -> String? {

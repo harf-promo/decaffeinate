@@ -4,15 +4,27 @@ import SwiftUI
 /// 9:32" / "Chrome is keeping your Mac awake"), and live status chips.
 struct StatusCardView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.colorScheme) private var colorScheme
 
     private var tint: Color {
+        // The most urgent conditions escalate the whole card to red, regardless
+        // of mug state.
+        if appState.thermalState == .critical { return .red }
+        if appState.power.onBattery, let pct = appState.power.chargePercent,
+            pct < appState.settings.batteryFloorPercent
+        {
+            return .red
+        }
         switch appState.mug {
         case .free: return .green
         case .counting: return .accentColor
         case .blocked: return .orange
-        case .caffeinated: return .yellow
+        case .caffeinated: return .purple
         }
     }
+
+    /// Color washes need a touch more presence in dark mode to keep grouping.
+    private var washOpacity: Double { colorScheme == .dark ? 0.16 : 0.09 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -21,6 +33,7 @@ struct StatusCardView: View {
                     .renderingMode(.template)
                     .foregroundStyle(tint)
                     .frame(width: 34)
+                    .accessibilityLabel(appState.mug.accessibilityLabel)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(appState.headline)
@@ -41,7 +54,7 @@ struct StatusCardView: View {
             chips
         }
         .padding(12)
-        .background(tint.opacity(0.08))
+        .background(tint.opacity(washOpacity))
     }
 
     private var chips: some View {

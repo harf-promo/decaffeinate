@@ -95,6 +95,18 @@ struct PowerAssertion: Identifiable, Hashable, Sendable {
         guard realOwner != nil else { return nil }
         return "via \(ownerName)"
     }
+
+    /// The "·"-joined secondary line shown under the app name in the list/CLI.
+    /// `held` is the caller-supplied "for 12m"; `includePID` adds the raw PID
+    /// (developer detail, off in the friendly menu).
+    func subtitle(held: String?, includePID: Bool) -> String {
+        var parts: [String] = [kind.label]
+        if let attribution { parts.append(attribution) }
+        if name != "Unnamed", !name.isEmpty { parts.append("“\(name)”") }
+        if let held { parts.append(held) }
+        if includePID { parts.append("PID \(pid)") }
+        return parts.joined(separator: " · ")
+    }
 }
 
 /// IOKit assertion-type string constants. Kept here so the rest of the codebase

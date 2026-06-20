@@ -39,25 +39,15 @@ private struct ShowcaseRow: View {
                 Text(assertion.displayName)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
-                Text(subtitle)
+                Text(assertion.subtitle(held: appState.heldDuration(assertion), includePID: false))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
             Spacer(minLength: 4)
             Image(systemName: "ellipsis.circle").foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
-    }
-
-    private var subtitle: String {
-        var parts: [String] = [assertion.kind.label]
-        if let attribution = assertion.attribution { parts.append(attribution) }
-        if assertion.name != "Unnamed", !assertion.name.isEmpty {
-            parts.append("“\(assertion.name)”")
-        }
-        if let held = appState.heldDuration(assertion) { parts.append(held) }
-        return parts.joined(separator: " · ")
     }
 }

@@ -19,10 +19,22 @@ APP_NAME="Decaffeinate"
 BUILD_DIR="build"
 APP_BUNDLE="${BUILD_DIR}/${APP_NAME}.app"
 
-echo "▸ Building (${CONFIG}) …"
-swift build -c "${CONFIG}"
+# Release builds are universal (Intel + Apple Silicon); debug stays host-arch for
+# fast local iteration. Override with UNIVERSAL=1 / UNIVERSAL=0.
+UNIVERSAL="${UNIVERSAL:-$([[ "${CONFIG}" == "release" ]] && echo 1 || echo 0)}"
+ARCH_FLAGS=()
+if [[ "${UNIVERSAL}" == "1" ]]; then
+    ARCH_FLAGS=(--arch arm64 --arch x86_64)
+    echo "▸ Building (${CONFIG}, universal arm64+x86_64) …"
+else
+    echo "▸ Building (${CONFIG}) …"
+fi
+# `${arr[@]+"${arr[@]}"}` expands safely even for an empty array under `set -u`
+# on macOS's bash 3.2.
+swift build -c "${CONFIG}" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
 
-BIN_PATH="$(swift build -c "${CONFIG}" --show-bin-path)/${APP_NAME}"
+BIN_DIR="$(swift build -c "${CONFIG}" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)"
+BIN_PATH="${BIN_DIR}/${APP_NAME}"
 if [[ ! -f "${BIN_PATH}" ]]; then
     echo "✗ Executable not found at ${BIN_PATH}" >&2
     exit 1
@@ -43,8 +55,7 @@ else
 fi
 
 # Embed Sparkle.framework (the executable links @rpath/Sparkle.framework and has
-# an @executable_path/../Frameworks rpath).
-BIN_DIR="$(swift build -c "${CONFIG}" --show-bin-path)"
+# an @executable_path/../Frameworks rpath). BIN_DIR was resolved above.
 FRAMEWORK="${BIN_DIR}/Sparkle.framework"
 if [[ -d "${FRAMEWORK}" ]]; then
     echo "▸ Embedding Sparkle.framework …"
