@@ -4,24 +4,20 @@ Decaffeinate v1 does one thing well: it tells you what's keeping your Mac awake
 and puts it to sleep when it should. Here's where we want to take it — and where
 **you** can jump in. Items tagged 🙋 are especially good for new contributors.
 
-## Done (1.1.0)
+## Shipped
 
-- [x] **Agentic completion detection** — watch a process tree's CPU + assertion
-  lifecycle and sleep once the work finishes.
-- [x] **Assertion attribution** — shared-daemon holds traced to the real app.
-- [x] **Notarized DMG + Homebrew pipeline** — signing, `make-dmg`, tag-triggered
-  `release.yml`, and a cask (publishing a signed build needs the maintainer's
-  Developer-ID secrets — see `docs/DISTRIBUTION.md`).
-- [x] **Custom allow durations** + an injectable, integration-tested decision loop.
+**1.1.0** — agentic completion detection; assertion attribution; custom allow
+durations; an injectable, integration-tested decision loop; and the full
+**signed + notarized DMG → GitHub Release → Homebrew** pipeline.
+
+**1.2.0** — **Sparkle auto-update** (EdDSA-signed appcast, generated in
+`release.yml`); **custom menu-bar mug icons**; README screenshots.
 
 ## Near term
 
-- [ ] **Auto-update** — Sparkle 2.x (EdDSA appcast generated in `release.yml`).
-- [ ] **Submit to homebrew/cask core** (needs pinned `sha256` + a public release).
-- [ ] 🙋 **README screenshots** of the menu, list, and settings.
+- [ ] **Submit to homebrew/cask core** (removes the one-time `brew trust`).
+- [ ] **Universal binary** — currently Apple Silicon only; add an `x86_64` slice.
 - [ ] 🙋 **Onboarding** — a first-run explainer of what the app does and why it's safe.
-- [ ] 🙋 **Richer menu-bar icons** — true "empty / filling / warning" mug states as a
-  custom icon set instead of SF Symbols.
 
 ## Smarter sleep
 
