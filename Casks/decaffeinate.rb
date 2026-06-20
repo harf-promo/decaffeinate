@@ -5,7 +5,9 @@
 # edits; submitting to homebrew/cask core later requires a real sha256 (it's
 # printed by Scripts/make-dmg.sh and published as SHA256SUMS.txt on each release).
 cask "decaffeinate" do
-  version "1.0.0"
+  # Keep `version` in lock-step with the released tag (the release process / tap
+  # maintainer bumps it) so the URL below resolves to a real DMG.
+  version "1.1.0"
   sha256 :no_check
 
   url "https://github.com/harf-promo/decaffeinate/releases/download/v#{version}/Decaffeinate-#{version}.dmg"

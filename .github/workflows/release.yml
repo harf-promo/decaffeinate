@@ -30,18 +30,31 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Preflight — secrets present?
+      - name: Preflight — all signing secrets present?
         env:
           CERT: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+          DEV_ID: ${{ secrets.DEVELOPER_ID_NAME }}
+          NKEY: ${{ secrets.NOTARY_KEY_P8 }}
+          NKEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
-          if [ -z "$CERT" ]; then
-            echo "::error::Signing secrets are not configured. See docs/DISTRIBUTION.md."
+          missing=""
+          for name in CERT CERT_PASSWORD DEV_ID NKEY NKEY_ID NISSUER; do
+            [ -z "${!name}" ] && missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing signing secrets:$missing — see docs/DISTRIBUTION.md."
             exit 1
           fi
 
       - name: Set version from tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$'; then
+            echo "::error::Tag '${GITHUB_REF_NAME}' is not a valid version (expected vMAJOR.MINOR.PATCH)."
+            exit 1
+          fi
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Resources/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" Resources/Info.plist
 

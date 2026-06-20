@@ -90,13 +90,28 @@ struct Rule: Identifiable, Codable, Hashable, Sendable {
     }
 
     func matches(_ assertion: PowerAssertion) -> Bool {
+        // Match either the owning process or, for holds routed through a shared
+        // daemon, the attributed real owner — so "Always allow" on the app the
+        // user actually sees ("Safari (via runningboardd)") keeps working.
+        if matchesIdentity(bundle: assertion.bundleIdentifier, process: assertion.processName) {
+            return true
+        }
+        if let owner = assertion.realOwner,
+            matchesIdentity(bundle: owner.bundleIdentifier, process: owner.name)
+        {
+            return true
+        }
+        return false
+    }
+
+    private func matchesIdentity(bundle: String?, process: String) -> Bool {
         // A bundle-scoped rule must match by bundle id — never fall back to the
         // process name, or it would also catch unrelated nil-bundle daemons that
         // happen to share the executable name.
         if let bundleIdentifier {
-            guard let other = assertion.bundleIdentifier else { return false }
-            return bundleIdentifier.caseInsensitiveCompare(other) == .orderedSame
+            guard let bundle else { return false }
+            return bundleIdentifier.caseInsensitiveCompare(bundle) == .orderedSame
         }
-        return processName.caseInsensitiveCompare(assertion.processName) == .orderedSame
+        return processName.caseInsensitiveCompare(process) == .orderedSame
     }
 }

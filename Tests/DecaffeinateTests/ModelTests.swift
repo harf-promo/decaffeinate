@@ -21,6 +21,24 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(rule.matches(Fixtures.assertion(process: "App", bundle: "com.other.App")))
     }
 
+    func testRuleMatchesAttributedRealOwner() {
+        // A rule keyed on the real app (Safari) should match a hold whose direct
+        // owner is a shared daemon but whose realOwner is Safari.
+        let rule = Rule(
+            bundleIdentifier: "com.apple.Safari", processName: "Safari",
+            displayName: "Safari", policy: .allow)
+        let daemonHold = Fixtures.assertion(
+            process: "runningboardd", bundle: nil,
+            realOwner: AssertionOwner(name: "Safari", bundleIdentifier: "com.apple.Safari"))
+        XCTAssertTrue(rule.matches(daemonHold))
+
+        // And it should NOT match an unrelated daemon hold.
+        let other = Fixtures.assertion(
+            process: "runningboardd", bundle: nil,
+            realOwner: AssertionOwner(name: "Music", bundleIdentifier: "com.apple.Music"))
+        XCTAssertFalse(rule.matches(other))
+    }
+
     func testBundlelessRuleMatchesByProcessName() {
         let rule = Rule(
             bundleIdentifier: nil,

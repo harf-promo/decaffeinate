@@ -9,7 +9,8 @@ enum Fixtures {
         bundle: String? = "com.example.TestApp",
         type: String = AssertionType.preventUserIdleSystemSleep,
         name: String = "Test assertion",
-        created: Date? = nil
+        created: Date? = nil,
+        realOwner: AssertionOwner? = nil
     ) -> PowerAssertion {
         PowerAssertion(
             id: "\(pid)-\(type)",
@@ -19,7 +20,8 @@ enum Fixtures {
             assertionType: type,
             name: name,
             kind: AssertionType.classify(type),
-            createdAt: created
+            createdAt: created,
+            realOwner: realOwner
         )
     }
 

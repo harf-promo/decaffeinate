@@ -101,11 +101,31 @@ struct TelemetryEngine {
             }
         }
 
-        // Otherwise parse the assertion name, and trust it only if it resolves
-        // to a real installed app.
-        if let hint = AssertionAttributor.bundleIDHint(inName: assertionName),
-            let app = localizedAppName(forBundleID: hint)
-        {
+        // Otherwise parse the assertion name and resolve it to the *canonical*
+        // top-level app, so e.g. `com.google.Chrome.helper` maps to Google
+        // Chrome, not a helper sub-bundle.
+        if let hint = AssertionAttributor.bundleIDHint(inName: assertionName) {
+            return canonicalOwner(forHint: hint)
+        }
+        return nil
+    }
+
+    /// Walk reverse-DNS prefixes of `hint` shortest-first and return the first
+    /// that resolves to an installed top-level app — so the canonical app id wins
+    /// over a `.helper` / `.gpu` sub-bundle, and framework/XPC bundles are
+    /// rejected entirely.
+    private func canonicalOwner(forHint hint: String) -> AssertionOwner? {
+        let segments = hint.split(separator: ".").map(String.init)
+        if segments.count >= 3 {
+            for count in 3...segments.count {
+                let candidate = segments.prefix(count).joined(separator: ".")
+                if let app = topLevelAppName(forBundleID: candidate) {
+                    return AssertionOwner(name: app, bundleIdentifier: candidate)
+                }
+            }
+            return nil
+        }
+        if let app = topLevelAppName(forBundleID: hint) {
             return AssertionOwner(name: app, bundleIdentifier: hint)
         }
         return nil

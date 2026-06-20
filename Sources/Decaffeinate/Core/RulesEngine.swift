@@ -71,10 +71,14 @@ final class RulesEngine: ObservableObject {
     }
 
     func setPolicy(_ policy: RulePolicy, for assertion: PowerAssertion) {
+        // Key the rule on the attributed real owner when present (so allowing
+        // "Safari (via runningboardd)" creates a rule for Safari, not for the
+        // shared daemon, which would be far too broad).
         upsert(
             Rule(
-                bundleIdentifier: assertion.bundleIdentifier,
-                processName: assertion.processName,
+                bundleIdentifier: assertion.realOwner?.bundleIdentifier
+                    ?? assertion.bundleIdentifier,
+                processName: assertion.realOwner?.name ?? assertion.processName,
                 displayName: assertion.displayName,
                 policy: policy
             )

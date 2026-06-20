@@ -348,7 +348,12 @@ final class AppState: ObservableObject {
     }
 
     private func key(_ assertion: PowerAssertion) -> String {
-        assertion.bundleIdentifier?.lowercased() ?? assertion.processName.lowercased()
+        // Key on the attributed real owner when present, so the firewall queue
+        // dedups and notifies per real app rather than per shared daemon.
+        if let owner = assertion.realOwner {
+            return (owner.bundleIdentifier ?? owner.name).lowercased()
+        }
+        return assertion.bundleIdentifier?.lowercased() ?? assertion.processName.lowercased()
     }
 
     // MARK: Derived UI state

@@ -89,6 +89,22 @@ final class RulesEngineTests: XCTestCase {
         XCTAssertNil(engine.policy(for: Fixtures.assertion(bundle: "com.unknown.app")))
     }
 
+    func testSetPolicyKeysOnRealOwner() {
+        let (engine, _, cleanup) = makeEngine()
+        defer { cleanup() }
+        // Allowing an attributed hold should create a rule for the real app…
+        let attributed = Fixtures.assertion(
+            process: "runningboardd", bundle: nil,
+            realOwner: AssertionOwner(name: "Safari", bundleIdentifier: "com.apple.Safari"))
+        engine.setPolicy(.allow, for: attributed)
+
+        let rule = engine.rules.first
+        XCTAssertEqual(rule?.bundleIdentifier, "com.apple.Safari")
+        // …and it must NOT be keyed on the shared daemon.
+        XCTAssertNotEqual(rule?.processName, "runningboardd")
+        XCTAssertTrue(engine.isActivelyAllowed(attributed))
+    }
+
     func testHasEffectiveDecision() {
         let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()

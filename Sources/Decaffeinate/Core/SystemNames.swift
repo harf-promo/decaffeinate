@@ -51,3 +51,22 @@ func localizedAppName(forBundleID bundleID: String) -> String? {
     let trimmed = (name as NSString).deletingPathExtension
     return trimmed.isEmpty ? nil : trimmed
 }
+
+/// Like ``localizedAppName(forBundleID:)`` but only for a *top-level* application
+/// — rejects helper/XPC/framework sub-bundles nested inside another app. Used
+/// for assertion attribution so a hold isn't mislabelled as "Google Chrome
+/// Helper" instead of "Google Chrome".
+func topLevelAppName(forBundleID bundleID: String) -> String? {
+    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+        return nil
+    }
+    let path = url.path
+    guard path.hasSuffix(".app") else { return nil }
+    let nestedMarkers = [
+        "/Contents/Frameworks/", "/Contents/Helpers/", "/XPCServices/", "/PlugIns/",
+    ]
+    if nestedMarkers.contains(where: { path.contains($0) }) { return nil }
+    let name = FileManager.default.displayName(atPath: path)
+    let trimmed = (name as NSString).deletingPathExtension
+    return trimmed.isEmpty ? nil : trimmed
+}
