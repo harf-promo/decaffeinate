@@ -36,15 +36,13 @@ enum AssertionAttributor {
             }
         }
 
-        // Prefer a real-app-looking id over WebKit/XPC infrastructure ids.
+        // Return a real-app-looking id; never fall back to a WebKit/XPC
+        // infrastructure id (those aren't real owners and would mis-attribute).
         let infrastructure = ["webkit", ".gpu", ".xpc", "xpcservice", "runningboard"]
-        if let appLike = candidates.first(where: { candidate in
+        return candidates.first { candidate in
             let lower = candidate.lowercased()
             return !infrastructure.contains { lower.contains($0) }
-        }) {
-            return appLike
         }
-        return candidates.first
     }
 
     /// Trim an over-qualified id like `com.apple.Safari.821279.822163` down to the

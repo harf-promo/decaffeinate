@@ -52,21 +52,28 @@ func localizedAppName(forBundleID bundleID: String) -> String? {
     return trimmed.isEmpty ? nil : trimmed
 }
 
-/// Like ``localizedAppName(forBundleID:)`` but only for a *top-level* application
-/// — rejects helper/XPC/framework sub-bundles nested inside another app. Used
-/// for assertion attribution so a hold isn't mislabelled as "Google Chrome
-/// Helper" instead of "Google Chrome".
-func topLevelAppName(forBundleID bundleID: String) -> String? {
-    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+/// Display name of a bundle id **only if it's a currently-running regular app**
+/// (`.regular` activation policy). This is the robust gate for assertion
+/// attribution: real owners like Safari / Chrome / WhatsApp are regular running
+/// apps, while XPC services (`com.apple.WebKit.GPU`), daemons (`corespeechd`),
+/// and helper sub-bundles (`…Chrome.helper`) are not — so they're rejected.
+func runningRegularAppName(forBundleID bundleID: String) -> String? {
+    let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+    guard let app = apps.first(where: { $0.activationPolicy == .regular }),
+        let name = app.localizedName, !name.isEmpty
+    else {
         return nil
     }
-    let path = url.path
-    guard path.hasSuffix(".app") else { return nil }
-    let nestedMarkers = [
-        "/Contents/Frameworks/", "/Contents/Helpers/", "/XPCServices/", "/PlugIns/",
-    ]
-    if nestedMarkers.contains(where: { path.contains($0) }) { return nil }
-    let name = FileManager.default.displayName(atPath: path)
-    let trimmed = (name as NSString).deletingPathExtension
-    return trimmed.isEmpty ? nil : trimmed
+    return name
+}
+
+/// The owning app for a PID, but only if it's a regular running app.
+func runningRegularApp(forPID pid: pid_t) -> (name: String, bundleID: String?)? {
+    guard let app = NSRunningApplication(processIdentifier: pid),
+        app.activationPolicy == .regular,
+        let name = app.localizedName, !name.isEmpty
+    else {
+        return nil
+    }
+    return (name, app.bundleIdentifier)
 }

@@ -92,18 +92,15 @@ struct TelemetryEngine {
     ) -> AssertionOwner? {
         guard AssertionAttributor.isSharedDaemon(ownerProcessName) else { return nil }
 
-        // Prefer the explicit on-behalf-of PID when present and distinct.
-        if let behalf = onBehalfOfPID, behalf > 0, behalf != ownerPID {
-            let resolvedName = processName(forPID: behalf)
-            let resolvedBundle = bundleIdentifier(forPID: behalf)
-            if !resolvedName.hasPrefix("PID ") {
-                return AssertionOwner(name: resolvedName, bundleIdentifier: resolvedBundle)
-            }
+        // Prefer the explicit on-behalf-of PID, but only if it's a regular app.
+        if let behalf = onBehalfOfPID, behalf > 0, behalf != ownerPID,
+            let app = runningRegularApp(forPID: behalf)
+        {
+            return AssertionOwner(name: app.name, bundleIdentifier: app.bundleID)
         }
 
         // Otherwise parse the assertion name and resolve it to the *canonical*
-        // top-level app, so e.g. `com.google.Chrome.helper` maps to Google
-        // Chrome, not a helper sub-bundle.
+        // running app, so e.g. `com.google.Chrome.helper` maps to Google Chrome.
         if let hint = AssertionAttributor.bundleIDHint(inName: assertionName) {
             return canonicalOwner(forHint: hint)
         }
@@ -111,22 +108,18 @@ struct TelemetryEngine {
     }
 
     /// Walk reverse-DNS prefixes of `hint` shortest-first and return the first
-    /// that resolves to an installed top-level app — so the canonical app id wins
-    /// over a `.helper` / `.gpu` sub-bundle, and framework/XPC bundles are
-    /// rejected entirely.
+    /// that is a **currently-running regular app** — so the canonical app id wins
+    /// over a `.helper` / `.gpu` sub-bundle, and XPC services, daemons, and
+    /// framework bundles (which aren't regular running apps) are rejected.
     private func canonicalOwner(forHint hint: String) -> AssertionOwner? {
         let segments = hint.split(separator: ".").map(String.init)
-        if segments.count >= 3 {
-            for count in 3...segments.count {
-                let candidate = segments.prefix(count).joined(separator: ".")
-                if let app = topLevelAppName(forBundleID: candidate) {
-                    return AssertionOwner(name: app, bundleIdentifier: candidate)
-                }
+        let start = max(2, min(3, segments.count))
+        guard segments.count >= start else { return nil }
+        for count in start...segments.count {
+            let candidate = segments.prefix(count).joined(separator: ".")
+            if let app = runningRegularAppName(forBundleID: candidate) {
+                return AssertionOwner(name: app, bundleIdentifier: candidate)
             }
-            return nil
-        }
-        if let app = topLevelAppName(forBundleID: hint) {
-            return AssertionOwner(name: app, bundleIdentifier: hint)
         }
         return nil
     }
