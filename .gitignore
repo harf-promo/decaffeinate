@@ -1,0 +1,29 @@
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Build output
+build/
+*.app
+DerivedData/
+
+# Generated icon intermediates (the committed assets/AppIcon.icns is kept)
+assets/AppIcon.iconset/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Editors
+.idea/
+.vscode/
+
+# Original product brief — kept local, superseded by docs/
+Product Requirement Document (PRD) - Decaffeinate.md

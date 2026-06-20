@@ -1,0 +1,41 @@
+name: 🐛 Bug report
+description: Something isn't working the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping make Decaffeinate better! Please fill in what you can.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+      placeholder: "I stepped away for 15 minutes but the Mac stayed awake because…"
+    validations:
+      required: true
+  - type: textarea
+    id: scan
+    attributes:
+      label: Output of `Decaffeinate --scan`
+      description: Run it in Terminal while the problem is happening, if you can.
+      render: shell
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.5 (Sonoma) / 15.0 (Sequoia)"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Mac model
+      placeholder: "MacBook Pro 14” M3, MacBook Air M2, …"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …

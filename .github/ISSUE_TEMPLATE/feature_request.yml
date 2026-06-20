@@ -1,0 +1,32 @@
+name: 💡 Feature request
+description: Suggest an idea for Decaffeinate
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Focus on the need, not just the solution.
+      placeholder: "When my agent finishes a long job, I want the Mac to…"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How might Decaffeinate solve it?
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fits Decaffeinate's principles?
+      description: We keep the core honest. Check any that apply to your idea.
+      options:
+        - label: No private APIs, kernel extensions, or root requirement
+        - label: No network calls or telemetry
+        - label: Respects the safety rails (media, backup, update, battery, thermal)
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Would you like to help build it?
+      options:
+        - label: I'd be up for opening a PR for this
