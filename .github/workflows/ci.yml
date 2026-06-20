@@ -15,7 +15,7 @@ jobs:
     name: Build & test (macOS, Swift 6)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Select latest stable Xcode
         uses: maxim-lobanov/setup-xcode@v1
