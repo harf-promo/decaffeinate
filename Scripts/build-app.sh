@@ -42,9 +42,34 @@ else
     echo "  (no assets/AppIcon.icns — run: swift Scripts/generate-icon.swift)"
 fi
 
+# Embed Sparkle.framework (the executable links @rpath/Sparkle.framework and has
+# an @executable_path/../Frameworks rpath).
+BIN_DIR="$(swift build -c "${CONFIG}" --show-bin-path)"
+FRAMEWORK="${BIN_DIR}/Sparkle.framework"
+if [[ -d "${FRAMEWORK}" ]]; then
+    echo "▸ Embedding Sparkle.framework …"
+    mkdir -p "${APP_BUNDLE}/Contents/Frameworks"
+    cp -R "${FRAMEWORK}" "${APP_BUNDLE}/Contents/Frameworks/"
+fi
+
 ENTITLEMENTS="Resources/Decaffeinate.entitlements"
+SPARKLE="${APP_BUNDLE}/Contents/Frameworks/Sparkle.framework"
 if [[ -n "${DEVELOPER_ID:-}" ]]; then
     echo "▸ Signing with Developer ID (hardened runtime) …"
+    if [[ -d "${SPARKLE}" ]]; then
+        # Sign Sparkle inside-out (notarization requires every nested binary signed).
+        V="${SPARKLE}/Versions/B"
+        for item in \
+            "${V}/XPCServices/Downloader.xpc" \
+            "${V}/XPCServices/Installer.xpc" \
+            "${V}/Updater.app" \
+            "${V}/Autoupdate" \
+            "${V}/Updater.app/Contents/MacOS/Updater"; do
+            [[ -e "${item}" ]] && codesign --force --options runtime --timestamp \
+                --sign "${DEVELOPER_ID}" "${item}"
+        done
+        codesign --force --options runtime --timestamp --sign "${DEVELOPER_ID}" "${SPARKLE}"
+    fi
     codesign --force --options runtime --timestamp \
         --entitlements "${ENTITLEMENTS}" \
         --sign "${DEVELOPER_ID}" "${APP_BUNDLE}"

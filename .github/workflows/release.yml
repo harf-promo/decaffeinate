@@ -121,6 +121,22 @@ jobs:
           xcrun stapler validate "$DMG"
           rm -f /tmp/notary.p8
 
+      - name: Generate signed appcast (Sparkle)
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "::warning::SPARKLE_PRIVATE_KEY not set — skipping appcast."; exit 0
+          fi
+          KEYFILE="$(mktemp)"; printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEYFILE"
+          BIN=".build/artifacts/sparkle/Sparkle/bin/generate_appcast"
+          STAGE="$(mktemp -d)"; cp build/Decaffeinate-*.dmg "$STAGE/"
+          "$BIN" --ed-key-file "$KEYFILE" \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/" \
+            "$STAGE"
+          cp "$STAGE/appcast.xml" build/appcast.xml
+          rm -f "$KEYFILE"; rm -rf "$STAGE"
+
       - name: Checksums
         run: |
           cd build
@@ -132,3 +148,5 @@ jobs:
         run: |
           gh release upload "${GITHUB_REF_NAME}" \
             build/Decaffeinate-*.dmg build/SHA256SUMS.txt --clobber
+          [ -f build/appcast.xml ] && gh release upload "${GITHUB_REF_NAME}" \
+            build/appcast.xml --clobber || true

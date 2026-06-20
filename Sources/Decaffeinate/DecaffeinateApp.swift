@@ -16,6 +16,7 @@ enum Main {
 struct DecaffeinateApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState.shared
+    @StateObject private var updater = UpdaterController()
 
     var body: some Scene {
         MenuBarExtra {
@@ -23,6 +24,7 @@ struct DecaffeinateApp: App {
                 .environmentObject(appState)
                 .environmentObject(appState.settingsStore)
                 .environmentObject(appState.rulesEngine)
+                .environmentObject(updater)
         } label: {
             Image(nsImage: MugIcon.image(for: appState.mug))
                 .renderingMode(.template)

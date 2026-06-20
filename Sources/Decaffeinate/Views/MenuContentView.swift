@@ -133,6 +133,7 @@ struct QuickActions: View {
 /// Footer: idle threshold, settings, quit.
 struct FooterView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var updater: UpdaterController
 
     var body: some View {
         HStack(spacing: 12) {
@@ -144,6 +145,15 @@ struct FooterView: View {
                 .foregroundStyle(.secondary)
             }
             Spacer()
+            if updater.isAvailable {
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.plain)
+                .help("Check for Updates…")
+            }
             SettingsLink {
                 Image(systemName: "gearshape")
             }

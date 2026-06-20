@@ -80,12 +80,22 @@ printed by `make-dmg.sh` and published as `SHA256SUMS.txt` on the GitHub release
 Submitting to **homebrew/cask core** later removes the `brew trust` step (and
 requires the pinned `sha256` + notarized artifact we already produce).
 
-## Auto-update (next)
+## Auto-update (Sparkle) — shipped
 
-Sparkle 2.x is the planned updater (works with SwiftPM once wrapped as a `.app`):
-add the SPM dependency, an `SPUStandardUpdaterController` + "Check for Updates…"
-menu item, an EdDSA key (public key in `Info.plist`), and an `appcast.xml`
-generated and signed in `release.yml`. Tracked as a follow-up.
+Sparkle 2.x is wired in:
+- SPM dependency in `Package.swift`; `Sparkle.framework` is embedded into the
+  `.app` by `build-app.sh` (and signed inside-out for Developer ID — verified
+  through notarization).
+- `UpdaterController` + a "Check for Updates…" item in the menu footer.
+- `Info.plist` carries `SUFeedURL`
+  (`…/releases/latest/download/appcast.xml`) and `SUPublicEDKey`.
+- The **EdDSA private key** is in 1Password (`Sparkle EdDSA Private Key
+  (Decaffeinate)`, Harf Promotions vault) and the `SPARKLE_PRIVATE_KEY` repo
+  secret. `release.yml` runs `generate_appcast` to publish a signed `appcast.xml`
+  on every release. Rotate by re-running `generate_keys` and updating both the
+  `SUPublicEDKey` and the secret.
+
+Updates roll out to 1.2.0 and later (the first Sparkle-enabled build).
 
 ## Want to own distribution?
 

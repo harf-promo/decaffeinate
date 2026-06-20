@@ -4,6 +4,17 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-06-20
+
+### Added
+- **Auto-update** via Sparkle 2.x — a "Check for Updates…" item in the menu, and
+  each release publishes an EdDSA-signed `appcast.xml` so the app keeps itself
+  current. (Updates roll to 1.2.0+; the bundle is Apple Silicon.)
+- **Custom menu-bar mug icons** — empty / half-full / steaming / bolt, replacing
+  the SF Symbols, drawn at runtime as template images.
+- **README screenshots** rendered deterministically via a hidden
+  `--render-previews` mode (no flaky popover capture).
+
 ## [1.1.0] — 2026-06-20
 
 The "make it real" release: distribution (signed + notarized DMG, Homebrew),

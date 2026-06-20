@@ -15,7 +15,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.0</string>
+    <string>1.2.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
@@ -28,5 +28,11 @@
     <false/>
     <key>NSSupportsSuddenTermination</key>
     <false/>
+    <key>SUFeedURL</key>
+    <string>https://github.com/harf-promo/decaffeinate/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>t8ABhQm2a5BQmzDaD+MGNFenm+A2j5UbaE7QXTwTwVI=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
 </dict>
 </plist>
