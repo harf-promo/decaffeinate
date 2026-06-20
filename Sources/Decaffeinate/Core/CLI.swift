@@ -23,6 +23,13 @@ enum CLI {
             printHelp()
             return true
         }
+        if let index = arguments.firstIndex(of: "--render-previews") {
+            let dir = arguments.indices.contains(index + 1) ? arguments[index + 1] : "assets"
+            print(
+                PreviewRenderer.renderAll(to: dir) ? "Rendered previews to \(dir)" : "Render failed"
+            )
+            return true
+        }
         return false
     }
 

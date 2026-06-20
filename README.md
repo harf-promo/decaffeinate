@@ -51,6 +51,18 @@ Keeping a Mac awake is a one-liner. **Knowing when it's safe to sleep — and ma
 
 ---
 
+## What it looks like
+
+<div align="center">
+<img src="assets/screenshot-menu.png" width="360" alt="Decaffeinate menu bar — the truth about what's keeping your Mac awake" />
+</div>
+
+The menu shows exactly what's holding your Mac awake — even tracing a hold routed
+through a shared daemon back to the real app (*Safari · via runningboardd*) — with
+one-click **Sleep Now**, auto-sleep, and keep-awake.
+
+---
+
 ## Features
 
 ### 🔎 The Truth Scanner
