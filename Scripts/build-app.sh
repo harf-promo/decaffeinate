@@ -5,9 +5,11 @@
 #   ./Scripts/build-app.sh            # release build → ./build/Decaffeinate.app
 #   CONFIG=debug ./Scripts/build-app.sh
 #
-# The resulting bundle is ad-hoc signed so it launches locally. For public
-# distribution you still need to sign with a Developer ID and notarize it
-# (see docs/DISTRIBUTION.md).
+# Signing:
+#   - default: ad-hoc signed so it launches locally.
+#   - set DEVELOPER_ID="Developer ID Application: Name (TEAMID)" to sign for
+#     distribution with the hardened runtime + entitlements (ready to notarize).
+# See docs/DISTRIBUTION.md.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -40,10 +42,18 @@ else
     echo "  (no assets/AppIcon.icns — run: swift Scripts/generate-icon.swift)"
 fi
 
-# Ad-hoc sign so Gatekeeper lets it run locally.
-echo "▸ Ad-hoc signing …"
-codesign --force --deep --sign - "${APP_BUNDLE}" >/dev/null 2>&1 || \
-    echo "  (codesign skipped/failed — bundle still runnable locally)"
+ENTITLEMENTS="Resources/Decaffeinate.entitlements"
+if [[ -n "${DEVELOPER_ID:-}" ]]; then
+    echo "▸ Signing with Developer ID (hardened runtime) …"
+    codesign --force --options runtime --timestamp \
+        --entitlements "${ENTITLEMENTS}" \
+        --sign "${DEVELOPER_ID}" "${APP_BUNDLE}"
+    codesign --verify --strict --verbose=2 "${APP_BUNDLE}"
+else
+    echo "▸ Ad-hoc signing (local use only) …"
+    codesign --force --deep --sign - "${APP_BUNDLE}" >/dev/null 2>&1 \
+        || echo "  (codesign skipped/failed — bundle still runnable locally)"
+fi
 
 echo "✓ Built ${APP_BUNDLE}"
 echo "  Run with:  open ${APP_BUNDLE}"

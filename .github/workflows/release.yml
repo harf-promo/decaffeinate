@@ -1,0 +1,98 @@
+name: Release
+
+# Builds, signs, notarizes, and publishes a DMG when a v* tag is pushed.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   DEVELOPER_ID_CERT_P12       base64 of your "Developer ID Application" .p12
+#   DEVELOPER_ID_CERT_PASSWORD  the .p12 export password
+#   DEVELOPER_ID_NAME           e.g. "Developer ID Application: Your Name (TEAMID)"
+#   NOTARY_KEY_P8               base64 of your App Store Connect API key (.p8)
+#   NOTARY_KEY_ID               the API key id
+#   NOTARY_ISSUER_ID            the API key issuer id
+# See docs/DISTRIBUTION.md for how to produce these.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, sign, notarize, publish
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Preflight — secrets present?
+        env:
+          CERT: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+        run: |
+          if [ -z "$CERT" ]; then
+            echo "::error::Signing secrets are not configured. See docs/DISTRIBUTION.md."
+            exit 1
+          fi
+
+      - name: Set version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" Resources/Info.plist
+
+      - name: Import signing certificate
+        env:
+          CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERT_P12" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 3600 build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm -f /tmp/cert.p12
+
+      - name: Build & sign app
+        env:
+          DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_NAME }}
+        run: ./Scripts/build-app.sh
+
+      - name: Package DMG
+        run: ./Scripts/make-dmg.sh
+
+      - name: Notarize & staple
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          echo "$NOTARY_KEY_P8" | base64 --decode > /tmp/notary.p8
+          DMG="$(ls build/Decaffeinate-*.dmg)"
+          xcrun notarytool submit "$DMG" \
+            --key /tmp/notary.p8 \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          rm -f /tmp/notary.p8
+
+      - name: Checksums
+        run: |
+          cd build
+          shasum -a 256 Decaffeinate-*.dmg | tee SHA256SUMS.txt
+
+      - name: Publish to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            build/Decaffeinate-*.dmg build/SHA256SUMS.txt --clobber
