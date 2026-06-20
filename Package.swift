@@ -21,6 +21,6 @@ let package = Package(
             name: "DecaffeinateTests",
             dependencies: ["Decaffeinate"],
             path: "Tests/DecaffeinateTests"
-        )
+        ),
     ]
 )

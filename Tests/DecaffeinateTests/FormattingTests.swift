@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import Decaffeinate
 
 final class FormattingTests: XCTestCase {

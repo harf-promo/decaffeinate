@@ -34,9 +34,11 @@ private struct GeneralSettings: View {
                         .frame(width: 52, alignment: .trailing)
                 }
                 .disabled(!store.settings.decaffeinateEnabled)
-                Text("When you step away, Decaffeinate forces sleep after this much idle time — even if an app is trying to keep the Mac awake.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "When you step away, Decaffeinate forces sleep after this much idle time — even if an app is trying to keep the Mac awake."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Section("Keep awake (optional)") {
@@ -75,10 +77,11 @@ private struct SafetySettings: View {
             Section("Battery & heat") {
                 HStack {
                     Text("Battery floor")
-                    Slider(value: Binding(
-                        get: { Double(store.settings.batteryFloorPercent) },
-                        set: { store.settings.batteryFloorPercent = Int($0) }
-                    ), in: 0...50, step: 5)
+                    Slider(
+                        value: Binding(
+                            get: { Double(store.settings.batteryFloorPercent) },
+                            set: { store.settings.batteryFloorPercent = Int($0) }
+                        ), in: 0...50, step: 5)
                     Text("\(store.settings.batteryFloorPercent)%")
                         .monospacedDigit()
                         .frame(width: 44, alignment: .trailing)
@@ -86,8 +89,10 @@ private struct SafetySettings: View {
                 Text("On battery, keep-awake holds are dropped below this charge.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Backpack guard (sleep if overheating)", isOn: s.thermalGuardEnabled)
-                Text("If the Mac gets thermally stressed — e.g. lid closed in a bag — all keep-awake holds are released and it sleeps immediately.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(
+                    "If the Mac gets thermally stressed — e.g. lid closed in a bag — all keep-awake holds are released and it sleeps immediately."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -145,8 +150,10 @@ private struct AdvancedSettings: View {
         Form {
             Section("Strict takeover") {
                 Toggle("Let Decaffeinate own the idle timer", isOn: s.strictTakeoverMode)
-                Text("Holds a system-sleep assertion so macOS never idle-sleeps on its own — Decaffeinate becomes the only thing that decides when to sleep. If it ever quits, normal macOS sleep resumes automatically.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(
+                    "Holds a system-sleep assertion so macOS never idle-sleeps on its own — Decaffeinate becomes the only thing that decides when to sleep. If it ever quits, normal macOS sleep resumes automatically."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -168,9 +175,11 @@ private struct AboutView: View {
             Text("Version \(AppInfo.version) · MIT Licensed")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
-            Link("github.com/harf-promo/decaffeinate",
-                 destination: URL(string: "https://github.com/harf-promo/decaffeinate")!)
-                .font(.caption)
+            Link(
+                "github.com/harf-promo/decaffeinate",
+                destination: URL(string: "https://github.com/harf-promo/decaffeinate")!
+            )
+            .font(.caption)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()

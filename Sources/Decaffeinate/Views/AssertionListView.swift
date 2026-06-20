@@ -14,8 +14,9 @@ struct AssertionListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SectionHeader("Keeping your Mac awake",
-                          trailing: appState.assertions.isEmpty ? "all clear" : nil)
+            SectionHeader(
+                "Keeping your Mac awake",
+                trailing: appState.assertions.isEmpty ? "all clear" : nil)
 
             if appState.assertions.isEmpty {
                 emptyState

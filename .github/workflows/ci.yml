@@ -27,6 +27,9 @@ jobs:
           swift --version
           xcodebuild -version
 
+      - name: Lint (swift-format)
+        run: swift format lint --strict --recursive --configuration .swift-format Sources Tests Package.swift
+
       - name: Build
         run: swift build -v
 

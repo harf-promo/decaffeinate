@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import Decaffeinate
 
 @MainActor
@@ -7,7 +8,8 @@ final class RulesEngineTests: XCTestCase {
     /// Build an isolated engine on the main actor (avoids constructing the
     /// `@MainActor` engine from XCTest's nonisolated `setUp`, which would send a
     /// non-Sendable `UserDefaults` across isolation under strict concurrency).
-    private func makeEngine() -> (engine: RulesEngine, defaults: UserDefaults, cleanup: () -> Void) {
+    private func makeEngine() -> (engine: RulesEngine, defaults: UserDefaults, cleanup: () -> Void)
+    {
         let suite = "decaffeinate.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         let engine = RulesEngine(defaults: defaults)
@@ -90,7 +92,7 @@ final class RulesEngineTests: XCTestCase {
     func testHasEffectiveDecision() {
         let (engine, _, cleanup) = makeEngine(); defer { cleanup() }
         let a = Fixtures.assertion()
-        XCTAssertFalse(engine.hasEffectiveDecision(for: a)) // unclassified
+        XCTAssertFalse(engine.hasEffectiveDecision(for: a))  // unclassified
 
         engine.setPolicy(.allow, for: a)
         XCTAssertTrue(engine.hasEffectiveDecision(for: a))

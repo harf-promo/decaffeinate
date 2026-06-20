@@ -1,6 +1,6 @@
-import Foundation
-import Combine
 import AppKit
+import Combine
+import Foundation
 
 /// Visual state of the menu-bar icon, mapped to the PRD's mug metaphor.
 enum MugState: Equatable {
@@ -38,15 +38,16 @@ enum MugState: Equatable {
 @MainActor
 final class AppState: ObservableObject {
 
-    // Dependencies
+    // Dependencies (injectable seams; default to the real engines in production)
     let settingsStore: SettingsStore
     let rulesEngine: RulesEngine
-    private let telemetry = TelemetryEngine()
-    private let idleMonitor = IdleMonitor()
-    private let powerReader = PowerSourceReader()
-    private let caffeine = CaffeineEngine()
-    private let notifier = Notifier()
-    private var sleepController = SleepController()
+    private let telemetry: any PowerAssertionScanning
+    private let idleMonitor: any IdleReading
+    private let powerReader: any PowerReading
+    private let caffeine: any KeepAwakeControlling
+    private let notifier: any BlockerNotifying
+    private let sleepController: any SystemSleeping
+    private let thermalProvider: () -> ProcessInfo.ThermalState
 
     // Live, published system state
     @Published private(set) var assertions: [PowerAssertion] = []
@@ -72,13 +73,33 @@ final class AppState: ObservableObject {
     private var notifiedBlockers: Set<String> = []
     private var suppressForceSleepUntil: Date?
 
-    /// Override hook for tests.
-    var now: () -> Date = { Date() }
+    /// Clock seam for tests.
+    private let now: () -> Date
 
-    init(settingsStore: SettingsStore = SettingsStore(),
-         rulesEngine: RulesEngine = RulesEngine()) {
+    init(
+        settingsStore: SettingsStore = SettingsStore(),
+        rulesEngine: RulesEngine = RulesEngine(),
+        telemetry: any PowerAssertionScanning = TelemetryEngine(),
+        idleMonitor: any IdleReading = IdleMonitor(),
+        powerReader: any PowerReading = PowerSourceReader(),
+        caffeine: any KeepAwakeControlling = CaffeineEngine(),
+        notifier: any BlockerNotifying = Notifier(),
+        sleepController: any SystemSleeping = SleepController(),
+        thermalProvider: @escaping () -> ProcessInfo.ThermalState = {
+            ProcessInfo.processInfo.thermalState
+        },
+        now: @escaping () -> Date = { Date() }
+    ) {
         self.settingsStore = settingsStore
         self.rulesEngine = rulesEngine
+        self.telemetry = telemetry
+        self.idleMonitor = idleMonitor
+        self.powerReader = powerReader
+        self.caffeine = caffeine
+        self.notifier = notifier
+        self.sleepController = sleepController
+        self.thermalProvider = thermalProvider
+        self.now = now
     }
 
     var settings: DecaffeinateSettings { settingsStore.settings }
@@ -149,10 +170,11 @@ final class AppState: ObservableObject {
         assertions = telemetry.scan()
         idleSeconds = idleMonitor.secondsSinceLastInput()
         power = powerReader.snapshot()
-        thermalState = ProcessInfo.processInfo.thermalState
+        thermalState = thermalProvider()
 
         let systemBlockers = assertions.filter(\.blocksSystemSleep)
-        let whitelistedAwake = systemBlockers
+        let whitelistedAwake =
+            systemBlockers
             .filter { rulesEngine.isActivelyAllowed($0) }
             .map(\.displayName)
             .removingDuplicates()
@@ -167,8 +189,10 @@ final class AppState: ObservableObject {
         self.decision = decision
 
         // 1) Reconcile keep-awake holds (caffeine + strict takeover).
-        let wantsAwake = (s.caffeinateEnabled || s.strictTakeoverMode) && !decision.shouldDropKeepAwake
-        let wantsDisplayAwake = s.caffeinateEnabled
+        let wantsAwake =
+            (s.caffeinateEnabled || s.strictTakeoverMode) && !decision.shouldDropKeepAwake
+        let wantsDisplayAwake =
+            s.caffeinateEnabled
             && s.caffeinateKeepsDisplayAwake
             && !decision.shouldDropKeepAwake
         caffeine.update(
@@ -184,8 +208,10 @@ final class AppState: ObservableObject {
         //    Respects the cooldown so a persistent condition can't spawn pmset
         //    every second or thrash sleep→wake→sleep.
         if decision.mustSleepNow {
-            if forceSleep(reason: decision.immediateSleepReasons.first ?? "Safety guard",
-                          bypassCooldown: false) {
+            if forceSleep(
+                reason: decision.immediateSleepReasons.first ?? "Safety guard",
+                bypassCooldown: false)
+            {
                 return
             }
         }
@@ -197,16 +223,19 @@ final class AppState: ObservableObject {
             let r = s.idleThresholdSeconds - idleSeconds
             remaining = r
             if decision.canForceSleep, r <= 0 {
-                if forceSleep(reason: "Idle \(Int(s.idleThresholdMinutes)) min — putting Mac to sleep",
-                              bypassCooldown: false) {
+                if forceSleep(
+                    reason: "Idle \(Int(s.idleThresholdMinutes)) min — putting Mac to sleep",
+                    bypassCooldown: false)
+                {
                     return
                 }
             }
         }
 
-        updateDerivedState(systemBlockers: systemBlockers,
-                           decision: decision,
-                           remaining: remaining)
+        updateDerivedState(
+            systemBlockers: systemBlockers,
+            decision: decision,
+            remaining: remaining)
     }
 
     // MARK: Force sleep
@@ -253,9 +282,18 @@ final class AppState: ObservableObject {
 
         for blocker in systemBlockers {
             let k = key(blocker)
-            // Skip only apps with a *currently effective* decision; an expired
-            // "allow for 1 hour" should surface again, not stay silently blocked.
-            guard !rulesEngine.hasEffectiveDecision(for: blocker) else { continue }
+            // Apps with a currently-effective decision (Allow / Block / live
+            // "allow 1h") are settled — leave them alone.
+            if rulesEngine.hasEffectiveDecision(for: blocker) { continue }
+            // A rule that exists but is no longer effective is a *lapsed*
+            // "allow for 1 hour": drop the stale rule and clear the notification
+            // suppression so the firewall re-prompts once. (A blocker the user
+            // merely dismissed has no rule, so it stays dismissed — `notifiedBlockers`
+            // keeps it out of the queue until it goes away on its own.)
+            if let lapsed = rulesEngine.rule(for: blocker) {
+                rulesEngine.remove(lapsed)
+                notifiedBlockers.remove(k)
+            }
             guard !notifiedBlockers.contains(k) else { continue }
             notifiedBlockers.insert(k)
             if !pendingClassification.contains(where: { key($0) == k }) {
@@ -271,16 +309,19 @@ final class AppState: ObservableObject {
 
     // MARK: Derived UI state
 
-    private func updateDerivedState(systemBlockers: [PowerAssertion],
-                                    decision: SafetyDecision,
-                                    remaining: TimeInterval?) {
+    private func updateDerivedState(
+        systemBlockers: [PowerAssertion],
+        decision: SafetyDecision,
+        remaining: TimeInterval?
+    ) {
         let s = settings
         let nonWhitelistedBlockers = systemBlockers.filter { !rulesEngine.isActivelyAllowed($0) }
 
         if s.caffeinateEnabled, caffeine.isActive {
             mug = .caffeinated
             headline = "Keeping your Mac awake"
-            detail = s.caffeinateKeepsDisplayAwake ? "Display stays on too" : "Display can still sleep"
+            detail =
+                s.caffeinateKeepsDisplayAwake ? "Display stays on too" : "Display can still sleep"
             secondsUntilForcedSleep = nil
             return
         }
@@ -288,11 +329,13 @@ final class AppState: ObservableObject {
         // Counting down to a forced sleep — only surfaced once the user has
         // actually stepped away (so we don't show "Sleeping in 9:59" mid-type).
         if s.decaffeinateEnabled, !s.caffeinateEnabled, decision.canForceSleep,
-           let remaining, idleSeconds >= 30 {
+            let remaining, idleSeconds >= 30
+        {
             secondsUntilForcedSleep = max(0, remaining)
             mug = .counting
             headline = "Sleeping in \(Format.countdown(remaining))"
-            detail = nonWhitelistedBlockers.isEmpty
+            detail =
+                nonWhitelistedBlockers.isEmpty
                 ? "You stepped away — winding down"
                 : "Overriding \(nonWhitelistedBlockers.count) sleep block\(nonWhitelistedBlockers.count == 1 ? "" : "s")"
             return
@@ -303,7 +346,8 @@ final class AppState: ObservableObject {
         if !nonWhitelistedBlockers.isEmpty {
             mug = .blocked
             let names = nonWhitelistedBlockers.map(\.displayName).removingDuplicates()
-            headline = names.count == 1
+            headline =
+                names.count == 1
                 ? "\(names[0]) is keeping your Mac awake"
                 : "\(names.count) apps are keeping your Mac awake"
             if !decision.canForceSleep, let reason = decision.holdForceSleepReasons.first {

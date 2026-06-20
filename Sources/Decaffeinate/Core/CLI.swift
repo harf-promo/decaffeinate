@@ -40,7 +40,9 @@ enum CLI {
         if blockers.isEmpty {
             print("☕️  Nothing is blocking *system* sleep.")
         } else {
-            print("☀️  \(blockers.count) assertion\(blockers.count == 1 ? "" : "s") are keeping this Mac awake:\n")
+            print(
+                "☀️  \(blockers.count) assertion\(blockers.count == 1 ? "" : "s") are keeping this Mac awake:\n"
+            )
             for a in blockers { printRow(a) }
         }
 

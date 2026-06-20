@@ -41,11 +41,13 @@ struct Rule: Identifiable, Codable, Hashable, Sendable {
     var displayName: String
     var policy: RulePolicy
 
-    init(id: UUID = UUID(),
-         bundleIdentifier: String?,
-         processName: String,
-         displayName: String,
-         policy: RulePolicy) {
+    init(
+        id: UUID = UUID(),
+        bundleIdentifier: String?,
+        processName: String,
+        displayName: String,
+        policy: RulePolicy
+    ) {
         self.id = id
         self.bundleIdentifier = bundleIdentifier
         self.processName = processName

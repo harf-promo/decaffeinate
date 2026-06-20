@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// User-tunable behaviour for the sleep engine, persisted to `UserDefaults` as
 /// one JSON blob. Defaults are deliberately *decaffeination-first*: out of the
@@ -79,7 +79,8 @@ final class SettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.key),
-           let decoded = try? JSONDecoder().decode(DecaffeinateSettings.self, from: data) {
+            let decoded = try? JSONDecoder().decode(DecaffeinateSettings.self, from: data)
+        {
             self.settings = decoded
         } else {
             self.settings = DecaffeinateSettings()

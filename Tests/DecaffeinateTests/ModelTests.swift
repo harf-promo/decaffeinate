@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import Decaffeinate
 
 final class ModelTests: XCTestCase {
@@ -6,23 +7,26 @@ final class ModelTests: XCTestCase {
     // MARK: Rule.matches
 
     func testBundleScopedRuleRequiresBundleMatch() {
-        let rule = Rule(bundleIdentifier: "com.example.App",
-                        processName: "App",
-                        displayName: "App",
-                        policy: .allow)
+        let rule = Rule(
+            bundleIdentifier: "com.example.App",
+            processName: "App",
+            displayName: "App",
+            policy: .allow)
         // Same process name but no bundle id (a daemon) must NOT match.
         XCTAssertFalse(rule.matches(Fixtures.assertion(process: "App", bundle: nil)))
         // Matching bundle id (even with a different process name) matches.
-        XCTAssertTrue(rule.matches(Fixtures.assertion(process: "Helper", bundle: "com.example.App")))
+        XCTAssertTrue(
+            rule.matches(Fixtures.assertion(process: "Helper", bundle: "com.example.App")))
         // Different bundle id does not.
         XCTAssertFalse(rule.matches(Fixtures.assertion(process: "App", bundle: "com.other.App")))
     }
 
     func testBundlelessRuleMatchesByProcessName() {
-        let rule = Rule(bundleIdentifier: nil,
-                        processName: "node",
-                        displayName: "node",
-                        policy: .ignore)
+        let rule = Rule(
+            bundleIdentifier: nil,
+            processName: "node",
+            displayName: "node",
+            policy: .ignore)
         XCTAssertTrue(rule.matches(Fixtures.assertion(process: "NODE", bundle: nil)))
         XCTAssertFalse(rule.matches(Fixtures.assertion(process: "python", bundle: nil)))
     }

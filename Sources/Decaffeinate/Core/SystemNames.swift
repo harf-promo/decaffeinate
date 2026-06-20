@@ -1,6 +1,6 @@
-import Foundation
 import AppKit
 import Darwin
+import Foundation
 
 /// Resolve a process executable name from its PID using `proc_pidpath`,
 /// falling back to `proc_name`. Returns the last path component (e.g. the
@@ -8,7 +8,8 @@ import Darwin
 /// becomes `Google Chrome`.
 func processName(forPID pid: pid_t) -> String {
     if let running = NSRunningApplication(processIdentifier: pid),
-       let localized = running.localizedName, !localized.isEmpty {
+        let localized = running.localizedName, !localized.isEmpty
+    {
         return localized
     }
 
@@ -42,7 +43,7 @@ func bundleIdentifier(forPID pid: pid_t) -> String? {
 
 /// Localized application display name for a bundle identifier, if one is
 /// installed. Used to turn `com.google.Chrome` into `Google Chrome`.
-func NSWorkspaceAppName(_ bundleID: String) -> String? {
+func localizedAppName(forBundleID bundleID: String) -> String? {
     guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
         return nil
     }

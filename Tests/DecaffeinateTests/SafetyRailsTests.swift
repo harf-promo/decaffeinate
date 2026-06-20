@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import Decaffeinate
 
 final class SafetyRailsTests: XCTestCase {
@@ -48,7 +49,7 @@ final class SafetyRailsTests: XCTestCase {
 
     func testBatteryBelowFloorDropsKeepAwake() {
         let power = PowerSnapshot(onBattery: true, charge: 0.15, isCharging: false)
-        let decision = evaluate(power: power) // default floor 20%
+        let decision = evaluate(power: power)  // default floor 20%
         XCTAssertTrue(decision.shouldDropKeepAwake)
         XCTAssertFalse(decision.mustSleepNow)
     }
@@ -92,7 +93,8 @@ final class SafetyRailsTests: XCTestCase {
     }
 
     func testSystemUpdateDetectedFromInstaller() {
-        let update = Fixtures.assertion(process: "softwareupdated", bundle: nil, name: "Install macOS")
+        let update = Fixtures.assertion(
+            process: "softwareupdated", bundle: nil, name: "Install macOS")
         XCTAssertTrue(SafetyRails.isSystemUpdateActive([update]))
         let decision = evaluate(assertions: [update])
         XCTAssertFalse(decision.canForceSleep)

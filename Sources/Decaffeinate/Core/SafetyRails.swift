@@ -44,7 +44,8 @@ enum SafetyRails {
             decision.dropKeepAwakeReasons.append("Thermal pressure is high")
         }
         if power.onBattery, let pct = power.chargePercent, pct < settings.batteryFloorPercent {
-            decision.dropKeepAwakeReasons.append("Battery below \(settings.batteryFloorPercent)% floor")
+            decision.dropKeepAwakeReasons.append(
+                "Battery below \(settings.batteryFloorPercent)% floor")
         }
 
         // --- Hold-off reasons for the idle force-sleep engine ---
@@ -90,9 +91,11 @@ enum SafetyRails {
         }
     }
 
-    private static func matches(_ assertion: PowerAssertion,
-                                processes: [String],
-                                keywords: [String]) -> Bool {
+    private static func matches(
+        _ assertion: PowerAssertion,
+        processes: [String],
+        keywords: [String]
+    ) -> Bool {
         let proc = assertion.processName.lowercased()
         if processes.contains(where: { proc == $0.lowercased() }) { return true }
         let haystack = (assertion.name + " " + assertion.processName).lowercased()

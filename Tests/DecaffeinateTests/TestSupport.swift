@@ -1,4 +1,5 @@
 import Foundation
+
 @testable import Decaffeinate
 
 enum Fixtures {

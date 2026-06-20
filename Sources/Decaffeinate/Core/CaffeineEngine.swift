@@ -46,11 +46,13 @@ final class CaffeineEngine {
         update(keepSystemAwake: false, keepDisplayAwake: false, reason: "")
     }
 
-    private func reconcile(hold: Bool,
-                           currentlyHolding: inout Bool,
-                           assertionID: inout IOPMAssertionID,
-                           type: String,
-                           reason: String) {
+    private func reconcile(
+        hold: Bool,
+        currentlyHolding: inout Bool,
+        assertionID: inout IOPMAssertionID,
+        type: String,
+        reason: String
+    ) {
         if hold, !currentlyHolding {
             var newID = IOPMAssertionID(0)
             let result = IOPMAssertionCreateWithName(

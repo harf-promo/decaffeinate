@@ -15,7 +15,8 @@ final class Notifier {
     func requestAuthorizationIfNeeded() {
         guard isBundled, !requested else { return }
         requested = true
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
+            granted, _ in
             Task { @MainActor in self.authorized = granted }
         }
     }

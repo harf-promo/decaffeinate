@@ -46,7 +46,7 @@ struct PowerAssertion: Identifiable, Hashable, Sendable {
     var blocksSystemSleep: Bool { kind == .systemSleep }
 
     var displayName: String {
-        if let bundleIdentifier, let app = NSWorkspaceAppName(bundleIdentifier) {
+        if let bundleIdentifier, let app = localizedAppName(forBundleID: bundleIdentifier) {
             return app
         }
         return processName

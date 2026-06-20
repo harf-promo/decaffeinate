@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Real entry point: dispatch headless CLI commands first, otherwise run the
 /// SwiftUI menu-bar app.

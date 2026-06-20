@@ -24,9 +24,9 @@ struct PowerSourceReader {
 
     func snapshot() -> PowerSnapshot {
         guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef],
-              let first = sources.first,
-              let description = IOPSGetPowerSourceDescription(blob, first)?
+            let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef],
+            let first = sources.first,
+            let description = IOPSGetPowerSourceDescription(blob, first)?
                 .takeUnretainedValue() as? [String: Any]
         else {
             return .unknown
@@ -37,7 +37,8 @@ struct PowerSourceReader {
 
         var charge: Double?
         if let current = description[kIOPSCurrentCapacityKey] as? Double,
-           let max = description[kIOPSMaxCapacityKey] as? Double, max > 0 {
+            let max = description[kIOPSMaxCapacityKey] as? Double, max > 0
+        {
             charge = current / max
         }
 

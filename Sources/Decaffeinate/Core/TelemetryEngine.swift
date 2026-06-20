@@ -6,7 +6,7 @@ import IOKit.pwr_mgt
 /// `kIOPMAssertionNameKey`), so they're centralized here. Values were verified
 /// empirically against the live API.
 enum AssertionDetailKey {
-    static let startWhen = "AssertStartWhen"     // Date the assertion was created
+    static let startWhen = "AssertStartWhen"  // Date the assertion was created
     static let assertionID = "AssertionId"
     static let globalUniqueID = "GlobalUniqueID"
     static let processName = "Process Name"
@@ -24,7 +24,7 @@ struct TelemetryEngine {
     func scan() -> [PowerAssertion] {
         var unmanaged: Unmanaged<CFDictionary>?
         guard IOPMCopyAssertionsByProcess(&unmanaged) == kIOReturnSuccess,
-              let byProcess = unmanaged?.takeRetainedValue() as? [NSNumber: [[String: Any]]]
+            let byProcess = unmanaged?.takeRetainedValue() as? [NSNumber: [[String: Any]]]
         else {
             return []
         }
@@ -41,7 +41,8 @@ struct TelemetryEngine {
                 let type = detail[kIOPMAssertionTypeKey as String] as? String ?? "Unknown"
                 let assertionName = detail[kIOPMAssertionNameKey as String] as? String ?? "Unnamed"
                 let created = detail[AssertionDetailKey.startWhen] as? Date
-                let assertionID = (detail[AssertionDetailKey.assertionID] as? Int)
+                let assertionID =
+                    (detail[AssertionDetailKey.assertionID] as? Int)
                     ?? (detail[AssertionDetailKey.globalUniqueID] as? Int)
 
                 result.append(
@@ -64,7 +65,8 @@ struct TelemetryEngine {
             if lhs.blocksSystemSleep != rhs.blocksSystemSleep {
                 return lhs.blocksSystemSleep
             }
-            return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
+                == .orderedAscending
         }
     }
 }

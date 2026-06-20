@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Stores and evaluates the firewall rule set (the whitelist / blacklist).
 ///
@@ -19,7 +19,8 @@ final class RulesEngine: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.key),
-           let decoded = try? JSONDecoder().decode([Rule].self, from: data) {
+            let decoded = try? JSONDecoder().decode([Rule].self, from: data)
+        {
             self.rules = decoded
         } else {
             self.rules = []

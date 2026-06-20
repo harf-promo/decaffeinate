@@ -47,7 +47,8 @@ struct FirewallPromptSection: View {
                     HStack(spacing: 6) {
                         Button("Allow") { appState.setPolicy(.allow, for: assertion) }
                         Button("1 hour") {
-                            appState.setPolicy(.allowUntil(Date().addingTimeInterval(3600)), for: assertion)
+                            appState.setPolicy(
+                                .allowUntil(Date().addingTimeInterval(3600)), for: assertion)
                         }
                         Button("Block") { appState.setPolicy(.ignore, for: assertion) }
                         Spacer()
@@ -100,7 +101,8 @@ struct QuickActions: View {
                 Spacer()
 
                 if appState.settings.decaffeinateEnabled, !appState.settings.caffeinateEnabled,
-                   let remaining = appState.secondsUntilForcedSleep, appState.idleSeconds >= 30 {
+                    let remaining = appState.secondsUntilForcedSleep, appState.idleSeconds >= 30
+                {
                     Text(Format.countdown(remaining))
                         .font(.system(.callout, design: .monospaced))
                         .foregroundStyle(.secondary)
@@ -126,9 +128,11 @@ struct FooterView: View {
     var body: some View {
         HStack(spacing: 12) {
             if let last = appState.lastSleepAt {
-                Label("Slept \(Format.relative(since: last))", systemImage: "clock.arrow.circlepath")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Label(
+                    "Slept \(Format.relative(since: last))", systemImage: "clock.arrow.circlepath"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
             Spacer()
             SettingsLink {

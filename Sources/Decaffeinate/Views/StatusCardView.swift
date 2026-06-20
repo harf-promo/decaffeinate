@@ -49,9 +49,10 @@ struct StatusCardView: View {
         HStack(spacing: 6) {
             // Power
             if appState.power.onBattery, let pct = appState.power.chargePercent {
-                Chip(systemImage: appState.power.isCharging ? "battery.100.bolt" : "battery.50",
-                     text: "\(pct)%",
-                     tint: pct < appState.settings.batteryFloorPercent ? .red : .secondary)
+                Chip(
+                    systemImage: appState.power.isCharging ? "battery.100.bolt" : "battery.50",
+                    text: "\(pct)%",
+                    tint: pct < appState.settings.batteryFloorPercent ? .red : .secondary)
             } else {
                 Chip(systemImage: "powerplug", text: "AC power")
             }
@@ -66,9 +67,10 @@ struct StatusCardView: View {
 
             // Blockers
             if appState.systemBlockerCount > 0 {
-                Chip(systemImage: "sun.max.fill",
-                     text: "\(appState.systemBlockerCount) holding awake",
-                     tint: .orange)
+                Chip(
+                    systemImage: "sun.max.fill",
+                    text: "\(appState.systemBlockerCount) holding awake",
+                    tint: .orange)
             }
             Spacer(minLength: 0)
         }
