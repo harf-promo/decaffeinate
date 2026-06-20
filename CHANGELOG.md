@@ -4,6 +4,28 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-06-20
+
+### Added
+- **Universal binary** — Intel **and** Apple Silicon (was arm64-only).
+- **Sleep sooner on battery** — a shorter idle threshold when unplugged (default 3 min).
+- The menu always shows the core promise ("Sleeps ~N min after you step away")
+  when no live countdown is up.
+
+### Changed
+- UX polish from a multi-agent review: keep-awake now visibly pauses auto-sleep;
+  clearer firewall labels ("Let it sleep" / "Not now") with a primary Allow; the
+  watcher is retitled "Sleep when a task finishes" with grouped candidates and an
+  always-visible explainer; assertion rows surface attribution + how long they've
+  been held instead of the PID.
+- Visuals: the status card escalates to red on overheating / low battery, a
+  distinct keep-awake hue, and dark-mode-aware tints; better section-header contrast.
+- Accessibility labels on all icon-only controls.
+- Honest precision: the only network call is the optional Sparkle update check.
+
+### Removed
+- Dead code and duplicated view logic (shared subtitle + allow-duration menu).
+
 ## [1.2.0] — 2026-06-20
 
 ### Added

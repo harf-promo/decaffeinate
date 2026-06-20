@@ -9,7 +9,7 @@ telemetry, so we take its trust boundary seriously.
 - ✅ Reads idle time via `CGEventSource` (duration only — never keystrokes).
 - ✅ Sleeps the Mac via `/usr/bin/pmset sleepnow`; keeps it awake via `IOPMAssertionCreateWithName`.
 - ✅ Stores settings and rules locally in `UserDefaults`.
-- ❌ **No** network calls, telemetry, analytics, or accounts.
+- ❌ **No** telemetry, analytics, or accounts. The only network request is the optional Sparkle update check (fetching a signed `appcast.xml`); disable updates for zero network activity.
 - ❌ **No** kernel extension, **no** private APIs, **no** root requirement.
 - ❌ **No** reading or modification of other processes' memory.
 

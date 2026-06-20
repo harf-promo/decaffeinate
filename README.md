@@ -8,6 +8,9 @@
 
 **Decaffeinate tells you the truth about what's keeping your Mac awake, and gives you the power to put it to sleep — even when rogue apps, stray `caffeinate` processes, and background tabs refuse to let go.**
 
+> ### Your AI agent finished an hour ago — but your MacBook never slept.
+> Decaffeinate is the fix.
+
 [![CI](https://github.com/harf-promo/decaffeinate/actions/workflows/ci.yml/badge.svg)](https://github.com/harf-promo/decaffeinate/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/macOS-14%2B-blue)
@@ -31,6 +34,12 @@ This happens constantly in the age of agentic coding. You kick off a long job in
 
 > On the very machine this was built on, a quick scan found **six** stray `caffeinate` processes silently holding the Mac awake. That's the problem, live.
 
+**Don't believe me? Run this in your terminal right now:**
+```sh
+pmset -g assertions | grep -c -i "Prevent.*Sleep"
+```
+Every match is something quietly voting to keep your Mac awake. Decaffeinate shows you *who* — and overrules them.
+
 **Decaffeinate is the firewall for sleep.** It watches every power assertion on your system, attributes each one to the real process behind it, and — when you've stepped away and nothing important is actually happening — **forces a clean, safe sleep** regardless of who's complaining.
 
 ---
@@ -44,8 +53,9 @@ This happens constantly in the age of agentic coding. You kick off a long job in
 | Force sleep **after you're idle**, overriding rogue holds |          ❌                     |        ✅         |
 | Show you **what's** keeping it awake (by process) |                 ❌                     |        ✅         |
 | Allow / block individual apps (a sleep firewall) |                  ❌                     |        ✅         |
+| **Sleep when your build / agent finishes** |                  ❌                     |        ✅         |
 | Battery-floor + overheating safety guards |                ➖                     |        ✅         |
-| Headless `--scan` from the terminal |                  ➖                     |        ✅         |
+| Headless `--scan` from the terminal |                  ❌                     |        ✅         |
 
 Keeping a Mac awake is a one-liner. **Knowing when it's safe to sleep — and making it happen without losing your work — is the hard, useful part.** That's the part we built.
 
@@ -139,7 +149,7 @@ Decaffeinate is deliberately boring under the hood — that's the point of trust
 - **It sleeps the Mac** by invoking `/usr/bin/pmset sleepnow` — the exact mechanism behind  > Apple menu → Sleep. The kernel performs a normal, safe sleep transition, so even apps holding "prevent idle sleep" are cleanly overridden.
 - **It keeps awake** (optional) with a standard `IOPMAssertionCreateWithName` hold, released the moment it's no longer wanted.
 
-**No kernel extension. No private APIs. No root. No network calls. No telemetry. No accounts.** Decaffeinate runs entirely in user space and reads only the system signals it needs to do its one job. Because it shells out to `pmset` and inspects system-wide process telemetry, it lives **outside** the App Store sandbox — distributed as open source you can read, build, and audit yourself. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
+**No kernel extension. No private APIs. No root. No telemetry. No accounts.** The only network request is the optional Sparkle update check (which fetches a signed appcast — turn it off and there's zero network). Decaffeinate runs entirely in user space and reads only the system signals it needs to do its one job. Because it shells out to `pmset` and inspects system-wide process telemetry, it lives **outside** the App Store sandbox — distributed as open source you can read, build, and audit yourself. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
 
 ---
 
@@ -149,34 +159,31 @@ Decaffeinate is **free, open source (MIT), and built in the open by [Harf Promo]
 
 **We want collaborators.** If you care about Mac internals, power management, clean SwiftUI, or just hate waking up to a hot, dead laptop — there is real, high-impact work here with your name on it.
 
-Areas where you can make a dent today:
+Open areas where you can make a dent today:
 
 | Area | What's needed | Good for |
 | --- | --- | --- |
-| 📦 **Distribution** | Developer-ID signing + notarization, a Homebrew cask, auto-update | DevOps / release engineers |
-| 🧬 **Assertion attribution** | Trace `coreaudiod` / `runningboardd` holds back to the *real* owner (the browser tab, the music app) | IOKit / systems hackers |
+| 🌍 **Localization** | Set up a string catalog and add a language | Anyone, anywhere |
+| 🗓 **Schedules & quiet windows** | "Never sleep 9–5", "stay awake until 3pm" | Swift devs |
+| 📊 **Sleep history & insights** | Persist forced sleeps + a "battery saved" estimate | Swift devs |
+| 🔀 **Triggers & automation** | Stay awake while app X runs / on AC / above a CPU % | Power users |
+| 👋 **Onboarding** | A friendly first-run explainer | Designers |
 | 🌡 **Deeper sensors** | SMC temperature & fan reads for a smarter Backpack Guard | Hardware-curious folks |
-| 🎨 **Design** | A richer menu-bar icon set, the dashboard, onboarding | Designers |
-| 🌍 **Localization** | Translations beyond English | Anyone, anywhere |
-| 🧪 **Testing** | More coverage, a sleep-simulation harness | QA / test engineers |
 | 📝 **Docs & advocacy** | Guides, blog posts, demo videos | Writers & creators |
 
-👉 **Start here:** read [`CONTRIBUTING.md`](CONTRIBUTING.md), browse the [roadmap](docs/ROADMAP.md), and look for [`good first issue`](https://github.com/harf-promo/decaffeinate/labels/good%20first%20issue) labels. Open a discussion, file an idea, or just send a PR. First-timers are genuinely welcome — we'll help you land your first contribution.
+**You can land your first PR in ~10 minutes.** The whole test suite runs with `swift test` — **no GUI, no Apple account, no signing** — so all the decision logic is contributable in minutes. Already shipped by contributors-to-be: agentic completion detection, assertion attribution, a signed/notarized/auto-updating release pipeline. Your name's next.
 
-> Star the repo if you want a Mac that sleeps when it should. It helps more people find it, and it tells us to keep building.
+👉 **Start here:** read [`CONTRIBUTING.md`](CONTRIBUTING.md), browse the [roadmap](docs/ROADMAP.md), and grab a [`good first issue`](https://github.com/harf-promo/decaffeinate/labels/good%20first%20issue). Open a discussion, file an idea, or just send a PR — first-timers are genuinely welcome.
+
+> ⭐️ Star the repo if you want a Mac that sleeps when it should. It helps more people find it — and tells us to keep building.
 
 ---
 
-## Roadmap (highlights)
+## Roadmap
 
-- [ ] Notarized DMG + Homebrew cask
-- [ ] Smarter agentic detection ("sleep when the build/agent finishes")
-- [ ] Per-app and per-time-of-day sleep schedules
-- [ ] Sleep history & battery-saved insights
-- [ ] Deeper assertion attribution (real owner behind shared daemons)
-- [ ] SMC thermal/fan integration
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · agentic "sleep when the build finishes" detection · assertion attribution · custom mug icons · universal (Intel + Apple Silicon) build.
 
-Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Next:** localization · schedules & quiet windows · sleep history & battery-saved insights · triggers/automation · first-run onboarding. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 

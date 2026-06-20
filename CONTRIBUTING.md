@@ -40,7 +40,7 @@ swift run Decaffeinate --scan   # sanity-check the scanner
 
 ## Development guidelines
 
-- **Keep the core honest.** No private APIs, no kernel extensions, no root requirements, no network calls, no telemetry. If a feature seems to need one of those, open a discussion first — there's almost always a public-API path.
+- **Keep the core honest.** No private APIs, no kernel extensions, no root requirements, no telemetry, and no network calls beyond the Sparkle update check. If a feature seems to need one of those, open a discussion first — there's almost always a public-API path.
 - **Pure logic stays testable.** Decision logic (safety rails, rules matching, formatting) lives in plain value types with no system dependencies, so it can be unit-tested. Please add tests for new logic of this kind.
 - **Match the surrounding style.** Swift API Design Guidelines, clear names, comments that explain *why*. Mark UI/observable types `@MainActor`.
 - **Safety first.** This app can put a Mac to sleep. Any change to the sleep-decision path must respect the safety rails (active media, Time Machine, updates, battery floor, thermal guard) and come with tests.
