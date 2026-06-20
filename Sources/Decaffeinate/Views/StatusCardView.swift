@@ -17,11 +17,10 @@ struct StatusCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                Image(systemName: appState.mug.systemImage)
-                    .font(.system(size: 26))
+                Image(nsImage: MugIcon.image(for: appState.mug, size: 28))
+                    .renderingMode(.template)
                     .foregroundStyle(tint)
                     .frame(width: 34)
-                    .symbolRenderingMode(.hierarchical)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(appState.headline)

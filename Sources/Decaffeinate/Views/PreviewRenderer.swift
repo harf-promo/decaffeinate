@@ -21,7 +21,21 @@ enum PreviewRenderer {
             .environmentObject(state.rulesEngine)
             .fixedSize()
         let ok = render(showcase, to: dir.appendingPathComponent("screenshot-menu.png"))
-        print("  menu showcase: \(ok ? "ok" : "FAILED")")
+
+        // Mug icon set strip (inspection + README).
+        let states: [MugState] = [.free, .counting, .blocked, .caffeinated]
+        let strip = HStack(spacing: 22) {
+            ForEach(0..<states.count, id: \.self) { i in
+                Image(nsImage: MugIcon.image(for: states[i], size: 44))
+                    .renderingMode(.template)
+                    .foregroundStyle(.primary)
+            }
+        }
+        .padding(20)
+        .background(.background)
+        let stripOK = render(strip, to: dir.appendingPathComponent("menubar-icons.png"))
+
+        print("  menu showcase: \(ok ? "ok" : "FAILED")  mug strip: \(stripOK ? "ok" : "FAILED")")
         return ok
     }
 

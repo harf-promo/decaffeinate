@@ -13,14 +13,7 @@ enum MugState: Equatable {
     /// Keep-awake is intentionally engaged. (Bolt.)
     case caffeinated
 
-    var systemImage: String {
-        switch self {
-        case .free: return "cup.and.saucer"
-        case .counting: return "cup.and.saucer.fill"
-        case .blocked: return "exclamationmark.triangle.fill"
-        case .caffeinated: return "bolt.fill"
-        }
-    }
+    // The glyph for each state is drawn by `MugIcon` (custom template mugs).
 
     var accessibilityLabel: String {
         switch self {

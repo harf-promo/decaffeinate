@@ -24,7 +24,8 @@ struct DecaffeinateApp: App {
                 .environmentObject(appState.settingsStore)
                 .environmentObject(appState.rulesEngine)
         } label: {
-            Image(systemName: appState.mug.systemImage)
+            Image(nsImage: MugIcon.image(for: appState.mug))
+                .renderingMode(.template)
                 .accessibilityLabel(appState.mug.accessibilityLabel)
         }
         .menuBarExtraStyle(.window)

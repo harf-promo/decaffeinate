@@ -61,6 +61,14 @@ The menu shows exactly what's holding your Mac awake — even tracing a hold rou
 through a shared daemon back to the real app (*Safari · via runningboardd*) — with
 one-click **Sleep Now**, auto-sleep, and keep-awake.
 
+**Menu-bar at a glance** — a custom mug tells you the state without opening the menu:
+
+<div align="center">
+<img src="assets/menubar-icons.png" width="280" alt="Menu-bar mug states" />
+</div>
+
+> empty *(free to sleep)* · half-full *(winding down to sleep)* · steaming *(something's keeping it awake)* · bolt *(intentionally awake)*
+
 ---
 
 ## Features
