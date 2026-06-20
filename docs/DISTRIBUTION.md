@@ -66,21 +66,19 @@ Then cut a release: `git tag v1.1.0 && git push origin v1.1.0`.
 
 ## Homebrew cask
 
-A ready cask lives at [`Casks/decaffeinate.rb`](../Casks/decaffeinate.rb). To
-offer `brew install --cask`:
+The tap is **live** at [`harf-promo/homebrew-tap`](https://github.com/harf-promo/homebrew-tap);
+the canonical cask is mirrored in this repo at [`Casks/decaffeinate.rb`](../Casks/decaffeinate.rb).
 
-1. Create a tap repo named `harf-promo/homebrew-tap`.
-2. Copy `Casks/decaffeinate.rb` into its `Casks/` directory.
-3. Users then run:
-   ```sh
-   brew tap harf-promo/tap
-   brew install --cask decaffeinate
-   ```
+```sh
+brew tap harf-promo/tap
+brew trust harf-promo/tap        # Homebrew 5+ requires trusting third-party taps once
+brew install --cask decaffeinate
+```
 
-It uses `sha256 :no_check` so it tracks new releases without per-release edits.
-Submitting to **homebrew/cask core** later requires a pinned `sha256` (printed by
-`make-dmg.sh` and published as `SHA256SUMS.txt` on each release) and a notarized
-artifact.
+**Per release:** bump `version` + `sha256` in the tap's cask together — the sha is
+printed by `make-dmg.sh` and published as `SHA256SUMS.txt` on the GitHub release.
+Submitting to **homebrew/cask core** later removes the `brew trust` step (and
+requires the pinned `sha256` + notarized artifact we already produce).
 
 ## Auto-update (next)
 

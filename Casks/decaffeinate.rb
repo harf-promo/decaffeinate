@@ -1,14 +1,10 @@
-# Homebrew cask for Decaffeinate.
-#
-# For a personal tap (harf-promo/homebrew-tap), copy this file into that repo's
-# Casks/ directory. `sha256 :no_check` lets it track releases without per-release
-# edits; submitting to homebrew/cask core later requires a real sha256 (it's
-# printed by Scripts/make-dmg.sh and published as SHA256SUMS.txt on each release).
+# Homebrew cask for Decaffeinate — this is the canonical copy; the live one lives
+# in the tap repo harf-promo/homebrew-tap (Casks/decaffeinate.rb). Bump `version`
+# and `sha256` together on each release (the sha is printed by
+# Scripts/make-dmg.sh and published as SHA256SUMS.txt on the GitHub release).
 cask "decaffeinate" do
-  # Keep `version` in lock-step with the released tag (the release process / tap
-  # maintainer bumps it) so the URL below resolves to a real DMG.
   version "1.1.0"
-  sha256 :no_check
+  sha256 "fd2127f05f2c96f2a0d3f5ab5720c4a902975695239f7481a6fabacfbe6c14d5"
 
   url "https://github.com/harf-promo/decaffeinate/releases/download/v#{version}/Decaffeinate-#{version}.dmg"
   name "Decaffeinate"
@@ -20,7 +16,7 @@ cask "decaffeinate" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Decaffeinate.app"
 

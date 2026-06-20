@@ -80,20 +80,18 @@ Decaffeinate --scan      # print exactly what's keeping this Mac awake
 
 ## Install
 
-### Homebrew *(once a signed release is published)*
+### Homebrew (recommended)
 ```sh
 brew tap harf-promo/tap
+brew trust harf-promo/tap        # one-time: Homebrew 5+ requires trusting third-party taps
 brew install --cask decaffeinate
 ```
 
 ### Signed DMG
-Download the notarized `Decaffeinate-<version>.dmg` from the
+Download the **notarized** `Decaffeinate-<version>.dmg` from the
 [Releases](https://github.com/harf-promo/decaffeinate/releases) page and drag it
-to Applications.
-
-> The full signing + notarization + release pipeline is built
-> (`.github/workflows/release.yml`); publishing signed builds just needs an Apple
-> Developer ID configured as repo secrets — see [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
+to Applications. It's signed with a Developer ID and stapled, so it opens
+cleanly through Gatekeeper.
 
 ### Build from source
 Requires macOS 14+ and Xcode 16 / Swift 6.
