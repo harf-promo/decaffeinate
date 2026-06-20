@@ -13,10 +13,12 @@ durations; an injectable, integration-tested decision loop; and the full
 **1.2.0** — **Sparkle auto-update** (EdDSA-signed appcast, generated in
 `release.yml`); **custom menu-bar mug icons**; README screenshots.
 
+**1.3.0** — **universal binary** (Intel + Apple Silicon); "sleep sooner on
+battery"; a UX/visual/copy polish pass and dead-code cleanup.
+
 ## Near term
 
 - [ ] **Submit to homebrew/cask core** (removes the one-time `brew trust`).
-- [ ] **Universal binary** — currently Apple Silicon only; add an `x86_64` slice.
 - [ ] 🙋 **Onboarding** — a first-run explainer of what the app does and why it's safe.
 
 ## Smarter sleep
