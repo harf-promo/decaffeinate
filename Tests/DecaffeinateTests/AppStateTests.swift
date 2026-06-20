@@ -56,6 +56,16 @@ private final class ThermalBox: @unchecked Sendable {
     }
 }
 
+/// Reports a fixed, idle (zero-CPU) subtree forever — drives AgentWatcher to
+/// "completed" after its quiet window.
+@MainActor private final class QuietSampler: ProcessSampling {
+    let pids: Set<pid_t>
+    init(pids: Set<pid_t>) { self.pids = pids }
+    func sample(_ target: WatchTarget, now: Date) -> ProcessSample {
+        ProcessSample(pids: pids, cpuNanoseconds: 0, at: now)
+    }
+}
+
 // MARK: - Tests
 
 @MainActor
@@ -76,9 +86,10 @@ final class AppStateTests: XCTestCase {
         let cleanup: () -> Void
     }
 
-    private func makeHarness(_ configure: (inout DecaffeinateSettings) -> Void = { _ in })
-        -> Harness
-    {
+    private func makeHarness(
+        watcher: AgentWatcher = AgentWatcher(),
+        _ configure: (inout DecaffeinateSettings) -> Void = { _ in }
+    ) -> Harness {
         let suite = "decaf.appstate.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         let settings = SettingsStore(defaults: defaults)
@@ -102,6 +113,7 @@ final class AppStateTests: XCTestCase {
             notifier: notifier,
             sleepController: sleeper,
             thermalProvider: { thermal.state },
+            agentWatcher: watcher,
             now: { clock.date }
         )
         return Harness(
@@ -213,6 +225,33 @@ final class AppStateTests: XCTestCase {
         h.clock.advance(11)  // short failure cooldown
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 2)
+    }
+
+    func testAgentCompletionSleepIsOneShot() {
+        let watcher = AgentWatcher(sampler: QuietSampler(pids: [500]))
+        watcher.requiredQuietSeconds = 2
+        let h = makeHarness(watcher: watcher) { $0.idleThresholdMinutes = 10 }
+        defer { h.cleanup() }
+
+        // Drive the watcher to "completed" (quiet CPU past its window).
+        h.idle.seconds = 0
+        h.state.setWatchTarget(.processName("node"))
+        for _ in 0..<5 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+
+        // Now finished: the collapsed 60s grace fires once when the user is away.
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1)
+
+        // After waking + cooldown, it must NOT keep force-sleeping every 60s —
+        // the watch is cleared, so the normal 10-min threshold applies again.
+        h.clock.advance(120)
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "agent-completion sleep must be one-shot")
     }
 
     func testManualSleepNowBypassesCooldown() {

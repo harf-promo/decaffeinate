@@ -35,15 +35,28 @@ struct ProcessWatcher {
     }
 
     private func allProcesses() -> [ProcInfo] {
-        let capacity = 8192
-        var pids = [pid_t](repeating: 0, count: capacity)
-        let returned = proc_listallpids(&pids, Int32(capacity * MemoryLayout<pid_t>.size))
-        guard returned > 0 else { return [] }
+        // proc_listallpids fills the buffer and returns the number of PIDs
+        // written (verified empirically on macOS 26: the return equals `ps -A`'s
+        // count). If the buffer comes back completely full it may be truncated,
+        // so grow and retry — that's the real guard against a busy machine
+        // silently dropping a watched subtree (the trailing `pid > 0` check also
+        // keeps us correct if a future SDK ever returns a byte count instead).
+        let stride = MemoryLayout<pid_t>.stride
+        var capacity = 4096
+        var pids = [pid_t]()
+        var pidCount = 0
+        while true {
+            pids = [pid_t](repeating: 0, count: capacity)
+            let returned = proc_listallpids(&pids, Int32(capacity * stride))
+            guard returned > 0 else { return [] }
+            pidCount = min(Int(returned), capacity)
+            if pidCount < capacity || capacity >= 262_144 { break }
+            capacity *= 2
+        }
 
         var result: [ProcInfo] = []
-        // `returned` may be a pid count or a byte count depending on SDK; the
-        // `pid > 0` guard makes either interpretation safe.
-        for index in 0..<min(Int(returned), capacity) {
+        result.reserveCapacity(pidCount)
+        for index in 0..<pidCount {
             let pid = pids[index]
             guard pid > 0 else { continue }
             var info = proc_bsdinfo()

@@ -271,6 +271,13 @@ final class AppState: ObservableObject {
                     ? "Watched work finished — putting Mac to sleep"
                     : "Idle \(Int(s.idleThresholdMinutes)) min — putting Mac to sleep"
                 if forceSleep(reason: reason, bypassCooldown: false) {
+                    // The agent-completion sleep is one-shot: clear the watch so
+                    // it doesn't turn into a permanent 60s-idle aggressive-sleep
+                    // mode after the user wakes the Mac.
+                    if agentFinished {
+                        agentWatcher.setTarget(nil)
+                        watchStatus = agentWatcher.status
+                    }
                     return
                 }
             }
