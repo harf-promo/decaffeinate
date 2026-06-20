@@ -47,6 +47,16 @@ final class ModelTests: XCTestCase {
 
     // MARK: RulePolicy
 
+    func testAllowDurationExpiry() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(AllowDuration.thirtyMinutes.expiry(from: now), now.addingTimeInterval(1800))
+        XCTAssertEqual(AllowDuration.oneHour.expiry(from: now), now.addingTimeInterval(3600))
+        XCTAssertEqual(AllowDuration.fourHours.expiry(from: now), now.addingTimeInterval(14_400))
+        // Until tomorrow is strictly later than now.
+        XCTAssertGreaterThan(AllowDuration.untilTomorrow.expiry(from: now), now)
+        XCTAssertEqual(AllowDuration.allCases.count, 4)
+    }
+
     func testRulePolicyAllowanceSemantics() {
         XCTAssertTrue(RulePolicy.allow.isCurrentlyAllowing)
         XCTAssertFalse(RulePolicy.ignore.isCurrentlyAllowing)

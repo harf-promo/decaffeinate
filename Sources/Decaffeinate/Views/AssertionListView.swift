@@ -121,8 +121,13 @@ struct AssertionRow: View {
             Button("Always allow to keep awake") {
                 appState.setPolicy(.allow, for: assertion)
             }
-            Button("Allow for 1 hour") {
-                appState.setPolicy(.allowUntil(Date().addingTimeInterval(3600)), for: assertion)
+            Menu("Allow for…") {
+                ForEach(AllowDuration.allCases, id: \.self) { duration in
+                    Button(duration.label) {
+                        appState.setPolicy(
+                            .allowUntil(duration.expiry(from: Date())), for: assertion)
+                    }
+                }
             }
             Button("Block (let Mac sleep)") {
                 appState.setPolicy(.ignore, for: assertion)

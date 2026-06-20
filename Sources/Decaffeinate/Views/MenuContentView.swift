@@ -49,10 +49,16 @@ struct FirewallPromptSection: View {
                     }
                     HStack(spacing: 6) {
                         Button("Allow") { appState.setPolicy(.allow, for: assertion) }
-                        Button("1 hour") {
-                            appState.setPolicy(
-                                .allowUntil(Date().addingTimeInterval(3600)), for: assertion)
+                        Menu("For…") {
+                            ForEach(AllowDuration.allCases, id: \.self) { duration in
+                                Button(duration.label) {
+                                    appState.setPolicy(
+                                        .allowUntil(duration.expiry(from: Date())), for: assertion)
+                                }
+                            }
                         }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
                         Button("Block") { appState.setPolicy(.ignore, for: assertion) }
                         Spacer()
                         Button("Ignore") { appState.dismissPending(assertion) }

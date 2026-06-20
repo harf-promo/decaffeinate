@@ -1,5 +1,39 @@
 import Foundation
 
+/// Preset durations for a temporary "allow" — the firewall's
+/// "Allow for a custom duration" action.
+enum AllowDuration: CaseIterable, Hashable, Sendable {
+    case thirtyMinutes
+    case oneHour
+    case fourHours
+    case untilTomorrow
+
+    var label: String {
+        switch self {
+        case .thirtyMinutes: return "30 minutes"
+        case .oneHour: return "1 hour"
+        case .fourHours: return "4 hours"
+        case .untilTomorrow: return "Until tomorrow"
+        }
+    }
+
+    /// The expiry date for this duration, measured from `now`.
+    func expiry(from now: Date, calendar: Calendar = .current) -> Date {
+        switch self {
+        case .thirtyMinutes: return now.addingTimeInterval(30 * 60)
+        case .oneHour: return now.addingTimeInterval(60 * 60)
+        case .fourHours: return now.addingTimeInterval(4 * 60 * 60)
+        case .untilTomorrow:
+            // 8am the next calendar day.
+            let tomorrow =
+                calendar.date(byAdding: .day, value: 1, to: now) ?? now.addingTimeInterval(86_400)
+            return calendar.date(
+                bySettingHour: 8, minute: 0, second: 0, of: tomorrow)
+                ?? tomorrow
+        }
+    }
+}
+
 /// What Decaffeinate should do about a given application's sleep-blocking
 /// assertions. Mirrors the four firewall prompt actions in the PRD.
 enum RulePolicy: Codable, Hashable, Sendable {
