@@ -30,12 +30,6 @@ struct SleepController {
         run(arguments: ["sleepnow"])
     }
 
-    /// Sleep just the display now (softer than a full system sleep).
-    @discardableResult
-    func sleepDisplayNow() -> Result<Void, SleepError> {
-        run(arguments: ["displaysleepnow"])
-    }
-
     private func run(arguments: [String]) -> Result<Void, SleepError> {
         let process = Process()
         process.executableURL = pmsetURL

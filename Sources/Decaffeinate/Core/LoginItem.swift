@@ -6,11 +6,6 @@ import ServiceManagement
 enum LoginItem {
     static var isAvailable: Bool { Bundle.main.bundleIdentifier != nil }
 
-    static var isEnabled: Bool {
-        guard isAvailable else { return false }
-        return SMAppService.mainApp.status == .enabled
-    }
-
     @discardableResult
     static func setEnabled(_ enabled: Bool) -> Bool {
         guard isAvailable else { return false }

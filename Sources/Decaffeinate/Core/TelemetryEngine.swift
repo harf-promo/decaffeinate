@@ -9,9 +9,7 @@ enum AssertionDetailKey {
     static let startWhen = "AssertStartWhen"  // Date the assertion was created
     static let assertionID = "AssertionId"
     static let globalUniqueID = "GlobalUniqueID"
-    static let processName = "Process Name"
     static let onBehalfOfPID = "AssertionOnBehalfOfPID"
-    static let bundlePath = "BundlePath"
 }
 
 /// Reads the live set of power assertions on the system and attributes each one
