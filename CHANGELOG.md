@@ -4,12 +4,10 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] — Unreleased
+## [1.1.0] — 2026-06-20
 
-The "make it real" release: distribution, the flagship agentic feature, deeper
-truth, and a tested decision loop. To publish the signed build, add the Apple
-Developer ID secrets (see `docs/DISTRIBUTION.md`) and push the `v1.1.0` tag —
-`release.yml` then builds, notarizes, and attaches the DMG.
+The "make it real" release: distribution (signed + notarized DMG, Homebrew),
+the flagship agentic feature, deeper truth, and a tested decision loop.
 
 ### Added
 - **Agentic completion detection** — watch a build/agent (by process name or PID)

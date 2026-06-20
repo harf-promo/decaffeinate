@@ -19,8 +19,31 @@ permissions:
   contents: write
 
 jobs:
+  # Skip the heavy build when the release already has a DMG (e.g. it was built
+  # and notarized locally and uploaded ahead of the tag). Keeps tag-triggered
+  # releases idempotent and lets a maintainer publish from a local notarized
+  # build without this workflow clobbering it.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
+               --json assets -q '.assets[].name' 2>/dev/null | grep -q '\.dmg$'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${GITHUB_REF_NAME} already has a DMG — skipping build."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
     name: Build, sign, notarize, publish
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5

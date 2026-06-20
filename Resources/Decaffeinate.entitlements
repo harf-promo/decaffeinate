@@ -2,14 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!--
-      Decaffeinate runs OUTSIDE the App Store sandbox: it spawns /usr/bin/pmset
-      and reads system-wide power-assertion telemetry, neither of which a
-      sandboxed app may do. The hardened runtime (enabled at sign time with
-      `codesign --options runtime`) needs no extra entitlement to spawn a
-      subprocess, so this file just makes the non-sandboxed stance explicit.
-    -->
-    <key>com.apple.security.app-sandbox</key>
-    <false/>
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
 </dict>
 </plist>
