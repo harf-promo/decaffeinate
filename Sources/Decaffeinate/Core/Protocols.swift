@@ -42,6 +42,13 @@ protocol BlockerNotifying {
     func notifyNewBlocker(appName: String, assertionName: String)
 }
 
+@MainActor
+protocol ProcessSampling {
+    /// Sample the watched process subtree right now. Returns an empty sample
+    /// (`pids` empty) when no matching process is running.
+    func sample(_ target: WatchTarget, now: Date) -> ProcessSample
+}
+
 // MARK: - Real engines conform
 
 extension TelemetryEngine: PowerAssertionScanning {}
@@ -50,3 +57,4 @@ extension PowerSourceReader: PowerReading {}
 extension SleepController: SystemSleeping {}
 extension CaffeineEngine: KeepAwakeControlling {}
 extension Notifier: BlockerNotifying {}
+extension ProcessWatcher: ProcessSampling {}

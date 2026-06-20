@@ -48,6 +48,11 @@ final class AppState: ObservableObject {
     private let notifier: any BlockerNotifying
     private let sleepController: any SystemSleeping
     private let thermalProvider: () -> ProcessInfo.ThermalState
+    private let agentWatcher: AgentWatcher
+
+    /// Once a watched agent/build finishes, sleep this many seconds after the
+    /// user is idle (a short grace instead of the full idle threshold).
+    private let completionGraceSeconds: TimeInterval = 60
 
     // Live, published system state
     @Published private(set) var assertions: [PowerAssertion] = []
@@ -69,6 +74,9 @@ final class AppState: ObservableObject {
     /// "decide what to do" queue, surfaced in the menu.
     @Published private(set) var pendingClassification: [PowerAssertion] = []
 
+    /// Status of the "sleep when my agent/build finishes" watcher.
+    @Published private(set) var watchStatus: AgentWatcher.Status = .idle
+
     private var timer: Timer?
     private var notifiedBlockers: Set<String> = []
     private var suppressForceSleepUntil: Date?
@@ -88,6 +96,7 @@ final class AppState: ObservableObject {
         thermalProvider: @escaping () -> ProcessInfo.ThermalState = {
             ProcessInfo.processInfo.thermalState
         },
+        agentWatcher: AgentWatcher = AgentWatcher(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -99,6 +108,7 @@ final class AppState: ObservableObject {
         self.notifier = notifier
         self.sleepController = sleepController
         self.thermalProvider = thermalProvider
+        self.agentWatcher = agentWatcher
         self.now = now
     }
 
@@ -163,6 +173,28 @@ final class AppState: ObservableObject {
         tick()
     }
 
+    // MARK: Agent watcher
+
+    /// Watch a process (tree) and let the Mac sleep once it finishes. Pass `nil`
+    /// to stop watching.
+    func setWatchTarget(_ target: WatchTarget?) {
+        agentWatcher.setTarget(target)
+        watchStatus = agentWatcher.status
+        tick()
+    }
+
+    var isWatchingAgent: Bool { agentWatcher.isActive }
+
+    /// Quick "sleep when this finishes" picks: common long-running dev/agent
+    /// tools plus whatever is currently holding the Mac awake.
+    var watchCandidates: [String] {
+        let common = [
+            "claude", "node", "python3", "xcodebuild", "cargo", "make", "swift", "docker",
+        ]
+        let fromBlockers = assertions.filter(\.blocksSystemSleep).map(\.processName)
+        return (common + fromBlockers).removingDuplicates()
+    }
+
     // MARK: The tick
 
     func tick() {
@@ -204,6 +236,11 @@ final class AppState: ObservableObject {
         // 2) Firewall: surface newly-seen, unclassified blockers.
         updateFirewallQueue(systemBlockers, enabled: s.notifyOnNewBlocker)
 
+        // 2.5) Agent watcher: detect when a watched build/agent has finished.
+        agentWatcher.tick(now: now(), systemBlockingPIDs: Set(systemBlockers.map(\.pid)))
+        watchStatus = agentWatcher.status
+        let agentFinished = agentWatcher.hasCompleted
+
         // 3) Immediate-sleep guards (overheating / critically low battery).
         //    Respects the cooldown so a persistent condition can't spawn pmset
         //    every second or thrash sleep→wake→sleep.
@@ -216,17 +253,24 @@ final class AppState: ObservableObject {
             }
         }
 
-        // 4) The headline feature: force sleep when left idle.
+        // 4) The headline feature: force sleep when left idle. Once a watched
+        //    agent/build has finished, collapse the idle requirement to a short
+        //    grace so the Mac sleeps soon after you've stepped away.
         //    Suppressed while the user is intentionally caffeinating.
         var remaining: TimeInterval?
         if s.decaffeinateEnabled, !s.caffeinateEnabled {
-            let r = s.idleThresholdSeconds - idleSeconds
+            let threshold =
+                agentFinished
+                ? min(s.idleThresholdSeconds, completionGraceSeconds)
+                : s.idleThresholdSeconds
+            let r = threshold - idleSeconds
             remaining = r
             if decision.canForceSleep, r <= 0 {
-                if forceSleep(
-                    reason: "Idle \(Int(s.idleThresholdMinutes)) min — putting Mac to sleep",
-                    bypassCooldown: false)
-                {
+                let reason =
+                    agentFinished
+                    ? "Watched work finished — putting Mac to sleep"
+                    : "Idle \(Int(s.idleThresholdMinutes)) min — putting Mac to sleep"
+                if forceSleep(reason: reason, bypassCooldown: false) {
                     return
                 }
             }

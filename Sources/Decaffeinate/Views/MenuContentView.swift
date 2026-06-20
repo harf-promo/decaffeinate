@@ -19,6 +19,9 @@ struct MenuContentView: View {
             QuickActions()
 
             Divider()
+            WatchSection()
+
+            Divider()
             AssertionListView()
 
             Divider()
@@ -151,5 +154,63 @@ struct FooterView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+/// "Sleep when my agent/build finishes" — pick a process to watch; the Mac
+/// sleeps once it goes quiet.
+struct WatchSection: View {
+    @EnvironmentObject var appState: AppState
+
+    private var isActive: Bool {
+        if case .idle = appState.watchStatus { return false }
+        return true
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SectionHeader("Sleep when finished")
+
+            switch appState.watchStatus {
+            case .idle:
+                Menu {
+                    ForEach(appState.watchCandidates, id: \.self) { name in
+                        Button(name) { appState.setWatchTarget(.processName(name)) }
+                    }
+                } label: {
+                    Label("Watch an app or agent…", systemImage: "binoculars")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                Text("The Mac sleeps once the chosen build/agent goes quiet and you step away.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+            case .waiting(let label):
+                statusRow("hourglass", "Waiting for \(label) to start…")
+            case .watching(let label, let cpu):
+                let cpuText = cpu.map { String(format: " · %.0f%% CPU", $0) } ?? ""
+                statusRow("binoculars.fill", "Watching \(label)\(cpuText)")
+            case .completed(let label, _):
+                statusRow("checkmark.circle.fill", "\(label) finished — sleeping soon")
+            }
+
+            if isActive {
+                Button("Stop watching") { appState.setWatchTarget(nil) }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func statusRow(_ icon: String, _ text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon).foregroundStyle(.tint)
+            Text(text).font(.callout).lineLimit(1)
+        }
     }
 }
