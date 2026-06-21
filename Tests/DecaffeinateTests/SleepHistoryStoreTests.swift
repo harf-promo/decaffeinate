@@ -61,4 +61,22 @@ final class SleepHistoryStoreTests: XCTestCase {
         store.record(SleepEvent(date: Date(), reason: "y", onBattery: false))
         XCTAssertEqual(store.estimatedMinutesAvoided, 30)
     }
+
+    func testCorruptDataDecodesToEmpty() {
+        let suite = "decaf.history.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(Data([0xFF, 0x00, 0x01, 0x02]), forKey: "DecaffeinateHistory.v1")
+        let store = SleepHistoryStore(defaults: defaults)
+        XCTAssertTrue(store.events.isEmpty, "garbage bytes must decode to an empty log, not crash")
+    }
+
+    func testWrongShapeJSONDecodesToEmpty() {
+        let suite = "decaf.history.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(Data("{\"not\":\"an array\"}".utf8), forKey: "DecaffeinateHistory.v1")
+        let store = SleepHistoryStore(defaults: defaults)
+        XCTAssertTrue(store.events.isEmpty)
+    }
 }

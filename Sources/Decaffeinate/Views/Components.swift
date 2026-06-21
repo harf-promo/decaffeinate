@@ -58,14 +58,6 @@ extension AssertionKind {
         case .other: return .secondary
         }
     }
-
-    var glyph: String {
-        switch self {
-        case .systemSleep: return "sun.max.fill"
-        case .displaySleep: return "display"
-        case .other: return "circle.dotted"
-        }
-    }
 }
 
 /// A reusable "Allow for…" submenu offering the standard duration presets.

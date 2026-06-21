@@ -40,18 +40,18 @@ final class RulesEngine: ObservableObject {
 
     /// `true` when this assertion is from an app the user has whitelisted and the
     /// allowance is still in effect — i.e. a reason *not* to force sleep.
-    func isActivelyAllowed(_ assertion: PowerAssertion) -> Bool {
-        rule(for: assertion)?.policy.isCurrentlyAllowing ?? false
+    func isActivelyAllowed(_ assertion: PowerAssertion, now: Date = Date()) -> Bool {
+        rule(for: assertion)?.policy.isAllowing(at: now) ?? false
     }
 
     /// `true` when a rule governs this assertion *and* is still decisive. A
     /// `.allowUntil` that has expired returns `false`, so the firewall can ask
     /// again rather than treating the app as permanently classified.
-    func hasEffectiveDecision(for assertion: PowerAssertion) -> Bool {
+    func hasEffectiveDecision(for assertion: PowerAssertion, now: Date = Date()) -> Bool {
         guard let policy = policy(for: assertion) else { return false }
         switch policy {
         case .allow, .ignore: return true
-        case .allowUntil(let date): return date > Date()
+        case .allowUntil(let date): return date > now
         }
     }
 

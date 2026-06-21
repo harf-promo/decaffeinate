@@ -273,7 +273,7 @@ final class AppState: ObservableObject {
         let systemBlockers = assertions.filter(\.blocksSystemSleep)
         let whitelistedAwake =
             systemBlockers
-            .filter { rulesEngine.isActivelyAllowed($0) }
+            .filter { rulesEngine.isActivelyAllowed($0, now: now()) }
             .map(\.displayName)
             .removingDuplicates()
 
@@ -432,7 +432,7 @@ final class AppState: ObservableObject {
             let k = key(blocker)
             // Apps with a currently-effective decision (Allow / Block / live
             // "allow 1h") are settled — leave them alone.
-            if rulesEngine.hasEffectiveDecision(for: blocker) { continue }
+            if rulesEngine.hasEffectiveDecision(for: blocker, now: now()) { continue }
             // A rule that exists but is no longer effective is a *lapsed*
             // "allow for 1 hour": drop the stale rule and clear the notification
             // suppression so the firewall re-prompts once. (A blocker the user
@@ -469,7 +469,9 @@ final class AppState: ObservableObject {
         remaining: TimeInterval?
     ) {
         let s = settings
-        let nonWhitelistedBlockers = systemBlockers.filter { !rulesEngine.isActivelyAllowed($0) }
+        let nonWhitelistedBlockers = systemBlockers.filter {
+            !rulesEngine.isActivelyAllowed($0, now: now())
+        }
 
         if s.caffeinateEnabled, caffeine.isActive {
             mug = .caffeinated

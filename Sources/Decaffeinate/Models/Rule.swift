@@ -46,10 +46,14 @@ enum RulePolicy: Codable, Hashable, Sendable {
     /// is free to sleep when idle even while this app is running.
     case ignore
 
-    var isCurrentlyAllowing: Bool {
+    var isCurrentlyAllowing: Bool { isAllowing(at: Date()) }
+
+    /// Clock-injectable form so a single tick evaluates rule expiry against one
+    /// consistent timestamp (and tests can pin it).
+    func isAllowing(at now: Date) -> Bool {
         switch self {
         case .allow: return true
-        case .allowUntil(let date): return date > Date()
+        case .allowUntil(let date): return date > now
         case .ignore: return false
         }
     }

@@ -366,7 +366,9 @@ final class AppStateTests: XCTestCase {
         h.scanner.assertions = [blocker]
         h.state.tick()
 
-        h.state.setPolicy(.allowUntil(Date().addingTimeInterval(3600)), for: blocker)
+        // Expiry is now evaluated against the tick's injected clock, so anchor
+        // the allowance to the test clock rather than the real wall clock.
+        h.state.setPolicy(.allowUntil(h.clock.date.addingTimeInterval(3600)), for: blocker)
         h.state.tick()
         XCTAssertTrue(h.state.pendingClassification.isEmpty, "a live allowance is settled")
     }
@@ -377,9 +379,8 @@ final class AppStateTests: XCTestCase {
         h.scanner.assertions = [blocker]
         h.state.tick()
 
-        // A "1 hour" allowance that has already lapsed (RulesEngine uses the
-        // real wall clock for expiry, so use a real past date here).
-        h.state.setPolicy(.allowUntil(Date().addingTimeInterval(-3600)), for: blocker)
+        // A "1 hour" allowance that lapsed relative to the tick's clock.
+        h.state.setPolicy(.allowUntil(h.clock.date.addingTimeInterval(-3600)), for: blocker)
         XCTAssertEqual(h.state.pendingClassification.count, 1, "a lapsed allowance re-prompts")
         XCTAssertNil(h.rules.policy(for: blocker), "the stale rule is cleared")
     }
@@ -440,6 +441,30 @@ final class AppStateTests: XCTestCase {
         let until = try? XCTUnwrap(h.state.quietUntil)
         XCTAssertNotNil(until)
         XCTAssertGreaterThan(until!, h.clock.date)
+    }
+
+    func testStayAwakeUntilPastHourWrapsToTomorrow() {
+        let h = makeHarness(); defer { h.cleanup() }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let nowHour = cal.component(.hour, from: h.clock.date)
+        // Requesting the current hour is "already passed today" → roll to tomorrow.
+        h.state.stayAwake(untilHour: nowHour, calendar: cal)
+        let delta = h.state.quietUntil!.timeIntervalSince(h.clock.date)
+        XCTAssertGreaterThan(delta, 23 * 3600, "wrapped to ~tomorrow, not the past")
+        XCTAssertLessThanOrEqual(delta, 24 * 3600 + 1)
+    }
+
+    func testStayAwakeUntilHourSurvivesDSTGap() {
+        let h = makeHarness(); defer { h.cleanup() }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/New_York")!
+        // 01:30 just before the 2→3 AM spring-forward; 2 AM doesn't exist.
+        h.clock.date = cal.date(
+            from: DateComponents(year: 2026, month: 3, day: 8, hour: 1, minute: 30))!
+        h.state.stayAwake(untilHour: 2, calendar: cal)
+        XCTAssertNotNil(h.state.quietUntil, "a skipped wall-clock hour must not return nil")
+        XCTAssertGreaterThan(h.state.quietUntil!, h.clock.date)
     }
 
     func testScheduleStandsDownDuringActiveHours() {
@@ -554,5 +579,49 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(h.sleeper.callCount, 0, "10s < 60s grace — not yet asleep")
         XCTAssertEqual(h.state.mug, .counting)
         XCTAssertNotNil(h.state.secondsUntilForcedSleep)
+    }
+
+    // MARK: Schedule / quiet-window / watcher interactions
+
+    func testScheduleStillHoldsAfterQuietWindowExpires() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.scheduleEnabled = true
+        }
+        defer { h.cleanup() }
+        let hour = Calendar.current.component(.hour, from: h.clock.date)
+        h.settings.settings.activeHoursStart = hour
+        h.settings.settings.activeHoursEnd = (hour + 1) % 24
+        h.state.stayAwake(forMinutes: 1)
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "held by the quiet window")
+
+        h.clock.advance(61)  // window lapses, but still inside active hours
+        h.state.tick()
+        XCTAssertFalse(h.state.isQuietWindowActive)
+        XCTAssertEqual(h.sleeper.callCount, 0, "the schedule still holds after the window expires")
+        XCTAssertFalse(h.state.decision.canForceSleep)
+    }
+
+    func testAgentCompletionRespectsSchedule() {
+        let watcher = AgentWatcher(sampler: QuietSampler(pids: [500]))
+        watcher.requiredQuietSeconds = 2
+        let h = makeHarness(watcher: watcher) {
+            $0.idleThresholdMinutes = 10
+            $0.scheduleEnabled = true
+        }
+        defer { h.cleanup() }
+        let hour = Calendar.current.component(.hour, from: h.clock.date)
+        h.settings.settings.activeHoursStart = hour
+        h.settings.settings.activeHoursEnd = (hour + 1) % 24
+        h.idle.seconds = 0
+        h.state.setWatchTarget(.processName("node"))
+        for _ in 0..<5 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        h.idle.seconds = 120  // finished + away, but it's active hours
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "the schedule overrides the agent-completion grace")
     }
 }

@@ -43,6 +43,22 @@ final class ScheduleEngineTests: XCTestCase {
             ScheduleEngine.isWithinActiveHours(date(hour: 9), start: 9, end: 9, calendar: utc))
     }
 
+    func testOvernightWindowBoundaries() {
+        // 22 → 6, half-open: start hour inside, end hour exclusive even when wrapped.
+        XCTAssertTrue(
+            ScheduleEngine.isWithinActiveHours(date(hour: 22), start: 22, end: 6, calendar: utc),
+            "start hour is inside")
+        XCTAssertTrue(
+            ScheduleEngine.isWithinActiveHours(date(hour: 5), start: 22, end: 6, calendar: utc),
+            "the last hour before end is inside")
+        XCTAssertFalse(
+            ScheduleEngine.isWithinActiveHours(date(hour: 6), start: 22, end: 6, calendar: utc),
+            "end hour is exclusive on the wrapped side")
+        XCTAssertFalse(
+            ScheduleEngine.isWithinActiveHours(date(hour: 21), start: 22, end: 6, calendar: utc),
+            "the hour before start is outside")
+    }
+
     func testHoldReasonOnlyWhenEnabledAndInside() {
         var settings = DecaffeinateSettings()
         settings.activeHoursStart = 9
