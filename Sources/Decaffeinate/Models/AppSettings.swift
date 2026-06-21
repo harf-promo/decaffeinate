@@ -67,11 +67,20 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// earlier than the start to describe an overnight window (e.g. 22 → 6).
     var activeHoursEnd: Int = 17
 
+    /// Show the live "sleeping in M:SS" countdown next to the menu-bar icon while
+    /// a forced sleep is approaching. Off by default to keep the menu bar quiet.
+    var showMenuBarCountdown: Bool = false
+
     // MARK: Firewall / notifications
 
     /// Post a notification when a *new* unclassified app starts holding the Mac
     /// awake, so you can choose to allow or block it.
     var notifyOnNewBlocker: Bool = true
+
+    // MARK: First run
+
+    /// Set once the user has seen the welcome flow, so it only shows on first run.
+    var hasCompletedOnboarding: Bool = false
 
     // MARK: Advanced
 

@@ -65,6 +65,7 @@ private struct GeneralSettings: View {
 
             Section {
                 Toggle("Notify me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
+                Toggle("Show the countdown in the menu bar", isOn: s.showMenuBarCountdown)
                 if LoginItem.isAvailable {
                     Toggle("Launch at login", isOn: s.launchAtLogin)
                         .onChange(of: store.settings.launchAtLogin) { _, newValue in
@@ -226,6 +227,8 @@ private struct AdvancedSettings: View {
 }
 
 private struct AboutView: View {
+    @EnvironmentObject var appState: AppState
+
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "cup.and.saucer.fill")
@@ -245,6 +248,12 @@ private struct AboutView: View {
                 destination: URL(string: "https://github.com/harf-promo/decaffeinate")!
             )
             .font(.caption)
+            Button("Show welcome again") {
+                OnboardingPresenter.shared.present(settingsStore: appState.settingsStore)
+            }
+            .buttonStyle(.link)
+            .font(.caption)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()

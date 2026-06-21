@@ -115,11 +115,31 @@ final class AppState: ObservableObject {
 
     var settings: DecaffeinateSettings { settingsStore.settings }
 
+    /// The compact countdown to draw beside the menu-bar icon, or `nil` when the
+    /// setting is off or no forced sleep is imminent.
+    var menuBarCountdownText: String? {
+        guard settings.showMenuBarCountdown, let seconds = secondsUntilForcedSleep else {
+            return nil
+        }
+        return Format.countdown(seconds)
+    }
+
+    /// Ask for notification permission. Driven by the onboarding "Get started"
+    /// button on first run (so the prompt lands with its explanation), and by
+    /// `start()` on every later launch.
+    func requestNotificationAuthorization() {
+        notifier.requestAuthorizationIfNeeded()
+    }
+
     // MARK: Lifecycle
 
     func start() {
         timer?.invalidate()
-        notifier.requestAuthorizationIfNeeded()
+        // On first run, defer the notification prompt to the onboarding flow so it
+        // arrives with context instead of cold at launch.
+        if settings.hasCompletedOnboarding {
+            notifier.requestAuthorizationIfNeeded()
+        }
         tick()
         let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }

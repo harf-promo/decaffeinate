@@ -35,7 +35,13 @@ enum PreviewRenderer {
         .background(.background)
         let stripOK = render(strip, to: dir.appendingPathComponent("menubar-icons.png"))
 
-        print("  menu showcase: \(ok ? "ok" : "FAILED")  mug strip: \(stripOK ? "ok" : "FAILED")")
+        // First-run welcome panel (single static panel — TabView can't be drawn).
+        let onboardingOK = render(
+            OnboardingPreview(), to: dir.appendingPathComponent("onboarding.png"))
+
+        print(
+            "  menu showcase: \(ok ? "ok" : "FAILED")  mug strip: \(stripOK ? "ok" : "FAILED")  onboarding: \(onboardingOK ? "ok" : "FAILED")"
+        )
         return ok
     }
 

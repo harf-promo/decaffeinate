@@ -26,9 +26,14 @@ struct DecaffeinateApp: App {
                 .environmentObject(appState.rulesEngine)
                 .environmentObject(updater)
         } label: {
-            Image(nsImage: MugIcon.image(for: appState.mug))
-                .renderingMode(.template)
-                .accessibilityLabel(appState.mug.accessibilityLabel)
+            HStack(spacing: 3) {
+                Image(nsImage: MugIcon.image(for: appState.mug))
+                    .renderingMode(.template)
+                if let countdown = appState.menuBarCountdownText {
+                    Text(countdown).monospacedDigit()
+                }
+            }
+            .accessibilityLabel(appState.mug.accessibilityLabel)
         }
         .menuBarExtraStyle(.window)
 
@@ -50,6 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             NSApp.setActivationPolicy(.accessory)
             AppState.shared.start()
+            // First run: welcome the user (and own the notification prompt).
+            OnboardingPresenter.shared.showIfNeeded(
+                settingsStore: AppState.shared.settingsStore)
         }
     }
 

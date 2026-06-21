@@ -169,6 +169,26 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(h.state.mug, .caffeinated)
     }
 
+    func testMenuBarCountdownFollowsSettingAndState() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 10; $0.showMenuBarCountdown = true
+        }
+        defer { h.cleanup() }
+        h.idle.seconds = 60  // counting down, away
+        h.state.tick()
+        XCTAssertNotNil(h.state.secondsUntilForcedSleep)
+        XCTAssertNotNil(h.state.menuBarCountdownText, "shown when enabled and counting")
+
+        h.settings.settings.showMenuBarCountdown = false
+        XCTAssertNil(h.state.menuBarCountdownText, "hidden when the setting is off")
+    }
+
+    func testMenuBarCountdownHiddenWhenNotCounting() {
+        let h = makeHarness { $0.showMenuBarCountdown = true }; defer { h.cleanup() }
+        h.state.tick()  // free to sleep — nothing counting
+        XCTAssertNil(h.state.menuBarCountdownText)
+    }
+
     // MARK: Force sleep
 
     func testForcesSleepAfterIdleThreshold() {
