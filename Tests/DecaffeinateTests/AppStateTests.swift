@@ -189,6 +189,21 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(h.state.menuBarCountdownText)
     }
 
+    func testMenuBarAccessibilityLabelFoldsInCountdown() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 10; $0.showMenuBarCountdown = true
+        }
+        defer { h.cleanup() }
+        h.idle.seconds = 60  // counting down
+        h.state.tick()
+        XCTAssertTrue(
+            h.state.menuBarAccessibilityLabel.contains("sleeping in"),
+            "VoiceOver must announce the countdown the user opted into")
+
+        h.settings.settings.showMenuBarCountdown = false
+        XCTAssertEqual(h.state.menuBarAccessibilityLabel, h.state.mug.accessibilityLabel)
+    }
+
     // MARK: Force sleep
 
     func testForcesSleepAfterIdleThreshold() {

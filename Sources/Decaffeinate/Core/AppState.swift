@@ -128,6 +128,13 @@ final class AppState: ObservableObject {
         return Format.countdown(seconds)
     }
 
+    /// VoiceOver label for the whole menu-bar item, folding in the countdown the
+    /// user opted into (a raw "9:05" beside the icon is otherwise never announced).
+    var menuBarAccessibilityLabel: String {
+        guard let countdown = menuBarCountdownText else { return mug.accessibilityLabel }
+        return "\(mug.accessibilityLabel), sleeping in \(countdown)"
+    }
+
     /// Ask for notification permission. Driven by the onboarding "Get started"
     /// button on first run (so the prompt lands with its explanation), and by
     /// `start()` on every later launch.

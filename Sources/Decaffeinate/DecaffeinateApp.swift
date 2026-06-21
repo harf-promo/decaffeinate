@@ -33,7 +33,8 @@ struct DecaffeinateApp: App {
                     Text(countdown).monospacedDigit()
                 }
             }
-            .accessibilityLabel(appState.mug.accessibilityLabel)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(appState.menuBarAccessibilityLabel)
         }
         .menuBarExtraStyle(.window)
 

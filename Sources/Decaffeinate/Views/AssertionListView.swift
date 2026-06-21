@@ -80,13 +80,22 @@ struct AssertionRow: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(showDetails ? 90 : 0))
+                    .accessibilityHidden(true)
                 policyMenu
+                    .accessibilitySortPriority(-1)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
             .contentShape(Rectangle())
             .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() } }
-            .accessibilityHint("Double-tap to show or hide details")
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("\(assertion.displayName). \(rowSubtitle)")
+            .accessibilityValue(showDetails ? "Expanded" : "Collapsed")
+            .accessibilityHint("Shows or hides details")
+            .accessibilityAction {
+                withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() }
+            }
 
             if showDetails {
                 AssertionDetailView(assertion: assertion)

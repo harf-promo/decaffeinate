@@ -21,6 +21,9 @@ struct OnboardingView: View {
                 }
             }
             .tabViewStyle(.automatic)
+            // The page dots are intentionally hidden from VoiceOver (color-only),
+            // so carry the progress here instead.
+            .accessibilityValue("Page \(page + 1) of \(panels.count)")
 
             Divider()
 
@@ -96,11 +99,23 @@ private struct OnboardingPanelView: View {
     let panel: OnboardingPanel
 
     var body: some View {
+        // Scroll so large Dynamic Type sizes can pan rather than clip in the
+        // fixed-size onboarding window. (Content is split out so the headless
+        // preview renderer — which can't draw a ScrollView — can render it.)
+        ScrollView { OnboardingPanelContent(panel: panel) }
+    }
+}
+
+private struct OnboardingPanelContent: View {
+    let panel: OnboardingPanel
+
+    var body: some View {
         VStack(spacing: 16) {
             Image(systemName: panel.symbol)
                 .font(.system(size: 52))
                 .foregroundStyle(panel.tint)
                 .padding(.top, 8)
+                .accessibilityHidden(true)
             Text(panel.title)
                 .font(.title2.bold())
             Text(panel.body)
@@ -117,11 +132,10 @@ private struct OnboardingPanelView: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 36)
-        .padding(.top, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 24)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -145,7 +159,9 @@ private struct PageDots: View {
 /// `TabView` can't be drawn by `ImageRenderer`, so the README shot uses this.
 struct OnboardingPreview: View {
     var body: some View {
-        OnboardingPanelView(panel: OnboardingPanel.all[1])
+        // Render the content directly (not the live ScrollView wrapper, which
+        // ImageRenderer can't draw).
+        OnboardingPanelContent(panel: OnboardingPanel.all[1])
             .frame(width: 480, height: 340)
             .background(.background)
     }

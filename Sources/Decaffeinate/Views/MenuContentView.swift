@@ -159,12 +159,13 @@ struct QuietWindowControl: View {
             if let until = appState.quietUntil, appState.isQuietWindowActive {
                 if let paused = appState.quietWindowPausedReason {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        .accessibilityHidden(true)
                     Text("Quiet window paused — \(paused)")
                         .font(.caption)
-                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Image(systemName: "clock.fill").foregroundStyle(.tint)
+                        .accessibilityHidden(true)
                     Text("Awake until \(ScheduleEngine.timeLabel(until))")
                         .font(.caption)
                 }
@@ -310,7 +311,9 @@ struct WatchSection: View {
     private func statusRow(_ icon: String, _ text: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon).foregroundStyle(.tint)
-            Text(text).font(.callout).lineLimit(1)
+                .accessibilityHidden(true)  // decorative — duplicates the text
+            Text(text).font(.callout)
+                .fixedSize(horizontal: false, vertical: true)  // wrap, don't truncate
         }
     }
 }

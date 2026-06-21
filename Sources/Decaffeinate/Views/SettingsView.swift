@@ -33,6 +33,8 @@ private struct GeneralSettings: View {
                 HStack {
                     Text("Sleep after")
                     Slider(value: s.idleThresholdMinutes, in: 1...60, step: 1)
+                        .accessibilityLabel("Sleep after")
+                        .accessibilityValue("\(Int(store.settings.idleThresholdMinutes)) minutes")
                     Text("\(Int(store.settings.idleThresholdMinutes)) min")
                         .monospacedDigit()
                         .frame(width: 52, alignment: .trailing)
@@ -49,6 +51,9 @@ private struct GeneralSettings: View {
                 HStack {
                     Text("On battery, sleep after")
                     Slider(value: s.batteryIdleThresholdMinutes, in: 1...30, step: 1)
+                        .accessibilityLabel("On battery, sleep after")
+                        .accessibilityValue(
+                            "\(Int(store.settings.batteryIdleThresholdMinutes)) minutes")
                     Text("\(Int(store.settings.batteryIdleThresholdMinutes)) min")
                         .monospacedDigit()
                         .frame(width: 52, alignment: .trailing)
@@ -112,7 +117,10 @@ private struct SafetySettings: View {
                         value: Binding(
                             get: { Double(store.settings.batteryFloorPercent) },
                             set: { store.settings.batteryFloorPercent = Int($0) }
-                        ), in: 0...50, step: 5)
+                        ), in: 0...50, step: 5
+                    )
+                    .accessibilityLabel("Battery floor")
+                    .accessibilityValue("\(store.settings.batteryFloorPercent) percent")
                     Text("\(store.settings.batteryFloorPercent)%")
                         .monospacedDigit()
                         .frame(width: 44, alignment: .trailing)
@@ -188,11 +196,13 @@ private struct ScheduleSettings: View {
                         ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
                     }
                     .labelsHidden()
+                    .accessibilityLabel("Active hours start")
                     Text("to")
                     Picker("", selection: s.activeHoursEnd) {
                         ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
                     }
                     .labelsHidden()
+                    .accessibilityLabel("Active hours end")
                 }
                 .disabled(!store.settings.scheduleEnabled)
                 if store.settings.scheduleEnabled {
