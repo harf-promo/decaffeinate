@@ -83,38 +83,52 @@ struct AssertionDetailView: View {
 
     var body: some View {
         let reason = assertion.reason
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: Space.s2) {
             if !reason.resourceLabels.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(reason.resourceLabels, id: \.self) { label in
                         Chip(systemImage: resourceIcon(label), text: label, tint: .info)
                     }
                 }
-                .padding(.bottom, 2)
             }
             row("Why", reason.explanation)
-            if let owner = assertion.realOwner { row("Real owner", owner.name) }
+            // Who's really behind it — the daemon vs the real app, and the app it
+            // was created on behalf of.
+            row("Held by", assertion.processName)
+            if let owner = assertion.realOwner {
+                row(
+                    "Real app", owner.bundleIdentifier.map { "\(owner.name) (\($0))" } ?? owner.name
+                )
+            }
+            if assertion.viaRunningboard { row("Routed via", "runningboardd (background app)") }
             if let held = appState.heldDuration(assertion) {
-                row("Held", held.replacingOccurrences(of: "for ", with: ""))
+                row("Held for", held.replacingOccurrences(of: "for ", with: ""))
             }
             if let secs = reason.autoReleaseSeconds { row("Auto-releases", "in \(secs)s") }
+            if let path = assertion.bundlePath { row("Where", path) }
             row("Type", assertion.assertionType)
+            if let details = assertion.details, !details.isEmpty { row("App context", details) }
             if let raw = assertion.humanReadableReason, !raw.isEmpty { row("System reason", raw) }
-            if let path = assertion.bundlePath { row("Bundle", path) }
             row("Assertion", assertion.name)
             row("PID", "\(assertion.pid)")
         }
-        .font(HarfFont.micro)
-        .padding(.horizontal, Space.s3)
-        .padding(.vertical, Space.s2)
+        .font(HarfFont.caption)
+        .padding(.horizontal, Space.s3 + 26 + Space.s2)  // align under the row text, past the icon
+        .padding(.trailing, Space.s3)
+        .padding(.vertical, Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.paper2)
     }
 
     private func row(_ key: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: Space.s2) {
-            Text(key).foregroundStyle(Color.ink4).frame(width: 86, alignment: .leading)
-            Text(value).foregroundStyle(Color.ink2).textSelection(.enabled).lineLimit(3)
+        HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+            Text(key)
+                .foregroundStyle(Color.ink4)
+                .frame(width: 84, alignment: .leading)
+            Text(value)
+                .foregroundStyle(Color.ink1)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
     }

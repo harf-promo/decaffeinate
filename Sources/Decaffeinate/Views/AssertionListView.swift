@@ -1,6 +1,9 @@
 import SwiftUI
 
 /// The "what's keeping your Mac awake" list — the truth, straight from IOKit.
+/// Renders as plain content (the parent menu owns the single scroll). A blocker
+/// that still needs a decision shows its approval buttons inline (no separate
+/// firewall section — same row, highlighted).
 struct AssertionListView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var rules: RulesEngine
@@ -10,6 +13,9 @@ struct AssertionListView: View {
     }
     private var others: [PowerAssertion] {
         appState.assertions.filter { !$0.blocksSystemSleep }
+    }
+    private func isPending(_ a: PowerAssertion) -> Bool {
+        appState.pendingClassification.contains { $0.id == a.id }
     }
 
     var body: some View {
@@ -21,16 +27,11 @@ struct AssertionListView: View {
             if appState.assertions.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(systemBlockers) { AssertionRow(assertion: $0) }
-                        if !others.isEmpty {
-                            SectionHeader("Screen-only / background")
-                            ForEach(others) { AssertionRow(assertion: $0) }
-                        }
-                    }
+                ForEach(systemBlockers) { BlockerRow(assertion: $0, pending: isPending($0)) }
+                if !others.isEmpty {
+                    SectionHeader("Screen-only / background")
+                    ForEach(others) { BlockerRow(assertion: $0, pending: isPending($0)) }
                 }
-                .frame(maxHeight: 240)
             }
         }
     }
@@ -46,10 +47,12 @@ struct AssertionListView: View {
     }
 }
 
-/// One assertion row with the reason, an inline allow/block menu, and a
-/// tap-to-expand detail disclosure.
-struct AssertionRow: View {
+/// One blocker, with its real app icon, a plain-language reason, who's behind it,
+/// how long it's been held — and, when it still needs a decision, the inline
+/// Allow / Block buttons. Tap to expand the full, copyable detail.
+struct BlockerRow: View {
     let assertion: PowerAssertion
+    var pending: Bool = false
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var rules: RulesEngine
     @State private var showDetails = false
@@ -58,44 +61,52 @@ struct AssertionRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: assertion.reason.category.systemImage)
-                    .foregroundStyle(Color.ink2)
-                    .frame(width: 18)
+            HStack(alignment: .top, spacing: Space.s2) {
+                AppIconView(assertion: assertion, size: 26)
+                    .padding(.top, 1)
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {
                         Text(assertion.displayName)
                             .font(HarfFont.bodyMedium)
                             .foregroundStyle(Color.ink1)
                             .lineLimit(1)
-                        policyBadge
+                        if !pending { policyBadge }
                     }
-                    Text(rowSubtitle)
+                    Text(contextLine)
                         .font(HarfFont.micro)
                         .foregroundStyle(Color.ink3)
-                        .lineLimit(2)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if pending { approvalButtons }
                 }
+
                 Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(Color.ink4)
-                    .rotationEffect(.degrees(showDetails ? 90 : 0))
-                    .accessibilityHidden(true)
-                policyMenu
-                    .accessibilitySortPriority(-1)
+
+                if !pending {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(Color.ink4)
+                        .rotationEffect(.degrees(showDetails ? 90 : 0))
+                        .accessibilityHidden(true)
+                    policyMenu.accessibilitySortPriority(-1)
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Space.s3)
+            .padding(.vertical, Space.s2)
             .contentShape(Rectangle())
             .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() } }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("\(assertion.displayName). \(rowSubtitle)")
-            .accessibilityValue(showDetails ? "Expanded" : "Collapsed")
-            .accessibilityHint("Shows or hides details")
-            .accessibilityAction {
+            .accessibilityElement(children: pending ? .contain : .combine)
+            .accessibilityAddTraits(pending ? [] : .isButton)
+            .accessibilityLabel("\(assertion.displayName). \(contextLine)")
+            .accessibilityValue(pending ? "" : (showDetails ? "Expanded" : "Collapsed"))
+            .accessibilityAction(.default) {
                 withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() }
+            }
+            .background(pending ? Color.warningTint.opacity(0.45) : Color.clear)
+            .overlay(alignment: .leading) {
+                if pending { Rectangle().fill(Color.warning).frame(width: 3) }
             }
 
             if showDetails {
@@ -104,12 +115,39 @@ struct AssertionRow: View {
         }
     }
 
-    /// Reason-led subtitle: "Playing media · via runningboardd · for 14m".
-    private var rowSubtitle: String {
+    /// "Playing media · via coreaudiod · held 14m · auto-releases in 84s".
+    private var contextLine: String {
         var parts = [assertion.reason.explanation]
         if let attribution = assertion.attribution { parts.append(attribution) }
-        if let held = appState.heldDuration(assertion) { parts.append(held) }
+        if let held = appState.heldDuration(assertion) {
+            parts.append("held " + held.replacingOccurrences(of: "for ", with: ""))
+        }
+        if let secs = assertion.reason.autoReleaseSeconds {
+            parts.append("auto-releases in \(secs)s")
+        }
         return parts.joined(separator: " · ")
+    }
+
+    private var approvalButtons: some View {
+        HStack(spacing: Space.s2) {
+            Button("Allow") { appState.setPolicy(.allow, for: assertion) }
+                .buttonStyle(HarfButtonStyle(variant: .accent, size: .small))
+                .fixedSize()
+                .help("Let this app keep the Mac awake whenever it needs to.")
+            AllowForMenu(title: "For…", assertion: assertion)
+                .menuStyle(.borderlessButton)
+                .tint(Color.ink2)
+                .fixedSize()
+            Button("Let it sleep") { appState.setPolicy(.ignore, for: assertion) }
+                .buttonStyle(HarfButtonStyle(variant: .ghost, size: .small))
+                .fixedSize()
+                .help("Ignore this app's hold — the Mac may sleep while it runs.")
+            Button("Not now") { appState.dismissPending(assertion) }
+                .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
+                .fixedSize()
+                .help("Dismiss without making a rule.")
+        }
+        .padding(.top, 2)
     }
 
     @ViewBuilder private var policyBadge: some View {
@@ -145,6 +183,7 @@ struct AssertionRow: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .tint(Color.ink3)
         .fixedSize()
         .accessibilityLabel("Rules for \(assertion.displayName)")
     }
