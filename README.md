@@ -67,9 +67,17 @@ Keeping a Mac awake is a one-liner. **Knowing when it's safe to sleep — and ma
 <img src="assets/screenshot-menu.png" width="360" alt="Decaffeinate menu bar — the truth about what's keeping your Mac awake" />
 </div>
 
-The menu shows exactly what's holding your Mac awake — even tracing a hold routed
-through a shared daemon back to the real app (*Safari · via runningboardd*) — with
-one-click **Sleep Now**, auto-sleep, and keep-awake.
+The menu shows exactly what's holding your Mac awake — **and why**: "microphone in
+use (likely a call)", "playing media", "keeps the display on", "auto-releases in
+N s" — even tracing a hold routed through a shared daemon back to the real app
+(*Safari · via runningboardd*). Tap any row for the full detail. One-click **Sleep
+Now**, auto-sleep, and keep-awake.
+
+**A friendly first run** — a short welcome explains what it does and the safety promise:
+
+<div align="center">
+<img src="assets/onboarding.png" width="360" alt="Decaffeinate first-run welcome — safe by default" />
+</div>
 
 **Menu-bar at a glance** — a custom mug tells you the state without opening the menu:
 
