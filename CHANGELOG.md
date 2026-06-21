@@ -4,6 +4,22 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] — 2026-06-21
+
+Stop the agent-`caffeinate` churn. AI agents (Claude Code…) run `caffeinate -i -t
+300`, which re-spawns a fresh process every ~5 minutes — so the menu's "held"
+timer kept resetting and the list churned with ever-changing pids.
+
+### Fixed
+- **One stable row per agent session.** All of a session's churning caffeinates
+  now coalesce into a single row keyed by *agent + project + terminal* — labeled
+  "Claude Code · ~/myrepo" — that survives the respawns. Two projects (or two
+  terminal tabs) are two distinct, stable rows; "N apps holding" counts sessions.
+- **A correct "held" duration** anchored to when the *session* first started
+  holding (tracked across ticks with a 90-second grace so the respawn gap doesn't
+  reset it), instead of the current 5-minute process. The detail view notes
+  "Re-arms automatically (caffeinate -t)".
+
 ## [1.7.0] — 2026-06-21
 
 Transparency & agentic integration — answer *where* a keep-awake came from, and

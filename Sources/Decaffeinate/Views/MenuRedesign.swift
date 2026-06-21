@@ -230,13 +230,13 @@ private struct RDList: View {
     @State private var showExplainer = false
     @State private var didAutoShow = false
 
-    private var systemBlockers: [PowerAssertion] {
-        appState.assertions.filter(\.blocksSystemSleep)
-    }
     private var others: [PowerAssertion] {
         appState.assertions.filter { !$0.blocksSystemSleep }
     }
     private func isPending(_ a: PowerAssertion) -> Bool { appState.isPendingDecision(a) }
+    private func isPending(_ group: HoldGroup) -> Bool {
+        group.members.contains { appState.isPendingDecision($0) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.usesCards ? theme.rowGap : 0) {
@@ -246,7 +246,7 @@ private struct RDList: View {
             } else {
                 sectionHeader
                 if showExplainer { explainerCard }
-                rows(systemBlockers)
+                groupRows(appState.groupedSystemBlockers)
                 if !others.isEmpty {
                     RDSectionLabel(text: "Screen-only / background", trailing: nil)
                         .padding(.top, theme.usesCards ? 0 : Space.s2)
@@ -301,9 +301,24 @@ private struct RDList: View {
         .padding(.bottom, Space.s2)
     }
 
+    @ViewBuilder private func groupRows(_ list: [HoldGroup]) -> some View {
+        ForEach(Array(list.enumerated()), id: \.element.id) { idx, group in
+            RDRow(group: group, pending: isPending(group))
+            if !theme.usesCards && idx < list.count - 1 {
+                Rectangle().fill(theme.hairline).frame(height: 1)
+                    .padding(.leading, theme.contentInset + Metrics.rowIcon + Space.s3)
+            }
+        }
+    }
+
+    /// Non-system holds (screen-only / background) — always singleton rows.
     @ViewBuilder private func rows(_ list: [PowerAssertion]) -> some View {
         ForEach(Array(list.enumerated()), id: \.element.id) { idx, a in
-            RDRow(assertion: a, pending: isPending(a))
+            RDRow(
+                group: HoldGroup(
+                    id: "solo:" + a.id, representative: a, members: [a],
+                    isAgentSession: false, firstSeen: nil),
+                pending: isPending(a))
             if !theme.usesCards && idx < list.count - 1 {
                 Rectangle().fill(theme.hairline).frame(height: 1)
                     .padding(.leading, theme.contentInset + Metrics.rowIcon + Space.s3)
@@ -345,13 +360,24 @@ private struct RDSectionLabel: View {
 // ── One blocker row: icon · name + tag · two-tone context · (pending) 2 buttons ──
 private struct RDRow: View {
     @Environment(\.theme) private var theme
-    let assertion: PowerAssertion
+    let group: HoldGroup
     var pending: Bool = false
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var rules: RulesEngine
     @State private var showDetails = false
 
+    /// A stable stand-in for everything the row does; for an agent session this
+    /// is the longest-lived member, so it doesn't flicker as pids churn.
+    private var assertion: PowerAssertion { group.representative }
     private var policy: RulePolicy? { rules.policy(for: assertion) }
+
+    /// "Claude Code · ~/myrepo" for an agent session, else the app's name.
+    private var titleText: String {
+        if group.isAgentSession, let crumb = appState.originCrumb(for: assertion) {
+            return crumb
+        }
+        return assertion.displayName
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -375,7 +401,7 @@ private struct RDRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: Space.s2) {
-                    Text(assertion.displayName)
+                    Text(titleText)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(theme.ink1).lineLimit(1)
                     if !pending { tag }
@@ -401,16 +427,25 @@ private struct RDRow: View {
     private var contextText: Text {
         var t = Text(appState.displayReason(for: assertion)).foregroundStyle(theme.ink2)
         var tail: [String] = []
-        if let origin = appState.originCrumb(for: assertion) {
-            tail.append(origin)
-        } else if let attribution = assertion.attribution {
-            tail.append(attribution)
-        }
-        if let held = appState.heldDuration(assertion) {
-            tail.append("held " + held.replacingOccurrences(of: "for ", with: ""))
-        }
-        if let secs = assertion.reason.autoReleaseSeconds {
-            tail.append("auto-releases in \(secs)s")
+        if group.isAgentSession {
+            // Origin is the title; show the STABLE held duration (anchored to the
+            // session's first sighting, not the churny -t respawn) + live count.
+            if let held = appState.sessionHeldDuration(for: assertion) {
+                tail.append("held " + held.replacingOccurrences(of: "for ", with: ""))
+            }
+            if group.liveCount > 1 { tail.append("\(group.liveCount) live") }
+        } else {
+            if let origin = appState.originCrumb(for: assertion) {
+                tail.append(origin)
+            } else if let attribution = assertion.attribution {
+                tail.append(attribution)
+            }
+            if let held = appState.heldDuration(assertion) {
+                tail.append("held " + held.replacingOccurrences(of: "for ", with: ""))
+            }
+            if let secs = assertion.reason.autoReleaseSeconds {
+                tail.append("auto-releases in \(secs)s")
+            }
         }
         if !tail.isEmpty {
             t = t + Text(" · " + tail.joined(separator: " · ")).foregroundStyle(theme.ink4)

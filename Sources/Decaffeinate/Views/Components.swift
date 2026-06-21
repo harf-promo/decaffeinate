@@ -83,11 +83,23 @@ struct AssertionDetailView: View {
                 )
             }
             if assertion.viaRunningboard { row("Routed via", "runningboardd (background app)") }
-            if let held = appState.heldDuration(assertion) {
-                row("Held for", held.replacingOccurrences(of: "for ", with: ""))
+            // Held duration anchored to the session's first sighting, so an agent's
+            // `caffeinate -t` respawn doesn't reset it.
+            if let secs = appState.sessionHeldSeconds(for: assertion) {
+                row("Held for", Format.duration(secs))
             }
-            if let created = assertion.createdAt {
+            if let anchor = appState.sessionAnchor(for: assertion) {
+                row("Holding since", anchor.formatted(date: .abbreviated, time: .shortened))
+            } else if let created = assertion.createdAt {
                 row("Holding since", created.formatted(date: .abbreviated, time: .shortened))
+            }
+            if appState.isAgentSession(assertion) {
+                if let created = assertion.createdAt {
+                    row(
+                        "This process",
+                        "started " + created.formatted(date: .omitted, time: .shortened))
+                }
+                row("Note", "Re-arms automatically (caffeinate -t)")
             }
             if let secs = reason.autoReleaseSeconds { row("Auto-releases", "in \(secs)s") }
             if let p = provenance, !p.holderArgv.isEmpty {

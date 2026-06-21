@@ -70,6 +70,12 @@ final class AppState: ObservableObject {
     /// "decide what to do" queue, surfaced in the menu.
     @Published private(set) var pendingClassification: [PowerAssertion] = []
 
+    /// System-blocking holds grouped into stable rows: one group per agent session
+    /// (coalesced across the `caffeinate -t` respawns), singletons for everything
+    /// else. The menu renders these so rows don't churn as pids cycle. Snapshotted
+    /// in `tick()` so the order/first-seen stay consistent within a frame.
+    @Published private(set) var groupedSystemBlockers: [HoldGroup] = []
+
     /// Status of the "sleep when my agent/build finishes" watcher.
     @Published private(set) var watchStatus: AgentWatcher.Status = .idle
 
@@ -84,6 +90,18 @@ final class AppState: ObservableObject {
 
     private var timer: Timer?
     private var notifiedBlockers: Set<String> = []
+
+    /// First time each live session key was observed — the anchor for a stable
+    /// "held since" that survives `caffeinate -t` respawns. Pruned with a grace
+    /// period so the brief gap between an expiring `-t` hold and its respawn
+    /// doesn't reset the timer.
+    private var sessionFirstSeen: [String: Date] = [:]
+    /// Last tick each session key was seen live — drives the grace-period prune.
+    private var sessionLastSeen: [String: Date] = [:]
+    /// How long a vanished session key keeps its anchor before we forget it —
+    /// covers the gap while one `caffeinate -t 300` exits and the agent respawns.
+    private let sessionGracePeriod: TimeInterval = 90
+
     private var suppressForceSleepUntil: Date?
     /// Separate, short cooldown for the immediate-safety guards so an unrelated
     /// idle sleep's 60s cooldown can never muzzle the overheating / critical-
@@ -444,6 +462,11 @@ final class AppState: ObservableObject {
         // 2) Firewall: surface newly-seen, unclassified blockers.
         updateFirewallQueue(systemBlockers, enabled: s.notifyOnNewBlocker)
 
+        // Track per-session first-seen (with grace) and snapshot the coalesced
+        // rows, so the menu shows one stable row per agent session.
+        updateSessionTracking(systemBlockers)
+        groupedSystemBlockers = computeGroupedSystemBlockers()
+
         // 2.5) Agent watcher: optionally auto-arm on a recognized agent task, then
         // detect when a watched build/agent has finished.
         autoArmAgentWatchIfNeeded()
@@ -582,6 +605,104 @@ final class AppState: ObservableObject {
             return (owner.bundleIdentifier ?? owner.name).lowercased()
         }
         return assertion.bundleIdentifier?.lowercased() ?? assertion.processName.lowercased()
+    }
+
+    // MARK: Session identity & coalescing (stable across `caffeinate -t` respawns)
+
+    /// A stable identity for a hold that survives the agent's `caffeinate -t`
+    /// respawns. Agent holds coalesce by (agent + project folder + terminal);
+    /// everything else keeps its own per-assertion identity, so non-agent rows
+    /// never merge and behave exactly as before.
+    func sessionKey(for assertion: PowerAssertion) -> String {
+        guard isAgentSession(assertion),
+            let provenance = provenanceResolver.provenance(for: assertion.pid)
+        else {
+            return "solo:" + assertion.id
+        }
+        let agent = (provenance.originDisplayName ?? "agent").lowercased()
+        let folder = (provenance.cwd ?? "·").lowercased()
+        let tty = provenance.ttyName ?? "·"
+        return "agent:\(agent)|\(folder)|\(tty)"
+    }
+
+    /// Record first-/last-seen per session key, pruning a key only after it's
+    /// been absent past the grace period (so a respawn gap doesn't reset it).
+    private func updateSessionTracking(_ systemBlockers: [PowerAssertion]) {
+        let t = now()
+        var liveKeys: Set<String> = []
+        for blocker in systemBlockers {
+            let k = sessionKey(for: blocker)
+            liveKeys.insert(k)
+            sessionLastSeen[k] = t
+            // Anchor to the real assertion start (up to ~5 min old for a hold that
+            // predates app launch), and back-date if a concurrent member is older —
+            // a respawn is always newer, so this only ever improves the estimate.
+            let start = blocker.createdAt ?? t
+            if let existing = sessionFirstSeen[k] {
+                if start < existing { sessionFirstSeen[k] = start }
+            } else {
+                sessionFirstSeen[k] = start
+            }
+        }
+        for (k, last) in sessionLastSeen where !liveKeys.contains(k) {
+            if t.timeIntervalSince(last) > sessionGracePeriod {
+                sessionFirstSeen.removeValue(forKey: k)
+                sessionLastSeen.removeValue(forKey: k)
+            }
+        }
+    }
+
+    /// The stable "holding since" anchor for a hold's session, if tracked.
+    func sessionAnchor(for assertion: PowerAssertion) -> Date? {
+        sessionFirstSeen[sessionKey(for: assertion)]
+    }
+
+    /// Seconds a session has been continuously holding — anchored to its first
+    /// sighting, not the current process's `createdAt`, so a `-t` respawn doesn't
+    /// reset it. Falls back to the assertion's own age when untracked.
+    func sessionHeldSeconds(for assertion: PowerAssertion) -> TimeInterval? {
+        if let first = sessionAnchor(for: assertion) {
+            return now().timeIntervalSince(first)
+        }
+        if let created = assertion.createdAt { return now().timeIntervalSince(created) }
+        return nil
+    }
+
+    /// "for 12m" — the stable, respawn-proof held duration string.
+    func sessionHeldDuration(for assertion: PowerAssertion) -> String? {
+        sessionHeldSeconds(for: assertion).map { "for " + Format.duration($0) }
+    }
+
+    /// Coalesce the live system-blocking holds into stable rows: one group per
+    /// agent session, singletons for everything else. Order follows the scan sort
+    /// (first occurrence of each key).
+    private func computeGroupedSystemBlockers() -> [HoldGroup] {
+        let blockers = assertions.filter(\.blocksSystemSleep)
+        var order: [String] = []
+        var bucket: [String: [PowerAssertion]] = [:]
+        for blocker in blockers {
+            let k = sessionKey(for: blocker)
+            if bucket[k] == nil { order.append(k) }
+            bucket[k, default: []].append(blocker)
+        }
+        return order.map { k in
+            let members = bucket[k] ?? []
+            let rep = representative(of: members)
+            return HoldGroup(
+                id: k, representative: rep, members: members,
+                isAgentSession: isAgentSession(rep), firstSeen: sessionFirstSeen[k])
+        }
+    }
+
+    /// Pick a stable representative so the row's label/icon doesn't flicker as
+    /// pids churn: the longest-lived member, tie-broken by lowest pid.
+    private func representative(of members: [PowerAssertion]) -> PowerAssertion {
+        members.min { lhs, rhs in
+            switch (lhs.createdAt, rhs.createdAt) {
+            case (let l?, let r?) where l != r: return l < r
+            default: return lhs.pid < rhs.pid
+            }
+        } ?? members[0]
     }
 
     /// Whether this blocker still needs the user's allow/block decision. Matched
@@ -723,16 +844,17 @@ final class AppState: ObservableObject {
 
     var systemBlockerCount: Int { assertions.filter(\.blocksSystemSleep).count }
 
-    /// Unique apps actively holding the Mac awake that you have **not** allowed —
-    /// the same count the headline speaks to. (Allowed apps still appear in the
-    /// list, tagged, but aren't counted as holding it awake against your wishes.)
+    /// Distinct things actively holding the Mac awake that you have **not**
+    /// allowed — the count the headline speaks to. Agent sessions count per
+    /// session (Claude in ~/repoA and ~/repoB are two), non-agent apps dedup by
+    /// display name as before. (Allowed apps still appear in the list, tagged.)
     var activeHoldingCount: Int {
         let held =
             assertions
             .filter(\.blocksSystemSleep)
             .filter { !rulesEngine.isActivelyAllowed($0, now: now()) }
-            .map(\.displayName)
-        return Set(held).count
+        let identities = held.map { isAgentSession($0) ? sessionKey(for: $0) : $0.displayName }
+        return Set(identities).count
     }
 
     /// True when the idle force-sleep engine is currently held off for any reason

@@ -749,4 +749,143 @@ final class AppStateTests: XCTestCase {
         on.state.tick()
         XCTAssertNotEqual(on.state.watchStatus, .idle, "auto-arm fires for a recognized agent")
     }
+
+    // MARK: Session coalescing (ephemeral caffeinate churn)
+
+    /// An agent caffeinate with explicit pid / cwd / tty / createdAt so tests can
+    /// simulate respawns (new pid, same session) and concurrent sessions.
+    private func agentCaff(
+        _ h: Harness, pid: pid_t, cwd: String, tty: String, created: Date,
+        agent: String = "Claude Code"
+    ) -> PowerAssertion {
+        h.provenance.byPid[pid] = ProcessProvenance(
+            holderPid: pid, holderName: "caffeinate",
+            holderArgv: ["caffeinate", "-i", "-t", "300"],
+            parentChain: [ProcessLink(pid: pid - 1, name: "2.1.183")],
+            originApp: nil, originKind: .agentHost, ttyName: tty,
+            cwd: cwd, originCommand: ["claude"], sessionLabel: nil)
+        return Fixtures.assertion(
+            pid: pid, process: "caffeinate", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, created: created)
+    }
+
+    func testCaffeinateRespawnsCoalesceToOneGroup() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [
+            agentCaff(h, pid: 500, cwd: "/tmp/repo", tty: "ttys003", created: h.clock.date)
+        ]
+        h.state.tick()
+        XCTAssertEqual(h.state.groupedSystemBlockers.count, 1)
+
+        h.clock.advance(300)
+        let respawn = agentCaff(
+            h, pid: 777, cwd: "/tmp/repo", tty: "ttys003", created: h.clock.date)
+        h.scanner.assertions = [respawn]
+        h.state.tick()
+        XCTAssertEqual(
+            h.state.groupedSystemBlockers.count, 1, "a respawn is the same session")
+    }
+
+    func testSessionHeldDurationSurvivesRespawn() throws {
+        let h = makeHarness(); defer { h.cleanup() }
+        let t0 = h.clock.date
+        h.scanner.assertions = [
+            agentCaff(h, pid: 500, cwd: "/tmp/repo", tty: "ttys003", created: t0)
+        ]
+        h.state.tick()  // first seen, anchored to createdAt == t0
+
+        h.clock.advance(300)  // the -t hold's lifetime, then a respawn (new pid)
+        let a1 = agentCaff(h, pid: 777, cwd: "/tmp/repo", tty: "ttys003", created: h.clock.date)
+        h.scanner.assertions = [a1]
+        h.state.tick()
+
+        let secs = try XCTUnwrap(h.state.sessionHeldSeconds(for: a1))
+        XCTAssertEqual(secs, 300, accuracy: 1, "anchored to first-seen, not the new createdAt")
+    }
+
+    func testSessionAnchorSurvivesSubGraceGap() throws {
+        let h = makeHarness(); defer { h.cleanup() }
+        let t0 = h.clock.date
+        h.scanner.assertions = [
+            agentCaff(h, pid: 500, cwd: "/tmp/repo", tty: "ttys003", created: t0)
+        ]
+        h.state.tick()
+
+        h.clock.advance(30)  // session briefly absent for 30s (< 90s grace)
+        h.scanner.assertions = []
+        h.state.tick()
+        h.clock.advance(5)
+        let a1 = agentCaff(h, pid: 777, cwd: "/tmp/repo", tty: "ttys003", created: h.clock.date)
+        h.scanner.assertions = [a1]
+        h.state.tick()
+
+        let secs = try XCTUnwrap(h.state.sessionHeldSeconds(for: a1))
+        XCTAssertEqual(secs, 35, accuracy: 1, "anchor survives an absence shorter than the grace")
+    }
+
+    func testSessionAnchorResetsPastGracePeriod() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let t0 = h.clock.date
+        h.scanner.assertions = [
+            agentCaff(h, pid: 500, cwd: "/tmp/repo", tty: "ttys003", created: t0)
+        ]
+        h.state.tick()
+
+        h.scanner.assertions = []
+        h.clock.advance(200)  // > 90s grace with nothing live → anchor forgotten
+        h.state.tick()
+        let a1 = agentCaff(h, pid: 777, cwd: "/tmp/repo", tty: "ttys003", created: h.clock.date)
+        h.scanner.assertions = [a1]
+        h.state.tick()
+        let secs = h.state.sessionHeldSeconds(for: a1) ?? -1
+        XCTAssertEqual(secs, 0, accuracy: 1, "past grace, the session is treated as new")
+    }
+
+    func testTwoProjectsAreTwoSessionsAndTwoHoldingCount() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let now = h.clock.date
+        h.scanner.assertions = [
+            agentCaff(h, pid: 500, cwd: "/tmp/repoA", tty: "ttys003", created: now),
+            agentCaff(h, pid: 600, cwd: "/tmp/repoB", tty: "ttys004", created: now),
+        ]
+        h.state.tick()
+        XCTAssertEqual(h.state.groupedSystemBlockers.count, 2)
+        XCTAssertEqual(h.state.activeHoldingCount, 2, "Claude in two repos counts as two")
+    }
+
+    func testSameFolderDifferentTerminalsAreTwoSessions() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let now = h.clock.date
+        h.scanner.assertions = [
+            agentCaff(h, pid: 500, cwd: "/tmp/repo", tty: "ttys003", created: now),
+            agentCaff(h, pid: 600, cwd: "/tmp/repo", tty: "ttys004", created: now),
+        ]
+        h.state.tick()
+        XCTAssertEqual(h.state.groupedSystemBlockers.count, 2, "different terminals split")
+    }
+
+    func testConcurrentCaffeinatesInOneSessionAreOneGroupWithCount() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let now = h.clock.date
+        h.scanner.assertions = [
+            agentCaff(h, pid: 500, cwd: "/tmp/repo", tty: "ttys003", created: now),
+            agentCaff(
+                h, pid: 777, cwd: "/tmp/repo", tty: "ttys003", created: now.addingTimeInterval(5)),
+        ]
+        h.state.tick()
+        let groups = h.state.groupedSystemBlockers
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups.first?.liveCount, 2)
+        XCTAssertEqual(groups.first?.representative.pid, 500, "oldest member is the representative")
+    }
+
+    func testNonAgentBlockerStaysSingletonRow() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome", bundle: "com.google.Chrome")]
+        h.state.tick()
+        let groups = h.state.groupedSystemBlockers
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertFalse(groups[0].isAgentSession)
+        XCTAssertEqual(groups[0].liveCount, 1)
+    }
 }
