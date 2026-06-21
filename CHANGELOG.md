@@ -4,6 +4,51 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] — 2026-06-21
+
+A correctness, safety, privacy & accessibility pass from a 37-finding adversarial
+audit of 1.4.0. No new features — everything here makes the existing ones more
+trustworthy.
+
+### Fixed — sleep correctness & safety
+- **No more "neither sleeps nor stays awake" limbo.** A quiet window under the
+  battery floor (or thermal pressure) now stops holding and lets force-sleep
+  re-engage; the active-hours schedule yields to the battery floor too.
+- **Stale media can't pin the Mac awake forever.** Audio-out / display-on holds
+  release after you've been idle past the threshold + 30 min (a forgotten
+  background tab). The microphone/call guard is now its own setting and is never
+  idle-capped.
+- **Anti-spoofing.** Time Machine / software-update detection trusts the verified
+  owning process (backupd / softwareupdated / installd), not a caller-controlled
+  assertion *name* — closing a trivial force-sleep bypass.
+- The overheating / critical-battery backpack guard has its own cooldown, so an
+  unrelated idle sleep can't muzzle it.
+- `pmset sleepnow` no longer blocks the main actor (the menu could hang at the
+  moment of sleep).
+
+### Fixed — honesty in the UI
+- The menu no longer says "Free to sleep" / "Sleeps ~N min" while it's actually
+  holding sleep off — it shows "Auto-sleep paused — <reason>".
+- Quiet-window rows say "paused — <reason>" when a safety rail drops the hold,
+  instead of claiming "Awake until X".
+- The watcher shows "finished — sleep paused" when a schedule/quiet window is
+  holding. Schedule settings gain a live "Active now / next window" indicator.
+
+### Fixed — privacy
+- Notifications show a classified reason ("Playing media"), never the raw,
+  app-controlled assertion name (which can leak a media title to the lock screen).
+- App-supplied reason text and the `--scan` output are sanitized (control/ANSI
+  stripped, clamped).
+
+### Fixed — accessibility
+- VoiceOver announces the menu-bar countdown; assertion rows are real buttons with
+  expand state; sliders/pickers get labels & values; the badge font scales;
+  onboarding panels scroll at large Dynamic Type.
+
+### Changed
+- The `.ignore` rule reads "Ignored" / "Let it sleep" consistently (was "Blocked").
+- 127 tests (was 100); removed dead code; rule expiry uses the injected clock.
+
 ## [1.4.0] — 2026-06-21
 
 The "why", not just the "what" — Decaffeinate now explains *why* each app is
