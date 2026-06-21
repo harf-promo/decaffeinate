@@ -440,7 +440,8 @@ final class AppState: ObservableObject {
             if !pendingClassification.contains(where: { key($0) == k }) {
                 pendingClassification.append(blocker)
             }
-            notifier.notifyNewBlocker(appName: blocker.displayName, assertionName: blocker.name)
+            notifier.notifyNewBlocker(
+                appName: blocker.displayName, reason: blocker.reason.category.label)
         }
     }
 

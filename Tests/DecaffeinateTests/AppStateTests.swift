@@ -49,10 +49,10 @@ private final class ThermalBox: @unchecked Sendable {
 }
 
 @MainActor private final class FakeNotifier: BlockerNotifying {
-    private(set) var notifications: [(app: String, name: String)] = []
+    private(set) var notifications: [(app: String, reason: String)] = []
     func requestAuthorizationIfNeeded() {}
-    func notifyNewBlocker(appName: String, assertionName: String) {
-        notifications.append((appName, assertionName))
+    func notifyNewBlocker(appName: String, reason: String) {
+        notifications.append((appName, reason))
     }
 }
 
@@ -316,11 +316,16 @@ final class AppStateTests: XCTestCase {
 
     func testFirewallSurfacesNewBlockerAndNotifiesOnce() {
         let h = makeHarness(); defer { h.cleanup() }
-        h.scanner.assertions = [systemBlocker("Zoom", bundle: "us.zoom.xos")]
+        h.scanner.assertions = [
+            systemBlocker("Zoom", bundle: "us.zoom.xos")  // default name "Test assertion"
+        ]
 
         h.state.tick()
         XCTAssertEqual(h.state.pendingClassification.count, 1)
         XCTAssertEqual(h.notifier.notifications.count, 1)
+        // The notification reason must be a classified label, never the raw,
+        // app-controlled assertion name (which can leak to the lock screen).
+        XCTAssertFalse(h.notifier.notifications.first!.reason.contains("Test assertion"))
 
         h.state.tick()  // already notified → no duplicate
         XCTAssertEqual(h.notifier.notifications.count, 1)

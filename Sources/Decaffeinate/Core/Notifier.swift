@@ -21,13 +21,16 @@ final class Notifier {
         }
     }
 
-    func notifyNewBlocker(appName: String, assertionName: String) {
+    func notifyNewBlocker(appName: String, reason: String) {
         guard isBundled else { return }
         requestAuthorizationIfNeeded()
 
         let content = UNMutableNotificationContent()
+        // `appName` is the resolved display name and `reason` is a fixed,
+        // classified label — never the raw, app-controlled assertion text, which
+        // can carry a media title / file name and would leak to the lock screen.
         content.title = "\(appName) is keeping your Mac awake"
-        content.body = "“\(assertionName)” — open Decaffeinate to Allow or Block it."
+        content.body = "\(reason) — open Decaffeinate to Allow or Block it."
         content.sound = nil
 
         let request = UNNotificationRequest(

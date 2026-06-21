@@ -101,7 +101,9 @@ enum ReasonEngine {
         {
             return .networkTransfer
         }
-        if proc == "backupd" || haystack.contains("time machine") || haystack.contains("backup") {
+        // Only the verified daemon or the specific "Time Machine" phrase — a bare
+        // "backup" keyword would mislabel every cloud-backup client as Time Machine.
+        if proc == "backupd" || haystack.contains("time machine") {
             return .backup
         }
         if proc == "softwareupdated" || proc == "installd"
@@ -124,11 +126,25 @@ enum ReasonEngine {
         -> String
     {
         if category != .unknown { return category.label }
+        // The fallback text is fully app-controlled, so sanitize it before it
+        // reaches the UI, the history log, a notification, or `--scan`'s stdout.
         if let reason = a.humanReadableReason, !reason.isEmpty {
-            return sentenceCased(reason)
+            return sanitize(sentenceCased(reason))
         }
-        if let details = a.details, !details.isEmpty { return details }
+        if let details = a.details, !details.isEmpty { return sanitize(details) }
         return category.label
+    }
+
+    /// Strip control characters (NUL, ESC/ANSI terminal-injection sequences, …),
+    /// collapse whitespace, and clamp the length of app-supplied free text before
+    /// it's displayed or printed. Keeps the feature (showing macOS' own reason)
+    /// while removing the untrusted-text-to-terminal / oversharing vector.
+    static func sanitize(_ string: String, maxLength: Int = 120) -> String {
+        let stripped = String(
+            string.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) })
+        let collapsed = stripped.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        guard collapsed.count > maxLength else { return collapsed }
+        return String(collapsed.prefix(maxLength - 1)) + "…"
     }
 
     static func resourceLabels(_ resources: [String]) -> [String] {

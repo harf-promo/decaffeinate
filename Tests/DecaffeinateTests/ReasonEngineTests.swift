@@ -79,6 +79,54 @@ final class ReasonEngineTests: XCTestCase {
         XCTAssertEqual(ReasonEngine.classify(a).explanation, "Some app is preventing sleep.")
     }
 
+    // MARK: Precedence (resources win over process/name keywords)
+
+    func testMicrophoneResourceBeatsProcessKeyword() {
+        let a = Fixtures.assertion(
+            process: "caffeinate", name: "caffeinate command-line tool", resources: ["audio-in"])
+        XCTAssertEqual(category(a), .microphone, "the mic/call signal must win over keywords")
+    }
+
+    func testAudioOutBeatsBackupKeyword() {
+        let a = Fixtures.assertion(process: "backupd", name: "Backup", resources: ["audio-out"])
+        XCTAssertEqual(category(a), .audioPlayback)
+    }
+
+    func testCloudBackupKeywordIsNotTimeMachine() {
+        // A bare "backup" keyword must not brand every cloud-backup app as TM.
+        let a = Fixtures.assertion(process: "bzbmenu", name: "Cloud backup in progress")
+        XCTAssertNotEqual(category(a), .backup)
+    }
+
+    func testUnknownFallsBackToDetailsThenLabel() {
+        let withDetails = Fixtures.assertion(
+            name: "opaque", humanReadableReason: nil, details: "Pending background work")
+        XCTAssertEqual(ReasonEngine.classify(withDetails).explanation, "Pending background work")
+
+        let bare = Fixtures.assertion(name: "opaque", humanReadableReason: nil, details: nil)
+        XCTAssertEqual(ReasonEngine.classify(bare).explanation, AssertionCategory.unknown.label)
+    }
+
+    // MARK: Sanitization of app-controlled text
+
+    func testSanitizeRemovesControlCharsAndClamps() {
+        let dirty = "Reason\u{1B}[2J\u{07}with codes " + String(repeating: "x", count: 200)
+        let clean = ReasonEngine.sanitize(dirty)
+        XCTAssertFalse(
+            clean.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) },
+            "no control / ANSI characters survive")
+        XCTAssertLessThanOrEqual(clean.count, 120)
+        XCTAssertTrue(clean.hasPrefix("Reason"))
+    }
+
+    func testUnknownExplanationIsSanitized() {
+        let a = Fixtures.assertion(
+            name: "opaque", humanReadableReason: "Playing\u{1B}[31m something.mov")
+        let explanation = ReasonEngine.classify(a).explanation
+        XCTAssertFalse(
+            explanation.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) })
+    }
+
     func testEveryCategoryHasLabelAndIcon() {
         let cats: [AssertionCategory] = [
             .microphone, .audioPlayback, .mediaPlayback, .networkTransfer, .handoff,

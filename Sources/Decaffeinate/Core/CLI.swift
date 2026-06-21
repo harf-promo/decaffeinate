@@ -61,7 +61,10 @@ enum CLI {
 
     @MainActor
     private static func printRow(_ a: PowerAssertion) {
-        let name = a.name.isEmpty || a.name == "Unnamed" ? "—" : a.name
+        // The assertion name is app-controlled free text; sanitize before it hits
+        // the terminal (ESC/ANSI injection) just like the reason explanation.
+        let rawName = a.name.isEmpty || a.name == "Unnamed" ? "—" : a.name
+        let name = ReasonEngine.sanitize(rawName)
         let via = a.attribution.map { " (\($0))" } ?? ""
         let reason = a.reason
         var why = "↳ \(reason.explanation)"

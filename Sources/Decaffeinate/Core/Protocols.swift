@@ -39,7 +39,10 @@ protocol KeepAwakeControlling {
 @MainActor
 protocol BlockerNotifying {
     func requestAuthorizationIfNeeded()
-    func notifyNewBlocker(appName: String, assertionName: String)
+    /// `reason` must be a non-identifying, classified label (e.g. "Playing
+    /// media"), never raw app-supplied assertion text — notifications surface on
+    /// the lock screen.
+    func notifyNewBlocker(appName: String, reason: String)
 }
 
 @MainActor
