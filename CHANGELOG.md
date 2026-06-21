@@ -4,6 +4,36 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-06-21
+
+A visual redesign in the **Harf design system**, a **new logo**, and the
+triggers/automation feature.
+
+### Added
+- **New logo** — a flat geometric crescent moon + a single green accent dot
+  (sleep, the honest inverse of a coffee cup), replacing the brown-gradient mug.
+  The menu-bar icon becomes a moon ↔ sun family (crescent · crescent+star · sun ·
+  bolt). Authored as a vector SVG (`assets/decaffeinate-mark.svg`).
+- **Triggers / automation** — keep the Mac awake *while* a condition holds: an app
+  is running, on AC power, or CPU is busy (Settings → Triggers). The safety rails
+  (battery floor / backpack guard) still override.
+
+### Changed
+- **Adopted the Harf design system** across the app: a SwiftUI token layer
+  (brand grey + green, ink/paper scales, the positive/warning/critical/info status
+  family, the √2 spacing ladder, the 5/4 type scale, sharp corners, hairlines).
+- **Onboarding redesigned** editorially — a quiet masthead, UPPERCASE-tracked step
+  eyebrows, a heavy display heading, a grey lede, green-dot bullets, numeral step
+  indicators, and an ink primary "Get started →" button.
+- **Menu, status card and Settings** re-skinned: the moon mark's *shape* carries
+  the state with a thin status-coloured rule (no full-card wash — clean in dark
+  mode); ink primary "Sleep Now"; hairlines, stamped pills, eyebrow section heads;
+  green kept as punctuation, with teal for active state.
+
+### Other
+- The Homebrew cask is now `brew style`-clean and cask-core-ready (see
+  `docs/HOMEBREW-CORE.md`). 138 tests.
+
 ## [1.4.1] — 2026-06-21
 
 A correctness, safety, privacy & accessibility pass from a 37-finding adversarial

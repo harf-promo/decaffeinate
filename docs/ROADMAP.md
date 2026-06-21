@@ -21,11 +21,17 @@ honest **microphone-in-use** detection via the public `audio-in` resource key),
 with per-blocker detail; **onboarding**; **sleep history**; **schedules** &
 **quiet windows**; and an optional **menu-bar countdown**.
 
+**1.4.1** — a 37-finding adversarial audit: safety-rail correctness, UX honesty,
+privacy and accessibility hardening.
+
+**1.5.0** — adopts the **Harf design system** (new crescent logo, a SwiftUI token
+layer, redesigned onboarding/menu/settings); **triggers / automation**
+(keep-awake while an app runs / on AC / CPU busy).
+
 ## Near term
 
-- [ ] **Submit to homebrew/cask core** (removes the one-time `brew trust`).
-- [ ] **Triggers / automation** — stay awake while app X runs / on AC / above a
-  CPU threshold (the main feature gap vs Amphetamine).
+- [ ] **Submit to homebrew/cask core** (removes the one-time tap step) — the cask
+  is style-ready; gated only on notability. See [`HOMEBREW-CORE.md`](HOMEBREW-CORE.md).
 
 ## Deeper system insight
 

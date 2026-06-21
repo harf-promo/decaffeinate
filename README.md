@@ -189,9 +189,9 @@ Open areas where you can make a dent today:
 
 ## Roadmap
 
-**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · agentic "sleep when the build finishes" detection · assertion attribution · custom menu-bar icons · universal (Intel + Apple Silicon) build.
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + new crescent logo · universal (Intel + Apple Silicon) build.
 
-**Next:** localization · schedules & quiet windows · sleep history & battery-saved insights · triggers/automation · first-run onboarding. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Next:** localization · homebrew/cask-core submission · SMC temperature sensors. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 

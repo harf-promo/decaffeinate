@@ -8,7 +8,7 @@ cask "decaffeinate" do
 
   url "https://github.com/harf-promo/decaffeinate/releases/download/v#{version}/Decaffeinate-#{version}.dmg"
   name "Decaffeinate"
-  desc "Makes your Mac sleep — sees what's keeping it awake and forces a safe sleep"
+  desc "Shows what's keeping the system awake and forces a safe sleep"
   homepage "https://github.com/harf-promo/decaffeinate"
 
   livecheck do
@@ -21,7 +21,5 @@ cask "decaffeinate" do
 
   app "Decaffeinate.app"
 
-  zap trash: [
-    "~/Library/Preferences/com.harfpromo.Decaffeinate.plist",
-  ]
+  zap trash: "~/Library/Preferences/com.harfpromo.Decaffeinate.plist"
 end
