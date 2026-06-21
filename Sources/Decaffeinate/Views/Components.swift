@@ -25,30 +25,6 @@ struct Chip: View {
     }
 }
 
-/// The tracked UPPERCASE section eyebrow used between menu sections.
-struct SectionHeader: View {
-    let title: String
-    var trailing: String?
-
-    init(_ title: String, trailing: String? = nil) {
-        self.title = title
-        self.trailing = trailing
-    }
-
-    var body: some View {
-        HStack {
-            Text(title).eyebrow()
-            Spacer()
-            if let trailing {
-                Text(trailing).eyebrow(.ink4)
-            }
-        }
-        .padding(.horizontal, Space.s3)
-        .padding(.top, Space.s2)
-        .padding(.bottom, 2)
-    }
-}
-
 /// A reusable "Allow for…" submenu offering the standard duration presets.
 /// Used by both the firewall prompt and the per-app row menu.
 struct AllowForMenu: View {
@@ -64,13 +40,6 @@ struct AllowForMenu: View {
                 }
             }
         }
-    }
-}
-
-extension View {
-    /// The small muted explanatory text style used under settings/menu controls.
-    func explanatory() -> some View {
-        font(HarfFont.caption).foregroundStyle(Color.ink3)
     }
 }
 

@@ -43,7 +43,13 @@ enum SafetyRails {
             decision.immediateSleepReasons.append("Mac is overheating (backpack guard)")
         }
         if power.onBattery, let pct = power.chargePercent, pct <= 3 {
-            decision.immediateSleepReasons.append("Battery critically low (\(pct)%)")
+            // Force sleep AND drop any keep-awake hold: if we don't also drop the
+            // hold, a user-set battery floor of ≤3% would let us try to force sleep
+            // while still asserting keep-awake — a self-contradiction. (Thermal-
+            // critical below already does both; this keeps the two guards in step.)
+            let reason = "Battery critically low (\(pct)%)"
+            decision.immediateSleepReasons.append(reason)
+            decision.dropKeepAwakeReasons.append(reason)
         }
 
         // --- Drop keep-awake overrides (but don't force sleep on an active user) ---

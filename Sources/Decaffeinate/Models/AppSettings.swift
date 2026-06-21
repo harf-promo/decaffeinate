@@ -104,10 +104,6 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
 
     /// Start Decaffeinate automatically at login.
     var launchAtLogin: Bool = false
-
-    /// Clamped to at least one minute so a corrupted or hand-edited `0` in
-    /// persisted defaults can never disable the idle gate and force constant sleep.
-    var idleThresholdSeconds: TimeInterval { max(1, idleThresholdMinutes) * 60 }
 }
 
 /// Observable wrapper that loads settings on init and writes them back to

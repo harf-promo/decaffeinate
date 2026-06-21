@@ -85,7 +85,7 @@ Now**, auto-sleep, and keep-awake.
 <img src="assets/menubar-icons.png" width="280" alt="Menu-bar states" />
 </div>
 
-> empty + crescent *(decaffeinated; free to sleep)* · draining *(winding down)* · full & steaming *(something's keeping it awake)* · with a bolt *(intentionally awake)*
+> empty cup + crescent *(decaffeinated; free to sleep)* · a downward chevron *(winding down)* · full & steaming *(something's keeping it awake)* · with a bolt *(intentionally awake)*
 
 ---
 

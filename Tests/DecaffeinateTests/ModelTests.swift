@@ -54,13 +54,13 @@ final class ModelTests: XCTestCase {
     func testIdleThresholdClampedToAtLeastOneMinute() {
         var s = DecaffeinateSettings()
         s.idleThresholdMinutes = 0
-        XCTAssertEqual(s.idleThresholdSeconds, 60, accuracy: 0.001)
+        XCTAssertEqual(s.effectiveIdleSeconds(onBattery: false), 60, accuracy: 0.001)
 
         s.idleThresholdMinutes = -5
-        XCTAssertEqual(s.idleThresholdSeconds, 60, accuracy: 0.001)
+        XCTAssertEqual(s.effectiveIdleSeconds(onBattery: false), 60, accuracy: 0.001)
 
         s.idleThresholdMinutes = 10
-        XCTAssertEqual(s.idleThresholdSeconds, 600, accuracy: 0.001)
+        XCTAssertEqual(s.effectiveIdleSeconds(onBattery: false), 600, accuracy: 0.001)
     }
 
     // MARK: RulePolicy

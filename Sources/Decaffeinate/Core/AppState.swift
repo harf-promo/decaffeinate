@@ -509,11 +509,20 @@ final class AppState: ObservableObject {
             return
         }
 
-        // Temporary "stay awake until …" quiet window.
-        if let until = quietUntil, until > now(), caffeine.isActive {
-            mug = .caffeinated
-            headline = "Awake until \(ScheduleEngine.timeLabel(until))"
-            detail = "Quiet window — auto-sleep paused"
+        // Temporary "stay awake until …" quiet window. Key on the real holding
+        // state (not the caffeine proxy): when a safety rail (battery / thermal)
+        // has paused the hold, say so plainly rather than falling through to a
+        // misleading "Sleeping in …" countdown.
+        if let until = quietUntil, until > now() {
+            if !decision.shouldDropKeepAwake {
+                mug = .caffeinated
+                headline = "Awake until \(ScheduleEngine.timeLabel(until))"
+                detail = "Quiet window — auto-sleep paused"
+            } else {
+                mug = .free
+                headline = "Quiet window paused"
+                detail = decision.dropKeepAwakeReasons.first ?? "Paused by a safety rail"
+            }
             secondsUntilForcedSleep = nil
             return
         }
@@ -608,6 +617,18 @@ final class AppState: ObservableObject {
     // MARK: Convenience for the UI
 
     var systemBlockerCount: Int { assertions.filter(\.blocksSystemSleep).count }
+
+    /// Unique apps actively holding the Mac awake that you have **not** allowed —
+    /// the same count the headline speaks to. (Allowed apps still appear in the
+    /// list, tagged, but aren't counted as holding it awake against your wishes.)
+    var activeHoldingCount: Int {
+        let held =
+            assertions
+            .filter(\.blocksSystemSleep)
+            .filter { !rulesEngine.isActivelyAllowed($0, now: now()) }
+            .map(\.displayName)
+        return Set(held).count
+    }
 
     /// True when the idle force-sleep engine is currently held off for any reason
     /// (keep-awake, an active quiet window, an active-hours schedule, or a safety

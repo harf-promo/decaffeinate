@@ -57,12 +57,14 @@ enum MugIcon {
         saucer.lineWidth = s * 0.07
         saucer.stroke()
 
-        // Coffee fill — the state lives here.
+        // Coffee fill — the state lives here. Each level is paired with a distinct
+        // top glyph (crescent / down-chevron / steam / bolt) so the four states
+        // separate by SHAPE, not just fill, at 18px.
         let fill: CGFloat
         switch state {
         case .free: fill = 0
-        case .counting: fill = 0.40
-        case .blocked, .caffeinated: fill = 0.85
+        case .counting: fill = 0.35
+        case .blocked, .caffeinated: fill = 0.9
         }
         if fill > 0 {
             ctx.saveGState()
@@ -76,16 +78,33 @@ enum MugIcon {
 
         switch state {
         case .free:
-            // A small crescent — the nightcap, resting. Sits above the rim, clear
-            // of the handle, and a touch fatter so it reads at 18px.
-            crescent(cx: s * 0.71, cy: s * 0.81, r: s * 0.155).fill()
+            // A bold crescent — the nightcap, resting. Sits above the rim, clear
+            // of the handle, fat enough to read at 18px.
+            crescent(cx: s * 0.72, cy: s * 0.82, r: s * 0.17).fill()
+        case .counting:
+            // Winding down toward sleep — a downward chevron (distinct from the
+            // upward steam and the bolt).
+            chevronDown(centerX: cup.midX, top: cup.maxY, size: s)
         case .blocked:
             steam(centerX: cup.midX, top: cup.maxY, size: s)
         case .caffeinated:
             bolt(centerX: cup.midX, baseY: cup.maxY + s * 0.05, size: s)
-        case .counting:
-            break
         }
+    }
+
+    /// A downward chevron above the cup — "winding down to sleep".
+    private static func chevronDown(centerX x: CGFloat, top: CGFloat, size s: CGFloat) {
+        let w = s * 0.12
+        let yTop = top + s * 0.20
+        let yTip = top + s * 0.08
+        let p = NSBezierPath()
+        p.lineWidth = s * 0.075
+        p.lineCapStyle = .round
+        p.lineJoinStyle = .round
+        p.move(to: CGPoint(x: x - w, y: yTop))
+        p.line(to: CGPoint(x: x, y: yTip))
+        p.line(to: CGPoint(x: x + w, y: yTop))
+        p.stroke()
     }
 
     /// A clean filled crescent via an internally-tangent carve (even-odd). A

@@ -4,6 +4,50 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-06-21
+
+A ground-up design pass, grounded in **real** screenshots for the first time, with
+the direction chosen from rendered options. New: a screenshot harness that captures
+the live SwiftUI surfaces (`NSHostingView` + `cacheDisplay`, so `ScrollView` /
+`TabView` / `Menu` render for real — `ImageRenderer` can't); a multi-agent design
+council critiqued those shots and proposed two directions; **Nightcap** (cool,
+native, airy) was chosen.
+
+### Changed
+- **The menu, rebuilt.** The header now *hugs* its content — the large dead gap
+  between the status and **Sleep Now** is gone (it was an unbounded accent rule
+  eating vertical slack). Green moved onto the action that matters (**Sleep Now**);
+  the two status chips collapse to one quiet, tracked meta-line (`BATTERY 82% ·
+  2 APPS HOLDING`), never amber for a normal hold; **Allowed** is now a neutral
+  tag with a teal dot, not a green pill. One row pattern: at most two buttons
+  (**Allow** / **Let it sleep**) plus a single `…` for the rest. A readable type
+  floor throughout.
+- **Settings, rebuilt as a native sidebar.** The old 8-tab strip (which clipped its
+  last tab) is now a sidebar of five grouped panes — **General** (Safety folded in),
+  **Schedule**, **Automation** (triggers + rules + strict takeover), **History**,
+  **About** — with the brand green carried through the controls and selection, so
+  Settings and the menu finally read as one product.
+- **Menu-bar icon states are clearer at 18px.** The four states now separate by
+  *shape*, not line-weight: crescent (free) · down-chevron (winding down) · steam
+  (held) · bolt (kept awake).
+- The header count and the meta-line count now agree (both speak to apps holding
+  the Mac awake that you haven't allowed).
+
+### Fixed
+- **Battery-critical now also drops keep-awake holds.** At ≤3% on battery the app
+  forced sleep but didn't release its hold; with a user floor set ≤3% that was a
+  force-sleep-vs-hold contradiction. It now drops the hold too (matching the
+  thermal-critical guard).
+- **Quiet window paused by a safety rail says so.** When battery/thermal pauses a
+  "stay awake until…" window, the header now reads *"Quiet window paused — <reason>"*
+  instead of falling through to a misleading "Sleeping in…" countdown.
+
+### Removed
+- Stale code retired in the rebuild: the old `ImageRenderer` preview path
+  (`PreviewRenderer`, `ShowcaseView`), the superseded menu views, and dead helpers
+  (`Eyebrow`, `SectionHeader`, `harfExplanatory`, `harfCardChrome`, `explanatory`,
+  `idleThresholdSeconds`, `OnboardingPreview`).
+
 ## [1.5.2] — 2026-06-21
 
 Hardening and delivery — from an adversarial review of the 1.5.1 menu.

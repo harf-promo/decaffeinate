@@ -62,6 +62,17 @@ final class SafetyRailsTests: XCTestCase {
         XCTAssertTrue(decision.mustSleepNow)
     }
 
+    func testBatteryCriticallyLowAlsoDropsKeepAwakeBelowAnyFloor() {
+        // A user-set floor below the 3% critical line must NOT let us force sleep
+        // while still asserting a keep-awake hold — critical drops the hold too.
+        var settings = DecaffeinateSettings()
+        settings.batteryFloorPercent = 0
+        let power = PowerSnapshot(onBattery: true, charge: 0.03, isCharging: false)
+        let decision = evaluate(power: power, settings: settings)
+        XCTAssertTrue(decision.mustSleepNow)
+        XCTAssertTrue(decision.shouldDropKeepAwake)
+    }
+
     func testBatteryFloorIgnoredOnAC() {
         let power = PowerSnapshot(onBattery: false, charge: 0.05, isCharging: true)
         let decision = evaluate(power: power)

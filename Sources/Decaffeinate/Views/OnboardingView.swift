@@ -182,16 +182,6 @@ private struct OnboardingPanelContent: View {
     }
 }
 
-/// A single static onboarding panel for headless preview rendering — the live
-/// view can't be drawn by `ImageRenderer`, so the README shot uses this.
-struct OnboardingPreview: View {
-    var body: some View {
-        OnboardingPanelContent(panel: OnboardingPanel.all[1])
-            .frame(width: 480, height: 300, alignment: .topLeading)
-            .background(Color.paper)
-    }
-}
-
 /// Owns the first-run window for an accessory (menu-bar) app: flips the
 /// activation policy to `.regular` while it's up so the window can take focus,
 /// and back to `.accessory` when it closes.

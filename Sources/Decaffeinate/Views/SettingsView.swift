@@ -1,67 +1,129 @@
 import SwiftUI
 
+/// Settings as a native sidebar (the macOS idiom for many sections) instead of
+/// the old 8-tab strip that clipped its last tab. Eight panes fold into five,
+/// grouped; native toggles/sliders are kept for muscle memory but tinted in the
+/// brand green so Settings and the menu read as one product.
 struct SettingsView: View {
+    @Environment(\.theme) private var theme
+    @State private var pane: SettingsPane = .general
+
     var body: some View {
-        TabView {
-            GeneralSettings()
-                .tabItem { Label("General", systemImage: "zzz") }
-            SafetySettings()
-                .tabItem { Label("Safety", systemImage: "shield.lefthalf.filled") }
-            ScheduleSettings()
-                .tabItem { Label("Schedule", systemImage: "calendar") }
-            TriggersSettings()
-                .tabItem { Label("Triggers", systemImage: "bolt.horizontal.circle") }
-            RulesSettings()
-                .tabItem { Label("Rules", systemImage: "list.bullet.rectangle") }
-            HistorySettings()
-                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
-            AdvancedSettings()
-                .tabItem { Label("Advanced", systemImage: "gearshape.2") }
-            AboutView()
-                .tabItem { Label("About", systemImage: "info.circle") }
+        HStack(spacing: 0) {
+            sidebar
+            Rectangle().fill(theme.hairline).frame(width: 1)
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(width: 460, height: 400)
+        .frame(width: 660, height: 480)
+        .background(theme.paper)
+        .tint(theme.accent)
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            sidebarLabel("Settings")
+            ForEach([SettingsPane.general, .schedule, .automation]) { sidebarRow($0) }
+            sidebarLabel("Info").padding(.top, Space.s3)
+            ForEach([SettingsPane.history, .about]) { sidebarRow($0) }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Space.s2)
+        .padding(.vertical, Space.s3)
+        .frame(width: 190)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.card)
+    }
+
+    private func sidebarLabel(_ text: String) -> some View {
+        Text(text).textCase(.uppercase).font(.system(size: 11, weight: .semibold))
+            .tracking(0.8).foregroundStyle(theme.ink4)
+            .padding(.horizontal, Space.s2).padding(.bottom, 2)
+    }
+
+    private func sidebarRow(_ item: SettingsPane) -> some View {
+        let selected = pane == item
+        return Button {
+            pane = item
+        } label: {
+            HStack(spacing: Space.s2) {
+                Image(systemName: item.icon).frame(width: 18)
+                    .foregroundStyle(selected ? Color.onGreen : theme.ink3)
+                Text(item.title).font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? Color.onGreen : theme.ink1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Space.s2).padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.soft)
+                    .fill(selected ? theme.accent : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch pane {
+        case .general: GeneralSettings()
+        case .schedule: ScheduleSettings()
+        case .automation: AutomationSettings()
+        case .history: HistorySettings()
+        case .about: AboutView()
+        }
     }
 }
 
+private enum SettingsPane: String, CaseIterable, Identifiable {
+    case general, schedule, automation, history, about
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: return "General"
+        case .schedule: return "Schedule"
+        case .automation: return "Automation"
+        case .history: return "History"
+        case .about: return "About"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .general: return "zzz"
+        case .schedule: return "calendar"
+        case .automation: return "bolt.horizontal.circle"
+        case .history: return "clock.arrow.circlepath"
+        case .about: return "info.circle"
+        }
+    }
+}
+
+// ── General: auto-sleep + battery + keep-awake + safety guards + startup ──
 private struct GeneralSettings: View {
     @EnvironmentObject var store: SettingsStore
     private var s: Binding<DecaffeinateSettings> { $store.settings }
 
     var body: some View {
         Form {
-            Section("Decaffeinate — put the Mac to sleep") {
+            Section("Put the Mac to sleep") {
                 Toggle("Auto-sleep when left idle", isOn: s.decaffeinateEnabled)
-                HStack {
-                    Text("Sleep after")
-                    Slider(value: s.idleThresholdMinutes, in: 1...60, step: 1)
-                        .accessibilityLabel("Sleep after")
-                        .accessibilityValue("\(Int(store.settings.idleThresholdMinutes)) minutes")
-                    Text("\(Int(store.settings.idleThresholdMinutes)) min")
-                        .monospacedDigit()
-                        .frame(width: 52, alignment: .trailing)
-                }
-                .disabled(!store.settings.decaffeinateEnabled)
+                LabeledSlider(
+                    "Sleep after", value: s.idleThresholdMinutes, range: 1...60,
+                    unit: "min", enabled: store.settings.decaffeinateEnabled)
                 Text(
                     "When you step away, Decaffeinate forces sleep after this much idle time — even if an app is trying to keep the Mac awake."
                 )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsCaption()
 
                 Toggle("Sleep sooner on battery", isOn: s.sleepSoonerOnBattery)
                     .disabled(!store.settings.decaffeinateEnabled)
-                HStack {
-                    Text("On battery, sleep after")
-                    Slider(value: s.batteryIdleThresholdMinutes, in: 1...30, step: 1)
-                        .accessibilityLabel("On battery, sleep after")
-                        .accessibilityValue(
-                            "\(Int(store.settings.batteryIdleThresholdMinutes)) minutes")
-                    Text("\(Int(store.settings.batteryIdleThresholdMinutes)) min")
-                        .monospacedDigit()
-                        .frame(width: 52, alignment: .trailing)
-                }
-                .disabled(
-                    !store.settings.decaffeinateEnabled || !store.settings.sleepSoonerOnBattery)
+                LabeledSlider(
+                    "On battery, sleep after", value: s.batteryIdleThresholdMinutes, range: 1...30,
+                    unit: "min",
+                    enabled: store.settings.decaffeinateEnabled
+                        && store.settings.sleepSoonerOnBattery
+                )
                 if store.settings.sleepSoonerOnBattery,
                     store.settings.batteryIdleThresholdMinutes
                         >= store.settings.idleThresholdMinutes
@@ -73,13 +135,41 @@ private struct GeneralSettings: View {
                 }
             }
 
+            Section("Never sleep at a bad moment") {
+                Toggle("Pause while the microphone is in use (calls)", isOn: s.pauseForActiveCall)
+                Toggle("Pause for active media", isOn: s.pauseForActiveMedia)
+                Toggle("Pause during Time Machine backups", isOn: s.pauseForTimeMachine)
+                Toggle("Pause during macOS updates", isOn: s.pauseForSystemUpdate)
+                Toggle("Respect apps I've allowed", isOn: s.respectWhitelist)
+                Text(
+                    "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
+                )
+                .settingsCaption()
+            }
+
+            Section("Battery & heat") {
+                LabeledSlider(
+                    "Battery floor",
+                    value: Binding(
+                        get: { Double(store.settings.batteryFloorPercent) },
+                        set: { store.settings.batteryFloorPercent = Int($0) }),
+                    range: 0...50, step: 5, unit: "%", width: 44)
+                Text("On battery, keep-awake holds are dropped below this charge.")
+                    .settingsCaption()
+                Toggle("Backpack guard (sleep if overheating)", isOn: s.thermalGuardEnabled)
+                Text(
+                    "If the Mac gets thermally stressed — e.g. lid closed in a bag — all keep-awake holds are released and it sleeps immediately."
+                )
+                .settingsCaption()
+            }
+
             Section("Keep awake (optional)") {
                 Toggle("Hold the Mac awake on purpose", isOn: s.caffeinateEnabled)
                 Toggle("Also keep the display on", isOn: s.caffeinateKeepsDisplayAwake)
                     .disabled(!store.settings.caffeinateEnabled)
             }
 
-            Section {
+            Section("Startup & alerts") {
                 Toggle("Notify me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
                 Toggle("Show the countdown in the menu bar", isOn: s.showMenuBarCountdown)
                 if LoginItem.isAvailable {
@@ -94,95 +184,7 @@ private struct GeneralSettings: View {
     }
 }
 
-private struct SafetySettings: View {
-    @EnvironmentObject var store: SettingsStore
-    private var s: Binding<DecaffeinateSettings> { $store.settings }
-
-    var body: some View {
-        Form {
-            Section("Never sleep at a bad moment") {
-                Toggle("Pause while the microphone is in use (calls)", isOn: s.pauseForActiveCall)
-                Toggle("Pause for active media", isOn: s.pauseForActiveMedia)
-                Toggle("Pause during Time Machine backups", isOn: s.pauseForTimeMachine)
-                Toggle("Pause during macOS updates", isOn: s.pauseForSystemUpdate)
-                Toggle("Respect apps I've allowed", isOn: s.respectWhitelist)
-                Text(
-                    "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
-                )
-                .font(.caption).foregroundStyle(.secondary)
-            }
-
-            Section("Battery & heat") {
-                HStack {
-                    Text("Battery floor")
-                    Slider(
-                        value: Binding(
-                            get: { Double(store.settings.batteryFloorPercent) },
-                            set: { store.settings.batteryFloorPercent = Int($0) }
-                        ), in: 0...50, step: 5
-                    )
-                    .accessibilityLabel("Battery floor")
-                    .accessibilityValue("\(store.settings.batteryFloorPercent) percent")
-                    Text("\(store.settings.batteryFloorPercent)%")
-                        .monospacedDigit()
-                        .frame(width: 44, alignment: .trailing)
-                }
-                Text("On battery, keep-awake holds are dropped below this charge.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Toggle("Backpack guard (sleep if overheating)", isOn: s.thermalGuardEnabled)
-                Text(
-                    "If the Mac gets thermally stressed — e.g. lid closed in a bag — all keep-awake holds are released and it sleeps immediately."
-                )
-                .font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-    }
-}
-
-private struct RulesSettings: View {
-    @EnvironmentObject var rules: RulesEngine
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if rules.rules.isEmpty {
-                ContentUnavailableView(
-                    "No rules yet",
-                    systemImage: "list.bullet.rectangle",
-                    description: Text("Allow or block apps from the menu and they'll show up here.")
-                )
-            } else {
-                List {
-                    ForEach(rules.rules) { rule in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(rule.displayName).font(.body)
-                                Text(rule.bundleIdentifier ?? rule.processName)
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            HarfPill(
-                                label: rule.policy.shortLabel,
-                                variant: rule.policy.isCurrentlyAllowing ? .positive : .neutral)
-                            Button(role: .destructive) {
-                                rules.remove(rule)
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-                }
-                HStack {
-                    Spacer()
-                    Button("Clear all rules", role: .destructive) { rules.removeAll() }
-                        .padding(8)
-                }
-            }
-        }
-    }
-}
-
+// ── Schedule: active hours + the live quiet window ──
 private struct ScheduleSettings: View {
     @EnvironmentObject var store: SettingsStore
     @EnvironmentObject var appState: AppState
@@ -197,23 +199,19 @@ private struct ScheduleSettings: View {
                     Picker("", selection: s.activeHoursStart) {
                         ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
                     }
-                    .labelsHidden()
-                    .accessibilityLabel("Active hours start")
+                    .labelsHidden().accessibilityLabel("Active hours start")
                     Text("to")
                     Picker("", selection: s.activeHoursEnd) {
                         ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
                     }
-                    .labelsHidden()
-                    .accessibilityLabel("Active hours end")
+                    .labelsHidden().accessibilityLabel("Active hours end")
                 }
                 .disabled(!store.settings.scheduleEnabled)
-                if store.settings.scheduleEnabled {
-                    scheduleStatusRow
-                }
+                if store.settings.scheduleEnabled { scheduleStatusRow }
                 Text(
                     "During these hours Decaffeinate stands down — it won't force sleep, so a long task or your own work is never cut off. macOS's own sleep still applies. Set the end earlier than the start for an overnight window."
                 )
-                .font(.caption).foregroundStyle(.secondary)
+                .settingsCaption()
             }
 
             Section("Quiet window") {
@@ -236,15 +234,13 @@ private struct ScheduleSettings: View {
                     Text(
                         "No quiet window active. Start one any time from the menu's “Stay awake until…”."
                     )
-                    .font(.caption).foregroundStyle(.secondary)
+                    .settingsCaption()
                 }
             }
         }
         .formStyle(.grouped)
     }
 
-    /// A live read of whether the schedule is suppressing sleep right now, plus a
-    /// warning when start == end makes the window a no-op.
     @ViewBuilder private var scheduleStatusRow: some View {
         let st = store.settings
         if st.activeHoursStart == st.activeHoursEnd {
@@ -271,9 +267,11 @@ private struct ScheduleSettings: View {
     }
 }
 
-private struct TriggersSettings: View {
+// ── Automation: triggers + per-app rules + strict takeover ──
+private struct AutomationSettings: View {
     @EnvironmentObject var store: SettingsStore
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var rules: RulesEngine
     @State private var newAppName = ""
 
     var body: some View {
@@ -283,18 +281,17 @@ private struct TriggersSettings: View {
                     Text(
                         "No triggers yet. Add one below to keep the Mac awake whenever a condition holds — the battery floor and backpack guard still override it."
                     )
-                    .font(.caption).foregroundStyle(Color.ink3)
+                    .settingsCaption()
                 }
                 ForEach(store.settings.triggers) { rule in
                     HStack(spacing: Space.s2) {
                         Toggle("", isOn: enabledBinding(rule)).labelsHidden()
                             .accessibilityLabel(rule.condition.label)
-                        Text(rule.condition.label).font(HarfFont.body)
+                        Text(rule.condition.label)
                             .foregroundStyle(rule.enabled ? Color.ink1 : Color.ink4)
                         Spacer()
                         if let reason = appState.activeTriggerReason, rule.enabled, isActive(rule) {
-                            HarfPill(label: "Active", variant: .live, dot: true)
-                                .help(reason)
+                            HarfPill(label: "Active", variant: .live, dot: true).help(reason)
                         }
                         Button(role: .destructive) {
                             remove(rule)
@@ -316,6 +313,43 @@ private struct TriggersSettings: View {
                 Button("While on AC power") { add(.onACPower) }
                 Button("While CPU is busy (above 50%)") { add(.cpuAbove(50)) }
             }
+
+            Section("Allowed / blocked apps") {
+                if rules.rules.isEmpty {
+                    Text("Allow or block apps from the menu and they'll show up here.")
+                        .settingsCaption()
+                } else {
+                    ForEach(rules.rules) { rule in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(rule.displayName)
+                                Text(rule.bundleIdentifier ?? rule.processName)
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            HarfPill(
+                                label: rule.policy.shortLabel,
+                                variant: rule.policy.isCurrentlyAllowing ? .positive : .neutral)
+                            Button(role: .destructive) {
+                                rules.remove(rule)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    Button("Clear all rules", role: .destructive) { rules.removeAll() }
+                }
+            }
+
+            Section("Strict takeover") {
+                Toggle(
+                    "Let Decaffeinate own the idle timer", isOn: $store.settings.strictTakeoverMode)
+                Text(
+                    "Holds a system-sleep assertion so macOS never idle-sleeps on its own — Decaffeinate becomes the only thing that decides when to sleep. If it ever quits, normal macOS sleep resumes automatically."
+                )
+                .settingsCaption()
+            }
         }
         .formStyle(.grouped)
     }
@@ -331,8 +365,6 @@ private struct TriggersSettings: View {
     }
 
     private func isActive(_ rule: TriggerRule) -> Bool {
-        // Best-effort: the menu shows the single active reason; mark the rule whose
-        // label most plausibly produced it. (Display-only.)
         guard let reason = appState.activeTriggerReason else { return false }
         switch rule.condition {
         case .onACPower: return reason == "On AC power"
@@ -344,34 +376,64 @@ private struct TriggersSettings: View {
     private func add(_ condition: TriggerCondition) {
         store.settings.triggers.append(TriggerRule(condition: condition))
     }
-
     private func addApp() {
         let name = newAppName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
         add(.appRunning(name))
         newAppName = ""
     }
-
     private func remove(_ rule: TriggerRule) {
         store.settings.triggers.removeAll { $0.id == rule.id }
     }
 }
 
-private struct AdvancedSettings: View {
-    @EnvironmentObject var store: SettingsStore
-    private var s: Binding<DecaffeinateSettings> { $store.settings }
+// ── History: the forced-sleep log + a rough "wake avoided" estimate ──
+private struct HistorySettings: View {
+    @EnvironmentObject var history: SleepHistoryStore
 
     var body: some View {
-        Form {
-            Section("Strict takeover") {
-                Toggle("Let Decaffeinate own the idle timer", isOn: s.strictTakeoverMode)
-                Text(
-                    "Holds a system-sleep assertion so macOS never idle-sleeps on its own — Decaffeinate becomes the only thing that decides when to sleep. If it ever quits, normal macOS sleep resumes automatically."
+        VStack(alignment: .leading, spacing: 0) {
+            if history.events.isEmpty {
+                ContentUnavailableView(
+                    "No sleeps yet",
+                    systemImage: "moon.zzz",
+                    description: Text(
+                        "When Decaffeinate forces your Mac to sleep, every one shows up here with the reason."
+                    )
                 )
-                .font(.caption).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    Text(
+                        "\(history.events.count) forced sleep\(history.events.count == 1 ? "" : "s") · \(history.batteryCount) on battery"
+                    )
+                    .font(HarfFont.title).foregroundStyle(Color.ink1)
+                    Text(
+                        "≈ \(history.estimatedMinutesAvoided) min of needless wake avoided (rough estimate)."
+                    )
+                    .font(.caption).foregroundStyle(Color.ink3)
+                }
+                .padding(Space.s4)
+                Hairline()
+                List {
+                    ForEach(history.events) { event in
+                        HStack(spacing: Space.s2) {
+                            Image(systemName: event.onBattery ? "battery.50" : "powerplug")
+                                .foregroundStyle(Color.ink3).frame(width: 18)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(event.reason).foregroundStyle(Color.ink1).lineLimit(1)
+                                Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption).foregroundStyle(Color.ink3)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+                HStack {
+                    Spacer()
+                    Button("Clear history", role: .destructive) { history.clear() }.padding(8)
+                }
             }
         }
-        .formStyle(.grouped)
     }
 }
 
@@ -393,14 +455,11 @@ private struct AboutView: View {
                 "github.com/harf-promo/decaffeinate",
                 destination: URL(string: "https://github.com/harf-promo/decaffeinate")!
             )
-            .font(HarfFont.caption)
-            .tint(Color.accentText)
+            .font(HarfFont.caption).tint(Color.accentText)
             Button("Show welcome again") {
                 OnboardingPresenter.shared.present(settingsStore: appState.settingsStore)
             }
-            .buttonStyle(.link)
-            .font(HarfFont.caption)
-            .tint(Color.ink2)
+            .buttonStyle(.link).font(HarfFont.caption).tint(Color.ink2)
             .padding(.top, Space.s1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -408,61 +467,51 @@ private struct AboutView: View {
     }
 }
 
-enum AppInfo {
-    static var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+// ── A labeled slider with a trailing value — used across the settings forms. ──
+private struct LabeledSlider: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double = 1
+    var unit: String
+    var enabled: Bool = true
+    var width: CGFloat = 52
+
+    init(
+        _ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1,
+        unit: String, enabled: Bool = true, width: CGFloat = 52
+    ) {
+        self.title = title
+        self._value = value
+        self.range = range
+        self.step = step
+        self.unit = unit
+        self.enabled = enabled
+        self.width = width
+    }
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Slider(value: $value, in: range, step: step)
+                .accessibilityLabel(title)
+                .accessibilityValue("\(Int(value)) \(unit)")
+            Text("\(Int(value)) \(unit)").monospacedDigit().frame(
+                width: width, alignment: .trailing)
+        }
+        .disabled(!enabled)
     }
 }
 
-private struct HistorySettings: View {
-    @EnvironmentObject var history: SleepHistoryStore
+extension View {
+    /// The muted caption under a settings control — one consistent voice.
+    fileprivate func settingsCaption() -> some View {
+        font(.caption).foregroundStyle(.secondary)
+    }
+}
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if history.events.isEmpty {
-                ContentUnavailableView(
-                    "No sleeps yet",
-                    systemImage: "moon.zzz",
-                    description: Text(
-                        "When Decaffeinate forces your Mac to sleep, every one shows up here with the reason."
-                    )
-                )
-            } else {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text(
-                        "\(history.events.count) forced sleep\(history.events.count == 1 ? "" : "s") · \(history.batteryCount) on battery"
-                    )
-                    .font(HarfFont.title)
-                    .foregroundStyle(Color.ink1)
-                    Text(
-                        "≈ \(history.estimatedMinutesAvoided) min of needless wake avoided (rough estimate)."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(Color.ink3)
-                }
-                .padding(Space.s3)
-                Hairline()
-                List {
-                    ForEach(history.events) { event in
-                        HStack(spacing: Space.s2) {
-                            Image(systemName: event.onBattery ? "battery.50" : "powerplug")
-                                .foregroundStyle(Color.ink3)
-                                .frame(width: 18)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(event.reason).font(HarfFont.body).foregroundStyle(Color.ink1)
-                                    .lineLimit(1)
-                                Text(event.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption).foregroundStyle(Color.ink3)
-                            }
-                            Spacer()
-                        }
-                    }
-                }
-                HStack {
-                    Spacer()
-                    Button("Clear history", role: .destructive) { history.clear() }.padding(8)
-                }
-            }
-        }
+enum AppInfo {
+    static var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 }

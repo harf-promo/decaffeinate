@@ -20,7 +20,8 @@ struct DecaffeinateApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContentView()
+            RedesignMenuView()
+                .environment(\.theme, .nightcap)
                 .environmentObject(appState)
                 .environmentObject(appState.settingsStore)
                 .environmentObject(appState.rulesEngine)
@@ -40,6 +41,7 @@ struct DecaffeinateApp: App {
 
         Settings {
             SettingsView()
+                .environment(\.theme, .nightcap)
                 .environmentObject(appState)
                 .environmentObject(appState.settingsStore)
                 .environmentObject(appState.rulesEngine)

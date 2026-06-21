@@ -149,18 +149,6 @@ extension View {
             .tracking(1.1)
             .foregroundStyle(color)
     }
-
-    /// Secondary explanatory caption.
-    func harfExplanatory() -> some View {
-        self.font(HarfFont.caption).foregroundStyle(Color.ink3)
-    }
-
-    /// A 1px Harf hairline below/above the view's row context.
-    func harfCardChrome() -> some View {
-        self
-            .background(Color.paper)
-            .overlay(Rectangle().stroke(Color.rule, lineWidth: 1))
-    }
 }
 
 /// A 1px hairline rule — the system runs on these, not shadows.
@@ -222,23 +210,6 @@ struct DecaffeinateMark: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
-    }
-}
-
-/// The tracked uppercase section eyebrow used between menu sections.
-struct Eyebrow: View {
-    let text: String
-    var trailing: String?
-    init(_ text: String, trailing: String? = nil) {
-        self.text = text
-        self.trailing = trailing
-    }
-    var body: some View {
-        HStack {
-            Text(text).eyebrow()
-            Spacer()
-            if let trailing { Text(trailing).eyebrow(.ink4) }
-        }
     }
 }
 
