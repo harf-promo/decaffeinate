@@ -479,6 +479,15 @@ final class AppState: ObservableObject {
         return assertion.bundleIdentifier?.lowercased() ?? assertion.processName.lowercased()
     }
 
+    /// Whether this blocker still needs the user's allow/block decision. Matched
+    /// by the firewall **key** (real owner / bundle / process) — the pending
+    /// queue dedups per app, so a sibling assertion from the same daemon (same
+    /// key, different `id`) is still "pending" and must show its approval buttons.
+    func isPendingDecision(_ assertion: PowerAssertion) -> Bool {
+        let k = key(assertion)
+        return pendingClassification.contains { key($0) == k }
+    }
+
     // MARK: Derived UI state
 
     private func updateDerivedState(

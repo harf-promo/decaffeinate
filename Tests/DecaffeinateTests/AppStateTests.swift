@@ -358,6 +358,27 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(h.notifier.notifications.count, 1)
     }
 
+    func testIsPendingDecisionMatchesByKeyNotID() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let zoom = systemBlocker("Zoom", bundle: "us.zoom.xos")
+        h.scanner.assertions = [zoom]
+        h.state.tick()  // Zoom enters the pending queue
+        XCTAssertTrue(h.state.isPendingDecision(zoom))
+
+        // A sibling hold from the same app — same firewall key, different id —
+        // must still read as pending (so its approval buttons render).
+        let sibling = Fixtures.assertion(
+            pid: 9999, process: "Zoom", bundle: "us.zoom.xos",
+            type: AssertionType.preventUserIdleSystemSleep, name: "another hold")
+        XCTAssertNotEqual(sibling.id, zoom.id)
+        XCTAssertTrue(
+            h.state.isPendingDecision(sibling), "same-key sibling is pending too")
+
+        // An unrelated app is not pending.
+        XCTAssertFalse(
+            h.state.isPendingDecision(systemBlocker("Safari", bundle: "com.apple.Safari")))
+    }
+
     func testDecidedBlockerLeavesQueue() {
         let h = makeHarness(); defer { h.cleanup() }
         let blocker = systemBlocker("Zoom", bundle: "us.zoom.xos")

@@ -26,8 +26,16 @@ struct MenuContentView: View {
             // ── Pinned footer ──
             FooterView()
         }
-        .frame(width: 360, height: 460)
+        .frame(width: 380, height: Self.menuHeight)
         .background(Color.paper)
+    }
+
+    /// A fixed-but-screen-aware height: tall enough for the list to breathe, but
+    /// never taller than the space below the menu bar — so the footer (Settings /
+    /// quit / update) can't be pushed off-screen on a small display.
+    static var menuHeight: CGFloat {
+        let available = NSScreen.main?.visibleFrame.height ?? 720
+        return min(460, max(360, available * 0.8))
     }
 }
 
@@ -88,7 +96,7 @@ struct QuickActionBar: View {
                 .help("Keep the Mac awake, on a timer, or until a task finishes.")
             }
 
-            activeControl
+            activeControls
 
             if let error = appState.lastError {
                 Text(error)
@@ -105,20 +113,24 @@ struct QuickActionBar: View {
         return true
     }
 
-    /// One cancelable line for the active keep-awake / watch mode (the status
-    /// card already names the *state*; this is the *control* to undo it).
-    @ViewBuilder private var activeControl: some View {
+    /// A cancelable line for *each* active keep-awake / watch mode (more than one
+    /// can be active at once; the status card names the *state*, these are the
+    /// *controls* to undo each).
+    @ViewBuilder private var activeControls: some View {
         if appState.isQuietWindowActive {
             controlRow("clock.fill", .info, "Cancel quiet window") { appState.clearQuietWindow() }
-        } else if isWatchActive {
+        }
+        if isWatchActive {
             controlRow("binoculars.fill", .positive, "Stop watching") {
                 appState.setWatchTarget(nil)
             }
-        } else if appState.settings.caffeinateEnabled {
+        }
+        if appState.settings.caffeinateEnabled {
             controlRow("bolt.fill", .info, "Stop keeping awake") {
                 settingsStore.settings.caffeinateEnabled = false
             }
-        } else if let reason = appState.activeTriggerReason {
+        }
+        if let reason = appState.activeTriggerReason {
             // Trigger keep-awake is automatic — show why, no manual cancel.
             HStack(spacing: Space.s2) {
                 Image(systemName: "bolt.horizontal.circle.fill")
@@ -153,7 +165,16 @@ struct FooterView: View {
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            if let last = appState.lastSleepAt {
+            if updater.updateAvailable {
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    Label("Update available", systemImage: "arrow.down.circle.fill")
+                }
+                .buttonStyle(HarfButtonStyle(variant: .accent, size: .small))
+                .fixedSize()
+                .help("A new version of Decaffeinate is ready — click to install.")
+            } else if let last = appState.lastSleepAt {
                 Label(
                     "Slept \(Format.relative(since: last))", systemImage: "clock.arrow.circlepath"
                 )

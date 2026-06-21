@@ -15,7 +15,7 @@ struct AssertionListView: View {
         appState.assertions.filter { !$0.blocksSystemSleep }
     }
     private func isPending(_ a: PowerAssertion) -> Bool {
-        appState.pendingClassification.contains { $0.id == a.id }
+        appState.isPendingDecision(a)
     }
 
     var body: some View {
@@ -62,7 +62,7 @@ struct BlockerRow: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: Space.s2) {
-                AppIconView(assertion: assertion, size: 26)
+                AppIconView(assertion: assertion, size: Metrics.rowIcon)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -134,14 +134,17 @@ struct BlockerRow: View {
                 .buttonStyle(HarfButtonStyle(variant: .accent, size: .small))
                 .fixedSize()
                 .help("Let this app keep the Mac awake whenever it needs to.")
+                .accessibilityLabel("Allow \(assertion.displayName) to keep the Mac awake")
             AllowForMenu(title: "For…", assertion: assertion)
                 .menuStyle(.borderlessButton)
                 .tint(Color.ink2)
                 .fixedSize()
+                .accessibilityLabel("Allow \(assertion.displayName) for a set time")
             Button("Let it sleep") { appState.setPolicy(.ignore, for: assertion) }
                 .buttonStyle(HarfButtonStyle(variant: .ghost, size: .small))
                 .fixedSize()
                 .help("Ignore this app's hold — the Mac may sleep while it runs.")
+                .accessibilityLabel("Ignore \(assertion.displayName); let the Mac sleep")
             Button("Not now") { appState.dismissPending(assertion) }
                 .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
                 .fixedSize()

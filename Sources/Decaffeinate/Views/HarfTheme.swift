@@ -116,6 +116,12 @@ enum Radius {
     static let pill: CGFloat = 999
 }
 
+/// Shared layout constants used across more than one view.
+enum Metrics {
+    /// The app-icon size in a blocker row; the expanded detail indents past it.
+    static let rowIcon: CGFloat = 26
+}
+
 // =====================================================================
 // Type — SF Pro at the Harf 5/4 scale + tracking + casing. (Geist is the
 // design system's Latin face; the app keeps the system font but adopts

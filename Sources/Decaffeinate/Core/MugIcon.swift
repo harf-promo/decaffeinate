@@ -76,8 +76,9 @@ enum MugIcon {
 
         switch state {
         case .free:
-            // A small crescent — the nightcap, resting.
-            crescent(cx: s * 0.74, cy: s * 0.78, r: s * 0.14).fill()
+            // A small crescent — the nightcap, resting. Sits above the rim, clear
+            // of the handle, and a touch fatter so it reads at 18px.
+            crescent(cx: s * 0.71, cy: s * 0.81, r: s * 0.155).fill()
         case .blocked:
             steam(centerX: cup.midX, top: cup.maxY, size: s)
         case .caffeinated:
@@ -87,9 +88,10 @@ enum MugIcon {
         }
     }
 
-    /// A clean filled crescent via an internally-tangent carve (even-odd).
+    /// A clean filled crescent via an internally-tangent carve (even-odd). A
+    /// fatter carve ratio keeps it legible at menu-bar size.
     private static func crescent(cx: CGFloat, cy: CGFloat, r: CGFloat) -> NSBezierPath {
-        let r2 = r * 0.78
+        let r2 = r * 0.72
         let d = r - r2
         let path = NSBezierPath()
         path.appendOval(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))

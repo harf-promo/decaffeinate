@@ -4,6 +4,31 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] — 2026-06-21
+
+Hardening and delivery — from an adversarial review of the 1.5.1 menu.
+
+### Added
+- **"Update available" button** in the footer, raised the moment Sparkle's
+  background check finds a new version — updates can't be missed. (The cask stays
+  `auto_updates true`; the README now documents `brew upgrade --cask decaffeinate
+  --greedy` for a forced Homebrew update.)
+
+### Fixed
+- **The popover can never clip again** — the height is now screen-aware
+  (`min(460, screen·0.8)`), so the pinned footer (Settings/quit) stays on screen
+  on small displays; the body scrolls within whatever fits. Width 380 for the
+  richer rows.
+- **Approval buttons can't vanish** — a sibling hold from the same app (same
+  firewall key, different assertion id) is now correctly recognised as pending,
+  so its Allow/Block buttons render.
+- **No menu stall** — app icons resolve after first paint (off the synchronous
+  render path), with a bounded cache; the category symbol shows until ready.
+- **All active modes are cancelable** — a quiet window *and* a watch (etc.) now
+  each show their own cancel line, instead of only the first.
+- Menu-bar `free` crescent reads better at 18px; approval buttons carry explicit
+  VoiceOver labels; tidied a brittle layout constant.
+
 ## [1.5.1] — 2026-06-21
 
 A menu UX overhaul and a new unified mark.

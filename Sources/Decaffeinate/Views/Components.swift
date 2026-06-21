@@ -113,7 +113,8 @@ struct AssertionDetailView: View {
             row("PID", "\(assertion.pid)")
         }
         .font(HarfFont.caption)
-        .padding(.horizontal, Space.s3 + 26 + Space.s2)  // align under the row text, past the icon
+        // Align under the row text, indented past the icon.
+        .padding(.leading, Space.s3 + Metrics.rowIcon + Space.s2)
         .padding(.trailing, Space.s3)
         .padding(.vertical, Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)

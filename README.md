@@ -125,6 +125,13 @@ brew trust harf-promo/tap        # one-time: Homebrew 5+ requires trusting third
 brew install --cask decaffeinate
 ```
 
+**Updating:** Decaffeinate updates itself via Sparkle (the menu's **Update available**
+button, or Settings → Check for Updates), so the cask is marked `auto_updates true`
+— which means a plain `brew upgrade` *skips* it. To force a Homebrew update:
+```sh
+brew update && brew upgrade --cask decaffeinate --greedy   # or: brew reinstall --cask decaffeinate
+```
+
 ### Signed DMG
 Download the **notarized** `Decaffeinate-<version>.dmg` from the
 [Releases](https://github.com/harf-promo/decaffeinate/releases) page and drag it
