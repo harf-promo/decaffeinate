@@ -163,6 +163,38 @@ struct Hairline: View {
     var body: some View { Rectangle().fill(color).frame(height: 1) }
 }
 
+/// The Decaffeinate brand mark — a harf-grey crescent moon with one harf-green
+/// accent dot (matches the app icon). Drawn with the same geometry as
+/// `Scripts/generate-icon.swift` so the mark is consistent everywhere.
+struct DecaffeinateMark: View {
+    var size: CGFloat = 22
+
+    var body: some View {
+        Canvas { ctx, sz in
+            let s = min(sz.width, sz.height)
+            // Crescent = outer disc minus an internally-tangent offset disc
+            // (even-odd), opening up-and-right toward the dot.
+            let c1 = CGPoint(x: s * 0.50, y: s * 0.485)
+            let r1 = s * 0.34
+            let r2 = r1 * 0.80
+            let d = r1 - r2
+            let c2 = CGPoint(x: c1.x + d * 0.80, y: c1.y - d * 0.62)
+            var path = Path()
+            path.addEllipse(in: CGRect(x: c1.x - r1, y: c1.y - r1, width: r1 * 2, height: r1 * 2))
+            path.addEllipse(in: CGRect(x: c2.x - r2, y: c2.y - r2, width: r2 * 2, height: r2 * 2))
+            ctx.fill(path, with: .color(.harfGrey), style: FillStyle(eoFill: true))
+
+            let dr = s * 0.075
+            let dc = CGPoint(x: s * 0.72, y: s * 0.70)
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: dc.x - dr, y: dc.y - dr, width: dr * 2, height: dr * 2)),
+                with: .color(.harfGreen))
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 /// The tracked uppercase section eyebrow used between menu sections.
 struct Eyebrow: View {
     let text: String

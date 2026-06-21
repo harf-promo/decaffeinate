@@ -15,52 +15,96 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabView(selection: $page) {
-                ForEach(Array(panels.enumerated()), id: \.offset) { index, panel in
-                    OnboardingPanelView(panel: panel).tag(index)
-                }
+            // Masthead — a quiet brand anchor.
+            HStack(spacing: Space.s2) {
+                DecaffeinateMark(size: 20)
+                Text("Decaffeinate").font(HarfFont.bodyMedium).foregroundStyle(Color.ink1)
+                Spacer()
+                Text("Welcome").eyebrow(.ink4)
             }
-            .tabViewStyle(.automatic)
-            // The page dots are intentionally hidden from VoiceOver (color-only),
-            // so carry the progress here instead.
-            .accessibilityValue("Page \(page + 1) of \(panels.count)")
+            .padding(.horizontal, Space.s5)
+            .padding(.vertical, Space.s4)
 
-            Divider()
+            Hairline()
 
-            HStack {
+            OnboardingPanelView(panel: panels[page])
+                .id(page)
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity))
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
+                .accessibilityValue("Step \(page + 1) of \(panels.count)")
+
+            Hairline()
+
+            HStack(spacing: Space.s3) {
                 Button("Skip") { onFinish() }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
+                    .fixedSize()
 
                 Spacer()
 
-                PageDots(count: panels.count, current: page)
+                StepNumerals(count: panels.count, current: page)
 
                 Spacer()
 
                 if page < panels.count - 1 {
-                    Button("Next") { withAnimation { page += 1 } }
-                        .keyboardShortcut(.defaultAction)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { page += 1 }
+                    } label: {
+                        HStack(spacing: Space.s2) {
+                            Text("Next")
+                            Text("→").font(HarfFont.code)
+                        }
+                    }
+                    .buttonStyle(HarfButtonStyle(variant: .primary, size: .regular))
+                    .keyboardShortcut(.defaultAction)
+                    .fixedSize()
                 } else {
-                    Button("Get started") {
+                    Button {
                         onEnableNotifications()
                         onFinish()
+                    } label: {
+                        HStack(spacing: Space.s2) {
+                            Text("Get started")
+                            Text("→").font(HarfFont.code)
+                        }
                     }
+                    .buttonStyle(HarfButtonStyle(variant: .primary, size: .regular))
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
+                    .fixedSize()
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.horizontal, Space.s5)
+            .padding(.vertical, Space.s4)
         }
-        .frame(width: 480, height: 400)
+        .frame(width: 480, height: 420)
+        .background(Color.paper)
+    }
+}
+
+/// 01 · 02 · 03 — Harf uses numerals (not dots) as step indicators.
+private struct StepNumerals: View {
+    let count: Int
+    let current: Int
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            ForEach(0..<count, id: \.self) { i in
+                Text(String(format: "%02d", i + 1))
+                    .font(HarfFont.codeSmall)
+                    .foregroundStyle(i == current ? Color.ink1 : Color.ink4)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
 private struct OnboardingPanel: Identifiable {
     let id = UUID()
-    let symbol: String
-    let tint: Color
+    let step: String
     let title: String
     let body: String
     /// Optional bullet points shown beneath the body.
@@ -68,17 +112,15 @@ private struct OnboardingPanel: Identifiable {
 
     static let all: [OnboardingPanel] = [
         OnboardingPanel(
-            symbol: "moon.zzz.fill",
-            tint: .indigo,
+            step: "01 — What it does",
             title: "Your Mac, finally asleep",
             body:
                 "Caffeine apps keep Macs awake. Decaffeinate does the opposite: when you step away, it puts your Mac to sleep — even when a rogue app is trying to keep it up."
         ),
         OnboardingPanel(
-            symbol: "shield.lefthalf.filled",
-            tint: .green,
-            title: "Safe by default",
-            body: "It never cuts off something that matters. Decaffeinate stands down during:",
+            step: "02 — Safe by default",
+            title: "It never cuts off what matters",
+            body: "Decaffeinate quietly stands down during:",
             bullets: [
                 "Calls, screen sharing and active media",
                 "Time Machine backups and macOS updates",
@@ -86,11 +128,10 @@ private struct OnboardingPanel: Identifiable {
             ]
         ),
         OnboardingPanel(
-            symbol: "bell.badge.fill",
-            tint: .orange,
+            step: "03 — Stay informed",
             title: "Know what's keeping you up",
             body:
-                "Decaffeinate can tell you the moment a new app starts holding your Mac awake — with the real reason, like “microphone in use” or “playing media” — so you decide what to allow. Turn on notifications to get the heads-up."
+                "Decaffeinate tells you the moment a new app starts holding your Mac awake — with the real reason, like “microphone in use” or “playing media” — so you decide what to allow. Turn on notifications to get the heads-up."
         ),
     ]
 }
@@ -110,60 +151,44 @@ private struct OnboardingPanelContent: View {
     let panel: OnboardingPanel
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: panel.symbol)
-                .font(.system(size: 52))
-                .foregroundStyle(panel.tint)
-                .padding(.top, 8)
-                .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: Space.s4) {
+            Text(panel.step).eyebrow()
             Text(panel.title)
-                .font(.title2.bold())
+                .font(HarfFont.display)
+                .foregroundStyle(Color.ink1)
+                .tracking(-0.5)
+                .fixedSize(horizontal: false, vertical: true)
             Text(panel.body)
-                .font(.callout)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+                .font(HarfFont.lede)
+                .foregroundStyle(Color.ink2)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
             if !panel.bullets.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Space.s2) {
                     ForEach(panel.bullets, id: \.self) { bullet in
-                        Label(bullet, systemImage: "checkmark.circle.fill")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                        HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                            Circle().fill(Color.harfGreen).frame(width: 5, height: 5)
+                            Text(bullet).font(HarfFont.body).foregroundStyle(Color.ink2)
+                        }
                     }
                 }
+                .padding(.top, Space.s1)
             }
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 36)
-        .padding(.vertical, 24)
-        .frame(maxWidth: .infinity)
-    }
-}
-
-private struct PageDots: View {
-    let count: Int
-    let current: Int
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<count, id: \.self) { index in
-                Circle()
-                    .fill(index == current ? Color.primary : Color.secondary.opacity(0.3))
-                    .frame(width: 6, height: 6)
-            }
-        }
-        .accessibilityHidden(true)
+        .padding(.horizontal, Space.s6)
+        .padding(.vertical, Space.s5)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 /// A single static onboarding panel for headless preview rendering — the live
-/// `TabView` can't be drawn by `ImageRenderer`, so the README shot uses this.
+/// view can't be drawn by `ImageRenderer`, so the README shot uses this.
 struct OnboardingPreview: View {
     var body: some View {
-        // Render the content directly (not the live ScrollView wrapper, which
-        // ImageRenderer can't draw).
         OnboardingPanelContent(panel: OnboardingPanel.all[1])
-            .frame(width: 480, height: 340)
-            .background(.background)
+            .frame(width: 480, height: 300, alignment: .topLeading)
+            .background(Color.paper)
     }
 }
 
