@@ -67,7 +67,7 @@ private struct GeneralSettings: View {
                     Text(
                         "This is at least your normal idle time, so it has no effect — lower it to sleep sooner on battery."
                     )
-                    .font(.caption).foregroundStyle(.orange)
+                    .font(.caption).foregroundStyle(Color.warning)
                 }
             }
 
@@ -159,9 +159,9 @@ private struct RulesSettings: View {
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text(rule.policy.shortLabel)
-                                .font(.caption)
-                                .foregroundStyle(rule.policy.isCurrentlyAllowing ? .green : .orange)
+                            HarfPill(
+                                label: rule.policy.shortLabel,
+                                variant: rule.policy.isCurrentlyAllowing ? .positive : .neutral)
                             Button(role: .destructive) {
                                 rules.remove(rule)
                             } label: {
@@ -221,7 +221,7 @@ private struct ScheduleSettings: View {
                             Label(
                                 "Paused — \(paused)", systemImage: "exclamationmark.triangle.fill"
                             )
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.warning)
                         } else {
                             Label(
                                 "Holding awake until \(ScheduleEngine.timeLabel(until))",
@@ -250,7 +250,7 @@ private struct ScheduleSettings: View {
                 "Start and end are the same — this schedule does nothing.",
                 systemImage: "exclamationmark.triangle"
             )
-            .font(.caption).foregroundStyle(.orange)
+            .font(.caption).foregroundStyle(Color.warning)
         } else if ScheduleEngine.isWithinActiveHours(
             Date(), start: st.activeHoursStart, end: st.activeHoursEnd)
         {
@@ -258,7 +258,7 @@ private struct ScheduleSettings: View {
                 "Active now — auto-sleep is paused until \(ScheduleEngine.hourLabel(st.activeHoursEnd))",
                 systemImage: "pause.circle.fill"
             )
-            .font(.caption).foregroundStyle(.tint)
+            .font(.caption).foregroundStyle(Color.positive)
         } else {
             Label(
                 "Outside active hours — auto-sleep is on. Next pause at \(ScheduleEngine.hourLabel(st.activeHoursStart)).",
@@ -291,33 +291,32 @@ private struct AboutView: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "cup.and.saucer.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(.tint)
-            Text("Decaffeinate").font(.title2.bold())
+        VStack(spacing: Space.s3) {
+            DecaffeinateMark(size: 56)
+            Text("Decaffeinate").font(HarfFont.h2).foregroundStyle(Color.ink1)
             Text("The truth about what's keeping your Mac awake — and the power to make it sleep.")
-                .font(.callout)
+                .font(HarfFont.lede)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal)
-            Text("Version \(AppInfo.version) · MIT Licensed")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            Text("Version \(AppInfo.version)").eyebrow(.ink4)
             Link(
                 "github.com/harf-promo/decaffeinate",
                 destination: URL(string: "https://github.com/harf-promo/decaffeinate")!
             )
-            .font(.caption)
+            .font(HarfFont.caption)
+            .tint(Color.accentText)
             Button("Show welcome again") {
                 OnboardingPresenter.shared.present(settingsStore: appState.settingsStore)
             }
             .buttonStyle(.link)
-            .font(.caption)
-            .padding(.top, 4)
+            .font(HarfFont.caption)
+            .tint(Color.ink2)
+            .padding(.top, Space.s1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .padding(Space.s5)
     }
 }
 
@@ -341,29 +340,31 @@ private struct HistorySettings: View {
                     )
                 )
             } else {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Space.s1) {
                     Text(
                         "\(history.events.count) forced sleep\(history.events.count == 1 ? "" : "s") · \(history.batteryCount) on battery"
                     )
-                    .font(.headline)
+                    .font(HarfFont.title)
+                    .foregroundStyle(Color.ink1)
                     Text(
                         "≈ \(history.estimatedMinutesAvoided) min of needless wake avoided (rough estimate)."
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ink3)
                 }
-                .padding(12)
-                Divider()
+                .padding(Space.s3)
+                Hairline()
                 List {
                     ForEach(history.events) { event in
-                        HStack(spacing: 8) {
+                        HStack(spacing: Space.s2) {
                             Image(systemName: event.onBattery ? "battery.50" : "powerplug")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ink3)
                                 .frame(width: 18)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(event.reason).font(.callout).lineLimit(1)
+                                Text(event.reason).font(HarfFont.body).foregroundStyle(Color.ink1)
+                                    .lineLimit(1)
                                 Text(event.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(Color.ink3)
                             }
                             Spacer()
                         }
