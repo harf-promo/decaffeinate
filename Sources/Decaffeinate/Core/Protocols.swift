@@ -52,6 +52,14 @@ protocol ProcessSampling {
     func sample(_ target: WatchTarget, now: Date) -> ProcessSample
 }
 
+@MainActor
+protocol ProcessProvenanceResolving {
+    /// Resolve where a holder pid came from (terminal / agent / project). Lazy &
+    /// cached; safe on row-expand / first-seen. Nil when the process is gone or
+    /// nothing could be read (never throws, never traps).
+    func provenance(for pid: pid_t) -> ProcessProvenance?
+}
+
 // MARK: - Real engines conform
 
 extension TelemetryEngine: PowerAssertionScanning {}
@@ -61,3 +69,4 @@ extension SleepController: SystemSleeping {}
 extension CaffeineEngine: KeepAwakeControlling {}
 extension Notifier: BlockerNotifying {}
 extension ProcessWatcher: ProcessSampling {}
+extension ProcessProvenanceResolver: ProcessProvenanceResolving {}

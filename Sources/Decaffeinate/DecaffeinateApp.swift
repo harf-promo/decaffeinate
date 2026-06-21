@@ -38,6 +38,12 @@ struct DecaffeinateApp: App {
             .accessibilityLabel(appState.menuBarAccessibilityLabel)
         }
         .menuBarExtraStyle(.window)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
+                    .disabled(!updater.isAvailable)
+            }
+        }
 
         Settings {
             SettingsView()
@@ -46,6 +52,7 @@ struct DecaffeinateApp: App {
                 .environmentObject(appState.settingsStore)
                 .environmentObject(appState.rulesEngine)
                 .environmentObject(appState.history)
+                .environmentObject(updater)
         }
     }
 }

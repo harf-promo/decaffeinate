@@ -92,11 +92,13 @@ final class AppStateTests: XCTestCase {
         let clock: TestClock
         let thermal: ThermalBox
         let triggers: FakeTriggerSampler
+        let provenance: FakeProvenanceResolver
         let cleanup: () -> Void
     }
 
     private func makeHarness(
         watcher: AgentWatcher = AgentWatcher(),
+        provenance: FakeProvenanceResolver = FakeProvenanceResolver(),
         _ configure: (inout DecaffeinateSettings) -> Void = { _ in }
     ) -> Harness {
         let suite = "decaf.appstate.\(UUID().uuidString)"
@@ -126,13 +128,14 @@ final class AppStateTests: XCTestCase {
             thermalProvider: { thermal.state },
             agentWatcher: watcher,
             triggerSampler: triggers,
+            provenanceResolver: provenance,
             now: { clock.date }
         )
         return Harness(
             state: state, scanner: scanner, idle: idle, power: power,
             sleeper: sleeper, caffeine: caffeine, notifier: notifier,
             settings: settings, rules: rules, clock: clock, thermal: thermal,
-            triggers: triggers,
+            triggers: triggers, provenance: provenance,
             cleanup: { defaults.removePersistentDomain(forName: suite) })
     }
 
@@ -701,5 +704,49 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(h.state.activeTriggerReason, "triggers are dropped below the battery floor")
         XCTAssertFalse(h.caffeine.holdingSystem)
         XCTAssertEqual(h.sleeper.callCount, 1, "the floor wins and force-sleep fires")
+    }
+
+    // MARK: Agentic integration
+
+    /// Build a caffeinate holder + provenance whose `-w` target is a real, live pid
+    /// (the test process itself), so the liveness check is deterministic.
+    private func agenticCaffeinate(_ h: Harness) -> PowerAssertion {
+        let me = getpid()
+        h.provenance.byPid[500] = ProcessProvenance(
+            holderPid: 500, holderName: "caffeinate",
+            holderArgv: ["caffeinate", "-i", "-w", "\(me)"],
+            parentChain: [ProcessLink(pid: 480, name: "2.1.183")],
+            originApp: nil, originKind: .agentHost, ttyName: "ttys003",
+            cwd: "/tmp/repo", originCommand: ["claude", "--model", "opusplan"],
+            sessionLabel: "started by Claude Code · in repo")
+        return Fixtures.assertion(
+            pid: 500, process: "caffeinate", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep)
+    }
+
+    func testAgentWaitTargetAndDisplayReason() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let caff = agenticCaffeinate(h)
+        h.scanner.assertions = [caff]
+        h.state.tick()
+
+        let target = h.state.agentWaitTarget(for: caff)
+        XCTAssertEqual(target?.pid, getpid())
+        XCTAssertTrue(h.state.isAgentSession(caff))
+        XCTAssertTrue(
+            h.state.displayReason(for: caff).contains("Keeping the system awake until"),
+            h.state.displayReason(for: caff))
+    }
+
+    func testAutoArmOnlyWhenSettingOn() {
+        let off = makeHarness(); defer { off.cleanup() }
+        off.scanner.assertions = [agenticCaffeinate(off)]
+        off.state.tick()
+        XCTAssertEqual(off.state.watchStatus, .idle, "no auto-arm when the setting is off")
+
+        let on = makeHarness { $0.autoSleepWhenAgentFinishes = true }; defer { on.cleanup() }
+        on.scanner.assertions = [agenticCaffeinate(on)]
+        on.state.tick()
+        XCTAssertNotEqual(on.state.watchStatus, .idle, "auto-arm fires for a recognized agent")
     }
 }

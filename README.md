@@ -109,9 +109,27 @@ Decaffeinate refuses to sleep at a bad moment, and *forces* sleep at a dangerous
 ### ⚡️ Keep-Awake, when you actually want it
 The opposite mode is one click away. Hold the Mac (and optionally the display) awake on purpose — with all the same safety rails watching your back.
 
+### 🔬 Provenance — *which window started this?*
+For every hold, Decaffeinate traces the real origin: the terminal, editor, or **AI
+agent** that spawned it, the **project folder** it's running in, the controlling
+TTY, and the exact command. So a stray `caffeinate` stops being a mystery — it's
+*"started by **Claude Code** · in **~/dev/myrepo**"*. All from public `libproc` /
+`sysctl` — no root, no private APIs.
+
+<div align="center">
+<img src="assets/provenance.png" width="360" alt="Provenance detail — started by Claude Code, in ~/dev/myrepo" />
+</div>
+
+### 🤖 Built for the agentic era
+AI coding agents (**Claude Code**, Cursor, …) hold the Mac awake until their work
+is done. Decaffeinate understands that: it reads the agent's own `caffeinate -w`
+to tell you *exactly* what it's waiting on, offers a one-click **"Sleep when it
+finishes,"** and can auto-sleep the moment a watched agent's task completes.
+
 ### 🖥 Terminal-friendly
 ```sh
-Decaffeinate --scan      # print exactly what's keeping this Mac awake
+Decaffeinate --scan         # print exactly what's keeping this Mac awake
+Decaffeinate --provenance   # …and trace each one to its window / agent / project
 ```
 
 ---
@@ -196,7 +214,7 @@ Open areas where you can make a dent today:
 
 ## Roadmap
 
-**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the coffee "nightcap" mark · universal (Intel + Apple Silicon) build.
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the coffee "nightcap" mark · universal (Intel + Apple Silicon) build.
 
 **Next:** localization · homebrew/cask-core submission · SMC temperature sensors. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

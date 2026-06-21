@@ -4,6 +4,39 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] — 2026-06-21
+
+Transparency & agentic integration — answer *where* a keep-awake came from, and
+work with the AI agents that create them.
+
+### Added
+- **Process provenance.** Decaffeinate now traces each hold back to the window /
+  terminal / agent / project that started it — e.g. *"caffeinate · started by
+  **Claude Code** · in **~/dev/myrepo** · ttys004"*. The expanded row shows
+  *Started by*, *Folder*, *Terminal*, the exact *Command*, and *Holding since*.
+  Built entirely on public `libproc` / `sysctl` (parent-chain + `cwd` + `argv`) —
+  no root, no private API, no new permission.
+- **Agentic awareness.** It parses a holder's `caffeinate` command line to say
+  exactly what it's doing (*"Keeping the system awake until npm run build (PID
+  8123) finishes"* / *"for up to 5 min"*), recognizes AI-agent sessions (Claude
+  Code, Cursor, Windsurf, Aider), and — for a `caffeinate -w <pid>` hold — offers
+  a one-click **"Sleep when it finishes"**. New Settings → Automation toggle
+  **"Auto-sleep when a watched agent finishes"** makes that hands-off.
+- **An inline "ⓘ what's keeping it awake?" explainer** that demystifies the
+  numbers (what a power assertion is, that *"held 9m"* is the real age) — shown
+  once, then a tap away.
+- **A standard Software Update home** in Settings → About: *Check for Updates…*,
+  *Automatically check for updates*, and *Last checked* — plus a *Check for
+  Updates…* app-menu command. The unlabeled refresh icon is gone from the menu
+  (the green "Update available" button stays).
+- **`Decaffeinate --provenance [pid]`** — a terminal diagnostic that prints where
+  each holder came from.
+
+### Fixed
+- **Settings no longer reset when you upgrade.** The settings decoder failed the
+  whole blob on a single missing key, so every version that added a setting wiped
+  your saved preferences. It now keeps defaults for absent keys.
+
 ## [1.6.0] — 2026-06-21
 
 A ground-up design pass, grounded in **real** screenshots for the first time, with

@@ -44,6 +44,7 @@ final class AppState: ObservableObject {
     private let thermalProvider: () -> ProcessInfo.ThermalState
     private let agentWatcher: AgentWatcher
     private let triggerSampler: any TriggerSampling
+    private let provenanceResolver: any ProcessProvenanceResolving
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -107,6 +108,7 @@ final class AppState: ObservableObject {
         },
         agentWatcher: AgentWatcher = AgentWatcher(),
         triggerSampler: any TriggerSampling = LiveTriggerSampler(),
+        provenanceResolver: any ProcessProvenanceResolving = ProcessProvenanceResolver(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -121,7 +123,14 @@ final class AppState: ObservableObject {
         self.thermalProvider = thermalProvider
         self.agentWatcher = agentWatcher
         self.triggerSampler = triggerSampler
+        self.provenanceResolver = provenanceResolver
         self.now = now
+    }
+
+    /// Where a holder pid came from (terminal / agent / project), resolved lazily
+    /// and cached by the resolver. Used by the detail view and row enrichment.
+    func provenance(for pid: pid_t) -> ProcessProvenance? {
+        provenanceResolver.provenance(for: pid)
     }
 
     var settings: DecaffeinateSettings { settingsStore.settings }
@@ -264,8 +273,102 @@ final class AppState: ObservableObject {
 
     /// Common long-running dev/agent tools to watch even if not (yet) running.
     var commonWatchCandidates: [String] {
-        ["claude", "node", "python3", "xcodebuild", "cargo", "make", "swift", "docker"]
-            .filter { !runningWatchCandidates.contains($0) }
+        AgentRegistry.commonWatchProcessNames.filter { !runningWatchCandidates.contains($0) }
+    }
+
+    // MARK: Agentic / caffeinate enrichment
+
+    /// The parsed `caffeinate` invocation behind a hold, if it is one.
+    private func caffeinateInvocation(for assertion: PowerAssertion) -> CaffeinateInvocation? {
+        guard let provenance = provenanceResolver.provenance(for: assertion.pid),
+            let first = provenance.holderArgv.first,
+            (first as NSString).lastPathComponent.lowercased() == "caffeinate"
+        else { return nil }
+        return CaffeinateArgvParser.parse(provenance.holderArgv)
+    }
+
+    /// The reason string shown in the UI — enriched to spell out exactly what a
+    /// `caffeinate` hold is doing (e.g. "…until npm run build (PID 8123) finishes").
+    func displayReason(for assertion: PowerAssertion) -> String {
+        if let invocation = caffeinateInvocation(for: assertion) {
+            // A gone target resolves to "PID N" — pass nil so the explainer uses
+            // the cleaner "until process N exits" form.
+            let waitName = invocation.waitPID
+                .map { processName(forPID: $0) }
+                .flatMap { $0.hasPrefix("PID ") ? nil : $0 }
+            return CaffeinateExplainer.explain(invocation, waitTargetName: waitName)
+        }
+        return assertion.reason.explanation
+    }
+
+    /// For a `caffeinate -w <pid>` hold whose wait target is still alive, the pid +
+    /// a label so the menu can offer one-click "Sleep when it finishes".
+    func agentWaitTarget(for assertion: PowerAssertion) -> (pid: pid_t, label: String)? {
+        guard let invocation = caffeinateInvocation(for: assertion),
+            let pid = invocation.waitPID, isAlive(pid)
+        else { return nil }
+        return (pid, processName(forPID: pid))
+    }
+
+    /// Whether a hold's provenance traces back to a known AI agent (Claude Code…).
+    func isAgentSession(_ assertion: PowerAssertion) -> Bool {
+        guard let provenance = provenanceResolver.provenance(for: assertion.pid) else {
+            return false
+        }
+        if provenance.originKind == .agentHost { return true }
+        return AgentRegistry.identify(
+            originApp: provenance.originDisplayName,
+            bundleID: provenance.originApp?.bundleIdentifier,
+            processNames: provenance.parentChain.map(\.name))?.isAIAgent == true
+    }
+
+    private func isAlive(_ pid: pid_t) -> Bool {
+        kill(pid, 0) == 0 || errno == EPERM
+    }
+
+    /// Holder pids whose one-click watch offer the user dismissed (per session).
+    @Published private var watchSuggestionDismissed: Set<pid_t> = []
+
+    func dismissWatchSuggestion(forHolder pid: pid_t) { watchSuggestionDismissed.insert(pid) }
+
+    /// Mark the inline "what's keeping it awake?" explainer as seen (so it
+    /// auto-opens only the first time).
+    func markAwakeExplainerSeen() {
+        if !settings.hasSeenAwakeExplainer { settingsStore.settings.hasSeenAwakeExplainer = true }
+    }
+
+    /// Whether to show the inline "Sleep when it finishes" offer for an agentic
+    /// `caffeinate -w` hold (not dismissed, target alive, nothing watched yet).
+    func shouldOfferWatch(for assertion: PowerAssertion) -> Bool {
+        guard case .idle = watchStatus, !watchSuggestionDismissed.contains(assertion.pid) else {
+            return false
+        }
+        return agentWaitTarget(for: assertion) != nil
+    }
+
+    /// A short origin crumb for the menu row — "Claude Code · ~/myrepo" / "Terminal".
+    func originCrumb(for assertion: PowerAssertion) -> String? {
+        guard let p = provenanceResolver.provenance(for: assertion.pid) else { return nil }
+        switch (p.originDisplayName, p.projectLabel) {
+        case (let name?, let project?): return "\(name) · \(project)"
+        case (let name?, nil): return name
+        case (nil, let project?): return project
+        default: return nil
+        }
+    }
+
+    /// When the auto-sleep-on-agent-finish setting is on and nothing is watched
+    /// yet, arm the watcher on a recognized agentic `caffeinate -w <pid>`.
+    private func autoArmAgentWatchIfNeeded() {
+        guard settings.autoSleepWhenAgentFinishes, case .idle = watchStatus else { return }
+        for assertion in assertions where assertion.blocksSystemSleep {
+            guard let target = agentWaitTarget(for: assertion), isAgentSession(assertion) else {
+                continue
+            }
+            agentWatcher.setTarget(.pid(target.pid))
+            watchStatus = agentWatcher.status
+            return
+        }
     }
 
     // MARK: The tick
@@ -341,7 +444,9 @@ final class AppState: ObservableObject {
         // 2) Firewall: surface newly-seen, unclassified blockers.
         updateFirewallQueue(systemBlockers, enabled: s.notifyOnNewBlocker)
 
-        // 2.5) Agent watcher: detect when a watched build/agent has finished.
+        // 2.5) Agent watcher: optionally auto-arm on a recognized agent task, then
+        // detect when a watched build/agent has finished.
+        autoArmAgentWatchIfNeeded()
         agentWatcher.tick(now: now(), systemBlockingPIDs: Set(systemBlockers.map(\.pid)))
         watchStatus = agentWatcher.status
         let agentFinished = agentWatcher.hasCompleted

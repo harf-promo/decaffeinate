@@ -36,6 +36,18 @@ enum ScreenshotRenderer {
                     appearance: appearance, to: dir.appendingPathComponent("menu-\(suffix).png"))
                 && ok
 
+            // The expanded provenance detail for the agentic caffeinate row.
+            if let caffeinate = state.assertions.first(where: { $0.processName == "caffeinate" }) {
+                let detail = AssertionDetailView(assertion: caffeinate)
+                    .environment(\.theme, theme)
+                    .environmentObject(state)
+                    .frame(width: 360)
+                ok =
+                    capture(
+                        detail, size: NSSize(width: 360, height: 360), appearance: appearance,
+                        to: dir.appendingPathComponent("detail-\(suffix).png")) && ok
+            }
+
             let onboarding = OnboardingView(onFinish: {}, onEnableNotifications: {})
             ok =
                 capture(
@@ -48,6 +60,7 @@ enum ScreenshotRenderer {
                 .environmentObject(state.settingsStore)
                 .environmentObject(state.rulesEngine)
                 .environmentObject(state.history)
+                .environmentObject(updater)
             ok =
                 capture(
                     settings, size: NSSize(width: 660, height: 480), appearance: appearance,

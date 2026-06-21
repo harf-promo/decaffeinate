@@ -28,7 +28,46 @@ enum CLI {
             _ = ScreenshotRenderer.renderAll(to: dir)
             return true
         }
+        if let index = arguments.firstIndex(of: "--provenance") {
+            let pid = arguments.indices.contains(index + 1) ? pid_t(arguments[index + 1]) : nil
+            runProvenance(pid: pid)
+            return true
+        }
         return false
+    }
+
+    /// Resolve and print where each sleep-holder came from — the window / agent /
+    /// project behind it. `--provenance [pid]` resolves one pid, or every holder.
+    @MainActor
+    private static func runProvenance(pid: pid_t?) {
+        let resolver = ProcessProvenanceResolver()
+
+        func dump(_ pid: pid_t, label: String) {
+            guard let p = resolver.provenance(for: pid) else {
+                print("• \(label) — pid \(pid): (unresolved)")
+                return
+            }
+            let chain = p.parentChain.map { "\($0.name)(\($0.pid))" }.joined(separator: " → ")
+            print("• \(label) — pid \(p.holderPid) [\(p.holderName)]")
+            print("    session:  \(p.sessionLabel ?? "—")")
+            print("    started by: \(p.originDisplayName ?? "—")  (\(p.originKind.rawValue))")
+            print("    tty:      \(p.ttyName ?? "—")")
+            print("    cwd:      \(p.cwd ?? "—")")
+            print("    argv:     \(p.holderArgv.joined(separator: " "))")
+            print("    parents:  \(chain.isEmpty ? "—" : chain)")
+            if let cmd = p.originCommand { print("    command:  \(cmd.joined(separator: " "))") }
+        }
+
+        if let pid {
+            dump(pid, label: "process")
+            return
+        }
+        let holders = TelemetryEngine().scan().filter(\.blocksSystemSleep)
+        if holders.isEmpty {
+            print("☕️  Nothing is holding this Mac awake.")
+            return
+        }
+        for holder in holders { dump(holder.pid, label: holder.displayName) }
     }
 
     @MainActor
@@ -83,10 +122,11 @@ enum CLI {
             Decaffeinate — the truth about what keeps your Mac awake.
 
             USAGE:
-              Decaffeinate              Run the menu-bar app
-              Decaffeinate --scan       Print active sleep assertions and exit
-              Decaffeinate --version    Print the version and exit
-              Decaffeinate --help       Show this help
+              Decaffeinate                Run the menu-bar app
+              Decaffeinate --scan         Print active sleep assertions and exit
+              Decaffeinate --provenance   Trace each holder to its window / agent / project
+              Decaffeinate --version      Print the version and exit
+              Decaffeinate --help         Show this help
 
             Project: https://github.com/harf-promo/decaffeinate
             """

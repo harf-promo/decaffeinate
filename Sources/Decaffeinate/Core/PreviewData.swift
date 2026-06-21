@@ -39,6 +39,31 @@ final class PreviewSampler: PowerAssertionScanning {
 }
 
 @MainActor
+struct PreviewProvenance: ProcessProvenanceResolving {
+    /// The sample `caffeinate` (pid 2810) resolves to an agent session so the
+    /// detail view + the agentic offer render in screenshots.
+    func provenance(for pid: pid_t) -> ProcessProvenance? {
+        guard pid == 2810 else { return nil }
+        let cwd = FileManager.default.homeDirectoryForCurrentUser.path + "/dev/myrepo"
+        return ProcessProvenance(
+            holderPid: 2810,
+            holderName: "caffeinate",
+            holderArgv: ["caffeinate", "-i", "-t", "300"],
+            parentChain: [
+                ProcessLink(pid: 2700, name: "claude"),
+                ProcessLink(pid: 1500, name: "zsh"),
+                ProcessLink(pid: 1490, name: "Ghostty"),
+            ],
+            originApp: nil,
+            originKind: .agentHost,
+            ttyName: "ttys004",
+            cwd: cwd,
+            originCommand: ["claude", "--model", "opusplan"],
+            sessionLabel: "started by Claude Code · in ~/dev/myrepo")
+    }
+}
+
+@MainActor
 struct PreviewIdle: IdleReading {
     var seconds: TimeInterval = 8
     func secondsSinceLastInput() -> TimeInterval { seconds }
@@ -58,6 +83,8 @@ extension AppState {
         let defaults = UserDefaults(suiteName: "decaffeinate.preview")!
         defaults.removePersistentDomain(forName: "decaffeinate.preview")
         let settings = SettingsStore(defaults: defaults)
+        // Keep the one-time explainer collapsed so the README menu shot is clean.
+        settings.settings.hasSeenAwakeExplainer = true
         let rules = RulesEngine(defaults: defaults)
         let state = AppState(
             settingsStore: settings,
@@ -65,7 +92,8 @@ extension AppState {
             telemetry: PreviewSampler(),
             idleMonitor: PreviewIdle(),
             powerReader: PreviewPower(),
-            thermalProvider: { .nominal }
+            thermalProvider: { .nominal },
+            provenanceResolver: PreviewProvenance()
         )
         state.tick()
         return state

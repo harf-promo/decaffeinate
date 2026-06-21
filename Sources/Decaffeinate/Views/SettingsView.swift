@@ -342,6 +342,16 @@ private struct AutomationSettings: View {
                 }
             }
 
+            Section("AI agents") {
+                Toggle(
+                    "Auto-sleep when a watched agent finishes",
+                    isOn: $store.settings.autoSleepWhenAgentFinishes)
+                Text(
+                    "When an AI agent (Claude Code, Cursor…) keeps the Mac awake until its task is done, watch it automatically and sleep once it finishes. Otherwise the menu just offers a one-click watch."
+                )
+                .settingsCaption()
+            }
+
             Section("Strict takeover") {
                 Toggle(
                     "Let Decaffeinate own the idle timer", isOn: $store.settings.strictTakeoverMode)
@@ -439,6 +449,7 @@ private struct HistorySettings: View {
 
 private struct AboutView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var updater: UpdaterController
 
     var body: some View {
         VStack(spacing: Space.s3) {
@@ -450,7 +461,9 @@ private struct AboutView: View {
                 .foregroundStyle(Color.ink2)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal)
-            Text("Version \(AppInfo.version)").eyebrow(.ink4)
+
+            softwareUpdate
+
             Link(
                 "github.com/harf-promo/decaffeinate",
                 destination: URL(string: "https://github.com/harf-promo/decaffeinate")!
@@ -460,10 +473,33 @@ private struct AboutView: View {
                 OnboardingPresenter.shared.present(settingsStore: appState.settingsStore)
             }
             .buttonStyle(.link).font(HarfFont.caption).tint(Color.ink2)
-            .padding(.top, Space.s1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(Space.s5)
+    }
+
+    @ViewBuilder private var softwareUpdate: some View {
+        VStack(spacing: Space.s2) {
+            Text("Version \(AppInfo.version)").eyebrow(.ink4)
+            if updater.isAvailable {
+                if updater.updateAvailable {
+                    Label("An update is available", systemImage: "arrow.down.circle.fill")
+                        .font(HarfFont.caption).foregroundStyle(Color.positive)
+                }
+                Text("Last checked: \(lastChecked)")
+                    .font(HarfFont.caption).foregroundStyle(Color.ink3)
+                Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
+                    .padding(.top, 2)
+                Toggle("Automatically check for updates", isOn: $updater.automaticChecksEnabled)
+                    .font(HarfFont.caption).fixedSize()
+            }
+        }
+        .padding(.vertical, Space.s2)
+    }
+
+    private var lastChecked: String {
+        guard let date = updater.lastCheckedAt else { return "Never" }
+        return Format.relative(since: date)
     }
 }
 

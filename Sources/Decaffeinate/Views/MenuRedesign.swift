@@ -227,6 +227,8 @@ private struct RDActiveControls: View {
 private struct RDList: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject var appState: AppState
+    @State private var showExplainer = false
+    @State private var didAutoShow = false
 
     private var systemBlockers: [PowerAssertion] {
         appState.assertions.filter(\.blocksSystemSleep)
@@ -242,7 +244,8 @@ private struct RDList: View {
                 RDSectionLabel(text: "Keeping your Mac awake", trailing: "all clear")
                 emptyState
             } else {
-                RDSectionLabel(text: "Keeping your Mac awake", trailing: nil)
+                sectionHeader
+                if showExplainer { explainerCard }
                 rows(systemBlockers)
                 if !others.isEmpty {
                     RDSectionLabel(text: "Screen-only / background", trailing: nil)
@@ -251,6 +254,51 @@ private struct RDList: View {
                 }
             }
         }
+        .onAppear {
+            // Auto-open the explainer once, the first time there's something to explain.
+            if !didAutoShow, !appState.settings.hasSeenAwakeExplainer, !appState.assertions.isEmpty
+            {
+                didAutoShow = true
+                showExplainer = true
+                appState.markAwakeExplainerSeen()
+            }
+        }
+    }
+
+    private var sectionHeader: some View {
+        HStack {
+            Text("Keeping your Mac awake").textCase(.uppercase)
+                .font(.system(size: 11, weight: .semibold)).tracking(0.8)
+                .foregroundStyle(theme.ink3)
+            Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { showExplainer.toggle() }
+            } label: {
+                Image(systemName: "info.circle").font(.system(size: 12))
+            }
+            .buttonStyle(.plain).foregroundStyle(showExplainer ? theme.accent : theme.ink4)
+            .help("What does this mean?")
+            .accessibilityLabel("What's keeping your Mac awake?")
+        }
+        .padding(.horizontal, theme.contentInset)
+        .padding(.bottom, Space.s1)
+    }
+
+    private var explainerCard: some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            Text("What's keeping your Mac awake?")
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.ink1)
+            Text(
+                "macOS lets any app place a *power assertion* — a request that stops the Mac (or just the screen) from sleeping. Each row is one app's live request: what it's doing, who started it, and how long it's been held (\"held 9m\" is the real age). Decaffeinate still forces sleep once you step away."
+            )
+            .font(.system(size: 12)).foregroundStyle(theme.ink3)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Space.s3)
+        .background(RoundedRectangle(cornerRadius: Radius.soft).fill(theme.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.soft).stroke(theme.hairline, lineWidth: 1))
+        .padding(.horizontal, theme.contentInset)
+        .padding(.bottom, Space.s2)
     }
 
     @ViewBuilder private func rows(_ list: [PowerAssertion]) -> some View {
@@ -335,6 +383,7 @@ private struct RDRow: View {
                 contextText
                     .lineLimit(3).fixedSize(horizontal: false, vertical: true)
                 if pending { approvalButtons.padding(.top, Space.s1) }
+                if !pending, appState.shouldOfferWatch(for: assertion) { watchOffer }
             }
 
             Spacer(minLength: Space.s1)
@@ -350,9 +399,13 @@ private struct RDRow: View {
     }
 
     private var contextText: Text {
-        var t = Text(assertion.reason.explanation).foregroundStyle(theme.ink2)
+        var t = Text(appState.displayReason(for: assertion)).foregroundStyle(theme.ink2)
         var tail: [String] = []
-        if let attribution = assertion.attribution { tail.append(attribution) }
+        if let origin = appState.originCrumb(for: assertion) {
+            tail.append(origin)
+        } else if let attribution = assertion.attribution {
+            tail.append(attribution)
+        }
         if let held = appState.heldDuration(assertion) {
             tail.append("held " + held.replacingOccurrences(of: "for ", with: ""))
         }
@@ -363,6 +416,34 @@ private struct RDRow: View {
             t = t + Text(" · " + tail.joined(separator: " · ")).foregroundStyle(theme.ink4)
         }
         return t.font(.system(size: 12))
+    }
+
+    /// One-click "Sleep when it finishes" for an agentic `caffeinate -w` hold,
+    /// plus a dismiss — non-nagging, menu-only.
+    @ViewBuilder private var watchOffer: some View {
+        if let target = appState.agentWaitTarget(for: assertion) {
+            HStack(spacing: Space.s2) {
+                Button {
+                    appState.setWatchTarget(.pid(target.pid))
+                } label: {
+                    Label("Sleep when it finishes", systemImage: "binoculars")
+                }
+                .buttonStyle(RDSecondaryButton(compact: true))
+                .fixedSize()
+                .help("Watch \(target.label) and put the Mac to sleep once it's done.")
+                Button {
+                    appState.dismissWatchSuggestion(forHolder: assertion.pid)
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(theme.ink4)
+                .help("Dismiss")
+                .accessibilityLabel("Dismiss suggestion")
+                Spacer(minLength: 0)
+            }
+            .padding(.top, Space.s1)
+        }
     }
 
     @ViewBuilder private var tag: some View {
@@ -465,7 +546,7 @@ private struct RDFooter: View {
         HStack(spacing: Space.s3) {
             if updater.updateAvailable {
                 Button {
-                    updater.checkForUpdates()
+                    updater.checkForUpdatesUserInitiated()
                 } label: {
                     Label("Update available", systemImage: "arrow.down.circle.fill")
                 }
@@ -479,11 +560,8 @@ private struct RDFooter: View {
                 .font(.system(size: 11)).foregroundStyle(theme.ink3)
             }
             Spacer()
-            if updater.isAvailable {
-                iconButton("arrow.triangle.2.circlepath", "Check for updates") {
-                    updater.checkForUpdates()
-                }
-            }
+            // Routine "Check for Updates…" lives in Settings → About now; the menu
+            // only surfaces the green button above when there's genuinely an update.
             SettingsLink {
                 Label("Settings", systemImage: "gearshape").font(.system(size: 12, weight: .medium))
             }

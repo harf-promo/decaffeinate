@@ -40,6 +40,11 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// override (battery floor / thermal).
     var triggers: [TriggerRule] = []
 
+    /// When a recognized AI agent (Claude Code, Cursor…) is keeping the Mac awake
+    /// until its task finishes, automatically watch it and sleep when it's done.
+    /// Off by default — the menu otherwise just *offers* a one-click watch.
+    var autoSleepWhenAgentFinishes: Bool = false
+
     // MARK: Safety rails
 
     /// On battery, never force sleep below this charge — instead let macOS take
@@ -94,6 +99,10 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// Set once the user has seen the welcome flow, so it only shows on first run.
     var hasCompletedOnboarding: Bool = false
 
+    /// Set once the user has seen the inline "what's keeping it awake?" explainer,
+    /// so it auto-expands only the first time.
+    var hasSeenAwakeExplainer: Bool = false
+
     // MARK: Advanced
 
     /// Strict takeover: hold our own idle-sleep assertion so macOS never
@@ -104,6 +113,84 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
 
     /// Start Decaffeinate automatically at login.
     var launchAtLogin: Bool = false
+
+    init() {}
+}
+
+extension DecaffeinateSettings {
+    /// Resilient decode: any field absent from persisted JSON keeps its default,
+    /// so adding a setting in a new version never wipes a user's saved settings
+    /// (the previous synthesized decoder failed the whole blob on one missing key).
+    init(from decoder: Decoder) throws {
+        self.init()
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .decaffeinateEnabled) {
+            decaffeinateEnabled = v
+        }
+        if let v = try c.decodeIfPresent(Double.self, forKey: .idleThresholdMinutes) {
+            idleThresholdMinutes = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .sleepSoonerOnBattery) {
+            sleepSoonerOnBattery = v
+        }
+        if let v = try c.decodeIfPresent(Double.self, forKey: .batteryIdleThresholdMinutes) {
+            batteryIdleThresholdMinutes = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .caffeinateEnabled) {
+            caffeinateEnabled = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .caffeinateKeepsDisplayAwake) {
+            caffeinateKeepsDisplayAwake = v
+        }
+        if let v = try c.decodeIfPresent([TriggerRule].self, forKey: .triggers) { triggers = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .autoSleepWhenAgentFinishes) {
+            autoSleepWhenAgentFinishes = v
+        }
+        if let v = try c.decodeIfPresent(Int.self, forKey: .batteryFloorPercent) {
+            batteryFloorPercent = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .thermalGuardEnabled) {
+            thermalGuardEnabled = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pauseForActiveCall) {
+            pauseForActiveCall = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pauseForActiveMedia) {
+            pauseForActiveMedia = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pauseForTimeMachine) {
+            pauseForTimeMachine = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pauseForSystemUpdate) {
+            pauseForSystemUpdate = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .respectWhitelist) {
+            respectWhitelist = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .scheduleEnabled) {
+            scheduleEnabled = v
+        }
+        if let v = try c.decodeIfPresent(Int.self, forKey: .activeHoursStart) {
+            activeHoursStart = v
+        }
+        if let v = try c.decodeIfPresent(Int.self, forKey: .activeHoursEnd) { activeHoursEnd = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarCountdown) {
+            showMenuBarCountdown = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .notifyOnNewBlocker) {
+            notifyOnNewBlocker = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) {
+            hasCompletedOnboarding = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .hasSeenAwakeExplainer) {
+            hasSeenAwakeExplainer = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .strictTakeoverMode) {
+            strictTakeoverMode = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) { launchAtLogin = v }
+    }
 }
 
 /// Observable wrapper that loads settings on init and writes them back to

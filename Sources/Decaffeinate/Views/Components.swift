@@ -52,6 +52,7 @@ struct AssertionDetailView: View {
 
     var body: some View {
         let reason = assertion.reason
+        let provenance = appState.provenance(for: assertion.pid)
         VStack(alignment: .leading, spacing: Space.s2) {
             if !reason.resourceLabels.isEmpty {
                 HStack(spacing: 6) {
@@ -60,7 +61,19 @@ struct AssertionDetailView: View {
                     }
                 }
             }
-            row("Why", reason.explanation)
+            // The enriched "why" — for a caffeinate hold this spells out exactly
+            // what it's preventing and what it's waiting on.
+            row("Why", appState.displayReason(for: assertion))
+
+            // Where it came from — the window / agent / project behind the hold.
+            if let p = provenance {
+                if let started = p.originDisplayName { row("Started by", started) }
+                if let folder = p.cwd.flatMap(ProcessProvenance.relativizeHome) {
+                    row("Folder", folder)
+                }
+                if let tty = p.ttyName { row("Terminal", tty) }
+            }
+
             // Who's really behind it — the daemon vs the real app, and the app it
             // was created on behalf of.
             row("Held by", assertion.processName)
@@ -73,7 +86,13 @@ struct AssertionDetailView: View {
             if let held = appState.heldDuration(assertion) {
                 row("Held for", held.replacingOccurrences(of: "for ", with: ""))
             }
+            if let created = assertion.createdAt {
+                row("Holding since", created.formatted(date: .abbreviated, time: .shortened))
+            }
             if let secs = reason.autoReleaseSeconds { row("Auto-releases", "in \(secs)s") }
+            if let p = provenance, !p.holderArgv.isEmpty {
+                row("Command", p.holderArgv.joined(separator: " "))
+            }
             if let path = assertion.bundlePath { row("Where", path) }
             row("Type", assertion.assertionType)
             if let details = assertion.details, !details.isEmpty { row("App context", details) }

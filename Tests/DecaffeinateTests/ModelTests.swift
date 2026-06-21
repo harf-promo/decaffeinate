@@ -4,6 +4,30 @@ import XCTest
 
 final class ModelTests: XCTestCase {
 
+    // MARK: Settings migration (resilient decode)
+
+    func testSettingsDecodeKeepsDefaultsForMissingKeys() throws {
+        // Simulate JSON persisted by an older version that lacks the newer keys.
+        let oldJSON = #"{"caffeinateEnabled":true,"batteryFloorPercent":5}"#.data(using: .utf8)!
+        let s = try JSONDecoder().decode(DecaffeinateSettings.self, from: oldJSON)
+        // Present keys are honored…
+        XCTAssertTrue(s.caffeinateEnabled)
+        XCTAssertEqual(s.batteryFloorPercent, 5)
+        // …and every absent key keeps its default (no wipe).
+        XCTAssertTrue(s.decaffeinateEnabled)
+        XCTAssertEqual(s.idleThresholdMinutes, 10, accuracy: 0.001)
+        XCTAssertFalse(s.autoSleepWhenAgentFinishes)
+        XCTAssertFalse(s.hasSeenAwakeExplainer)
+    }
+
+    func testSettingsRoundTrip() throws {
+        var s = DecaffeinateSettings()
+        s.autoSleepWhenAgentFinishes = true
+        s.idleThresholdMinutes = 25
+        let data = try JSONEncoder().encode(s)
+        XCTAssertEqual(try JSONDecoder().decode(DecaffeinateSettings.self, from: data), s)
+    }
+
     // MARK: Rule.matches
 
     func testBundleScopedRuleRequiresBundleMatch() {
