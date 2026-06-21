@@ -65,6 +65,10 @@ struct AssertionDetailView: View {
             // what it's preventing and what it's waiting on.
             row("Why", appState.displayReason(for: assertion))
 
+            // Which audio device — so several audio sources are distinguishable.
+            let devices = appState.audioDevices(for: assertion)
+            if !devices.isEmpty { row("Device", devices.joined(separator: ", ")) }
+
             // Where it came from — the window / agent / project behind the hold.
             if let p = provenance {
                 if let started = p.originDisplayName { row("Started by", started) }
@@ -93,14 +97,13 @@ struct AssertionDetailView: View {
             } else if let created = assertion.createdAt {
                 row("Holding since", created.formatted(date: .abbreviated, time: .shortened))
             }
-            if appState.isAgentSession(assertion) {
-                if let created = assertion.createdAt {
-                    row(
-                        "This process",
-                        "started " + created.formatted(date: .omitted, time: .shortened))
-                }
-                row("Note", "Re-arms automatically (caffeinate -t)")
+            if appState.isAgentSession(assertion), let created = assertion.createdAt {
+                row(
+                    "This process", "started " + created.formatted(date: .omitted, time: .shortened)
+                )
             }
+            // How the hold ends — until a task finishes / on a timer / indefinite.
+            row("Ends", appState.holdLifetime(for: assertion).detailLabel)
             if let secs = reason.autoReleaseSeconds { row("Auto-releases", "in \(secs)s") }
             if let p = provenance, !p.holderArgv.isEmpty {
                 row("Command", p.holderArgv.joined(separator: " "))

@@ -41,6 +41,13 @@ final class AgentWatcher {
 
     var isActive: Bool { target != nil && !hasCompleted }
 
+    /// The pid currently being watched (when armed by pid), so a hold can tell
+    /// whether *it* is the one being watched.
+    var watchedTargetPID: pid_t? {
+        if case .pid(let pid) = target { return pid }
+        return nil
+    }
+
     func setTarget(_ newTarget: WatchTarget?) {
         target = newTarget
         lastSample = nil

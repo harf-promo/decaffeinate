@@ -45,6 +45,7 @@ final class AppState: ObservableObject {
     private let agentWatcher: AgentWatcher
     private let triggerSampler: any TriggerSampling
     private let provenanceResolver: any ProcessProvenanceResolving
+    private let audioResolver: any AudioDeviceResolving
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -127,6 +128,7 @@ final class AppState: ObservableObject {
         agentWatcher: AgentWatcher = AgentWatcher(),
         triggerSampler: any TriggerSampling = LiveTriggerSampler(),
         provenanceResolver: any ProcessProvenanceResolving = ProcessProvenanceResolver(),
+        audioResolver: any AudioDeviceResolving = AudioDeviceResolver(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -142,7 +144,44 @@ final class AppState: ObservableObject {
         self.agentWatcher = agentWatcher
         self.triggerSampler = triggerSampler
         self.provenanceResolver = provenanceResolver
+        self.audioResolver = audioResolver
         self.now = now
+    }
+
+    /// Friendly device name(s) behind an audio hold ("AirPods Pro", "Built-in
+    /// Microphone"), resolved lazily on render. Empty when unknown.
+    func audioDevices(for assertion: PowerAssertion) -> [String] {
+        ReasonEngine.deviceTokens(assertion.resources)
+            .compactMap { audioResolver.friendlyName(forToken: $0) }
+            .removingDuplicates()
+    }
+
+    /// The single best device string to append to an audio row, or nil.
+    func audioDeviceLabel(for assertion: PowerAssertion) -> String? {
+        switch assertion.reason.category {
+        case .microphone, .audioPlayback, .mediaPlayback:
+            return audioDevices(for: assertion).first
+        default:
+            return nil
+        }
+    }
+
+    /// An SF Symbol for an audio hold's resolved device (AirPods / headphones /
+    /// built-in), falling back to the category's icon.
+    func audioDeviceSymbol(for assertion: PowerAssertion) -> String? {
+        let tokens = ReasonEngine.deviceTokens(assertion.resources)
+        for token in tokens {
+            let name = (audioResolver.friendlyName(forToken: token) ?? token).lowercased()
+            if name.contains("airpod") { return "airpodspro" }
+            if name.contains("headphone") || name.contains("beats") { return "headphones" }
+            if name.contains("built-in speaker") || name.contains("macbook") {
+                return assertion.reason.category == .microphone ? "mic.fill" : "speaker.wave.2.fill"
+            }
+            if let device = audioResolver.device(forToken: token) {
+                return device.hasInput && !device.hasOutput ? "mic.fill" : "speaker.wave.2.fill"
+            }
+        }
+        return nil
     }
 
     /// Where a holder pid came from (terminal / agent / project), resolved lazily
@@ -326,6 +365,92 @@ final class AppState: ObservableObject {
             let pid = invocation.waitPID, isAlive(pid)
         else { return nil }
         return (pid, processName(forPID: pid))
+    }
+
+    /// How this hold will end — "until a task finishes" / timed / indefinite.
+    func holdLifetime(for assertion: PowerAssertion) -> HoldLifetime {
+        if case .watching = watchStatus, isThisHoldWatched(assertion) {
+            return .untilWatchedFinishes
+        }
+        if let target = agentWaitTarget(for: assertion) {
+            return .untilProcess(target.label)
+        }
+        if let invocation = caffeinateInvocation(for: assertion), invocation.timeoutSeconds != nil {
+            return .timed(reArms: isAgentSession(assertion))
+        }
+        if assertion.reason.autoReleaseSeconds != nil {
+            return .timed(reArms: isAgentSession(assertion))
+        }
+        return .indefinite
+    }
+
+    private func isThisHoldWatched(_ assertion: PowerAssertion) -> Bool {
+        guard let watched = agentWatcher.watchedTargetPID else { return false }
+        return agentWaitTarget(for: assertion)?.pid == watched
+    }
+
+    // MARK: Row actions (reveal / copy)
+
+    /// The owning app's name when this hold's pid is a regular GUI app we can
+    /// bring to the front, else nil (daemon / CLI holds use Activity Monitor).
+    func frontableAppName(for assertion: PowerAssertion) -> String? {
+        guard let app = NSRunningApplication(processIdentifier: assertion.pid),
+            app.activationPolicy == .regular, let name = app.localizedName
+        else { return nil }
+        return name
+    }
+
+    func bringToFront(_ assertion: PowerAssertion) {
+        NSRunningApplication(processIdentifier: assertion.pid)?.activate()
+    }
+
+    func openActivityMonitor() {
+        guard
+            let url = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: "com.apple.ActivityMonitor")
+        else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Copy a plain-text summary of a hold to the clipboard.
+    func copyDetails(_ assertion: PowerAssertion) {
+        var lines = [rowTitle(for: assertion), "Why: \(displayReason(for: assertion))"]
+        if let label = provenanceResolver.provenance(for: assertion.pid)?.sessionLabel {
+            lines.append("Origin: \(label)")
+        }
+        if let device = audioDeviceLabel(for: assertion) { lines.append("Device: \(device)") }
+        lines.append("Ends: \(holdLifetime(for: assertion).detailLabel)")
+        lines.append("Process: \(assertion.processName) (pid \(assertion.pid))")
+        lines.append("Type: \(assertion.assertionType)")
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+
+    /// A one-glance "what will end this?" line for the header — the single most
+    /// useful lifetime statement across the current holds, or nil when free.
+    var awakeSummary: String? {
+        let groups = groupedSystemBlockers
+        guard !groups.isEmpty else { return nil }
+        // The most concrete answer: a watched task or an explicit `-w` wait.
+        for group in groups {
+            switch holdLifetime(for: group.representative) {
+            case .untilWatchedFinishes: return "Won't sleep until the watched task finishes"
+            case .untilProcess(let name): return "Won't sleep until \(name) finishes"
+            default: continue
+            }
+        }
+        // An active agent session re-arms while it works.
+        if let agent = groups.first(where: \.isAgentSession) {
+            return "Won't sleep while \(groupTitle(for: agent)) is working"
+        }
+        // Otherwise name an indefinite hold, else note the timers.
+        if let indefinite = groups.first(where: {
+            holdLifetime(for: $0.representative) == .indefinite
+        }) {
+            return "Held indefinitely by \(groupTitle(for: indefinite))"
+        }
+        return "Holding on a timer — auto-releases"
     }
 
     /// Whether a hold's provenance traces back to a known AI agent (Claude Code…).
@@ -685,12 +810,17 @@ final class AppState: ObservableObject {
             if bucket[k] == nil { order.append(k) }
             bucket[k, default: []].append(blocker)
         }
-        return order.map { k in
+        let groups = order.map { k in
             let members = bucket[k] ?? []
             let rep = representative(of: members)
             return HoldGroup(
                 id: k, representative: rep, members: members,
                 isAgentSession: isAgentSession(rep), firstSeen: sessionFirstSeen[k])
+        }
+        // Stable, alphabetic by the user-visible title — so churning agent rows
+        // (all named "caffeinate") no longer float up and down with pid order.
+        return groups.sorted {
+            Self.stableTitleOrder($0.id, $1.id, groupTitle(for: $0), groupTitle(for: $1))
         }
     }
 
@@ -703,6 +833,41 @@ final class AppState: ObservableObject {
             default: return lhs.pid < rhs.pid
             }
         } ?? members[0]
+    }
+
+    /// The user-visible title for a group's row (matches `RDRow.titleText`).
+    func groupTitle(for group: HoldGroup) -> String { rowTitle(for: group.representative) }
+
+    /// The user-visible title for a single hold — agent crumb, else app name. An
+    /// unattributed audio hold (bare "coreaudiod") reads clearer titled by its
+    /// device, so several audio sources are distinguishable at a glance.
+    func rowTitle(for assertion: PowerAssertion) -> String {
+        if isAgentSession(assertion), let crumb = originCrumb(for: assertion) { return crumb }
+        // A genuinely unattributed audio hold (bare daemon — no real owner, no
+        // bundle) reads clearer titled by its device than "coreaudiod".
+        if assertion.realOwner == nil, assertion.bundleIdentifier == nil,
+            let device = audioDeviceLabel(for: assertion)
+        {
+            return device
+        }
+        return assertion.displayName
+    }
+
+    /// Order two rows alphabetically by their visible title, with a deterministic
+    /// identity tiebreaker so equal titles never reorder frame-to-frame.
+    static func stableTitleOrder(_ lid: String, _ rid: String, _ lt: String, _ rt: String) -> Bool {
+        switch lt.localizedCaseInsensitiveCompare(rt) {
+        case .orderedSame: return lid < rid
+        case let order: return order == .orderedAscending
+        }
+    }
+
+    /// `assertions` not holding system sleep (screen-only / background), sorted
+    /// with the same stable alphabetic order as the grouped rows.
+    var sortedOtherBlockers: [PowerAssertion] {
+        assertions
+            .filter { !$0.blocksSystemSleep }
+            .sorted { Self.stableTitleOrder($0.id, $1.id, rowTitle(for: $0), rowTitle(for: $1)) }
     }
 
     /// Whether this blocker still needs the user's allow/block decision. Matched

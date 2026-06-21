@@ -64,6 +64,20 @@ struct PreviewProvenance: ProcessProvenanceResolving {
 }
 
 @MainActor
+struct PreviewAudio: AudioDeviceResolving {
+    func friendlyName(forToken token: String) -> String? {
+        if let builtIn = AudioDeviceResolver.prettifyBuiltIn(token) { return builtIn }
+        if token == "DEVICE-UUID" { return "AirPods Pro" }
+        return AudioDeviceResolver.prettifyUnknown(token)
+    }
+    func device(forToken token: String) -> AudioDeviceInfo? {
+        token == "DEVICE-UUID"
+            ? AudioDeviceInfo(uid: token, name: "AirPods Pro", hasInput: true, hasOutput: false)
+            : nil
+    }
+}
+
+@MainActor
 struct PreviewIdle: IdleReading {
     var seconds: TimeInterval = 8
     func secondsSinceLastInput() -> TimeInterval { seconds }
@@ -93,7 +107,8 @@ extension AppState {
             idleMonitor: PreviewIdle(),
             powerReader: PreviewPower(),
             thermalProvider: { .nominal },
-            provenanceResolver: PreviewProvenance()
+            provenanceResolver: PreviewProvenance(),
+            audioResolver: PreviewAudio()
         )
         state.tick()
         return state

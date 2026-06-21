@@ -4,6 +4,31 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] — 2026-06-22
+
+Clearer holds: stable order, audio source, lifetime, and an at-a-glance answer.
+
+### Added
+- **A lifetime indicator** on every hold — a quiet trailing mark that says whether
+  it's **until done** (it'll end on its own), **timed**, or **indefinite**, plus an
+  "Ends" row in the detail ("When npm finishes" / "On a timer (re-arms
+  automatically)" / "No timeout — held until released").
+- **A header "won't sleep until…" line** — the single most useful answer at a
+  glance, e.g. *"Won't sleep while Claude Code · ~/myrepo is working"* or *"Won't
+  sleep until npm finishes"*.
+- **Audio source detail.** Audio holds now name **which device** is keeping the
+  Mac awake — "Playing audio · **Built-in Speakers**", "Microphone in use ·
+  **AirPods Pro**" — resolved via public CoreAudio (no extra permission). An
+  unattributed `coreaudiod` hold is titled by its device so several audio sources
+  read distinctly, with device-aware icons (AirPods / headphones / speaker).
+- **Row actions** in the `…` menu: *Bring <app> to front*, *Show in Activity
+  Monitor*, and *Copy details*.
+
+### Changed
+- **The list is now stably alphabetical** by the row's visible title (agent +
+  project, app name, or device), with a deterministic tiebreaker — so re-spawning
+  AI-agent holds no longer jump up and down between scans.
+
 ## [1.7.1] — 2026-06-21
 
 Stop the agent-`caffeinate` churn. AI agents (Claude Code…) run `caffeinate -i -t

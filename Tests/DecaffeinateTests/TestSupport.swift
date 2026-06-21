@@ -89,3 +89,16 @@ final class FakeProvenanceResolver: ProcessProvenanceResolving {
         return byPid[pid]
     }
 }
+
+/// A canned audio-device resolver for tests (no CoreAudio).
+@MainActor
+final class FakeAudioDeviceResolver: AudioDeviceResolving {
+    var byToken: [String: String] = [:]
+    var devices: [String: AudioDeviceInfo] = [:]
+    private(set) var lookups: [String] = []
+    func friendlyName(forToken token: String) -> String? {
+        lookups.append(token)
+        return byToken[token]
+    }
+    func device(forToken token: String) -> AudioDeviceInfo? { devices[token] }
+}

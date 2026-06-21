@@ -83,6 +83,16 @@ private struct RDHeader: View {
                 .tracking(0.8)
                 .foregroundStyle(theme.ink4)
                 .padding(.top, Space.s2)
+
+            // The one at-a-glance "what will end this?" answer.
+            if let summary = appState.awakeSummary {
+                Text(summary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.ink2)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, Space.s2)
+            }
         }
         .padding(.horizontal, theme.contentInset)
         .padding(.top, Space.s4)
@@ -230,9 +240,7 @@ private struct RDList: View {
     @State private var showExplainer = false
     @State private var didAutoShow = false
 
-    private var others: [PowerAssertion] {
-        appState.assertions.filter { !$0.blocksSystemSleep }
-    }
+    private var others: [PowerAssertion] { appState.sortedOtherBlockers }
     private func isPending(_ a: PowerAssertion) -> Bool { appState.isPendingDecision(a) }
     private func isPending(_ group: HoldGroup) -> Bool {
         group.members.contains { appState.isPendingDecision($0) }
@@ -372,6 +380,21 @@ private struct RDRow: View {
     private var policy: RulePolicy? { rules.policy(for: assertion) }
 
     /// "Claude Code · ~/myrepo" for an agent session, else the app's name.
+    /// The row icon: a device-specific glyph for an unattributed audio hold (so
+    /// AirPods / headphones / built-in read at a glance), else the app icon.
+    @ViewBuilder private var rowIcon: some View {
+        if assertion.realOwner == nil, assertion.bundleIdentifier == nil,
+            let symbol = appState.audioDeviceSymbol(for: assertion)
+        {
+            Image(systemName: symbol)
+                .font(.system(size: 15))
+                .foregroundStyle(theme.ink2)
+                .frame(width: Metrics.rowIcon, height: Metrics.rowIcon)
+        } else {
+            AppIconView(assertion: assertion, size: Metrics.rowIcon)
+        }
+    }
+
     private var titleText: String {
         if group.isAgentSession, let crumb = appState.originCrumb(for: assertion) {
             return crumb
@@ -396,8 +419,7 @@ private struct RDRow: View {
 
     private var content: some View {
         HStack(alignment: .top, spacing: Space.s3) {
-            AppIconView(assertion: assertion, size: Metrics.rowIcon)
-                .padding(.top, 1)
+            rowIcon.padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: Space.s2) {
@@ -440,6 +462,11 @@ private struct RDRow: View {
             } else if let attribution = assertion.attribution {
                 tail.append(attribution)
             }
+            // Name the audio device, unless it's already this row's title (an
+            // unattributed audio hold is titled by its device).
+            if let device = appState.audioDeviceLabel(for: assertion), device != titleText {
+                tail.append(device)
+            }
             if let held = appState.heldDuration(assertion) {
                 tail.append("held " + held.replacingOccurrences(of: "for ", with: ""))
             }
@@ -449,6 +476,16 @@ private struct RDRow: View {
         }
         if !tail.isEmpty {
             t = t + Text(" · " + tail.joined(separator: " · ")).foregroundStyle(theme.ink4)
+        }
+        // The lifetime — until done / timed / indefinite — as a quiet trailing
+        // mark so you can tell at a glance whether it ends on its own.
+        if !pending {
+            let lifetime = appState.holdLifetime(for: assertion)
+            t =
+                t
+                + Text("  ·  " + lifetime.badgeLabel)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(lifetime.isBounded ? theme.teal : theme.ink4)
         }
         return t.font(.system(size: 12))
     }
@@ -529,9 +566,14 @@ private struct RDRow: View {
             AllowForMenu(title: "Allow for…", assertion: assertion)
             Button("Let it sleep (ignore)") { appState.setPolicy(.ignore, for: assertion) }
             if policy != nil {
-                Divider()
                 Button("Clear rule") { appState.clearRule(for: assertion) }
             }
+            Divider()
+            if let app = appState.frontableAppName(for: assertion) {
+                Button("Bring \(app) to front") { appState.bringToFront(assertion) }
+            }
+            Button("Show in Activity Monitor") { appState.openActivityMonitor() }
+            Button("Copy details") { appState.copyDetails(assertion) }
         } label: {
             Image(systemName: "ellipsis.circle")
         }

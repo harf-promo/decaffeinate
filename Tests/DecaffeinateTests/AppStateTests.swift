@@ -93,12 +93,14 @@ final class AppStateTests: XCTestCase {
         let thermal: ThermalBox
         let triggers: FakeTriggerSampler
         let provenance: FakeProvenanceResolver
+        let audio: FakeAudioDeviceResolver
         let cleanup: () -> Void
     }
 
     private func makeHarness(
         watcher: AgentWatcher = AgentWatcher(),
         provenance: FakeProvenanceResolver = FakeProvenanceResolver(),
+        audio: FakeAudioDeviceResolver = FakeAudioDeviceResolver(),
         _ configure: (inout DecaffeinateSettings) -> Void = { _ in }
     ) -> Harness {
         let suite = "decaf.appstate.\(UUID().uuidString)"
@@ -129,13 +131,14 @@ final class AppStateTests: XCTestCase {
             agentWatcher: watcher,
             triggerSampler: triggers,
             provenanceResolver: provenance,
+            audioResolver: audio,
             now: { clock.date }
         )
         return Harness(
             state: state, scanner: scanner, idle: idle, power: power,
             sleeper: sleeper, caffeine: caffeine, notifier: notifier,
             settings: settings, rules: rules, clock: clock, thermal: thermal,
-            triggers: triggers, provenance: provenance,
+            triggers: triggers, provenance: provenance, audio: audio,
             cleanup: { defaults.removePersistentDomain(forName: suite) })
     }
 
@@ -887,5 +890,83 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(groups.count, 1)
         XCTAssertFalse(groups[0].isAgentSession)
         XCTAssertEqual(groups[0].liveCount, 1)
+    }
+
+    // MARK: Stable alphabetic ordering (v1.8.0)
+
+    func testGroupedBlockersAreStableAlphabeticAcrossRespawn() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let now = h.clock.date
+        // Titles sort apple < banana < cherry; fed in cherry, apple, banana order.
+        let c = agentCaff(h, pid: 30, cwd: "/x/cherry", tty: "ttys003", created: now)
+        let a = agentCaff(h, pid: 31, cwd: "/x/apple", tty: "ttys004", created: now)
+        let b = agentCaff(h, pid: 32, cwd: "/x/banana", tty: "ttys005", created: now)
+        h.scanner.assertions = [c, a, b]
+        h.state.tick()
+        let titles = h.state.groupedSystemBlockers.map { h.state.groupTitle(for: $0) }
+        XCTAssertEqual(
+            titles, titles.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending })
+
+        // Respawn the middle one with a new pid in a different scan position.
+        let bRespawn = agentCaff(h, pid: 99, cwd: "/x/banana", tty: "ttys005", created: now)
+        h.scanner.assertions = [bRespawn, c, a]
+        h.state.tick()
+        XCTAssertEqual(
+            h.state.groupedSystemBlockers.map { h.state.groupTitle(for: $0) }, titles,
+            "order is identical after a respawn — no churn")
+    }
+
+    // MARK: Audio device label
+
+    func testAudioDeviceLabelForAudioHold() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.audio.byToken = ["AirPodsUID": "AirPods Pro"]
+        let mic = Fixtures.assertion(
+            pid: 700, process: "coreaudiod", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, resources: ["audio-in", "AirPodsUID"])
+        let chrome = systemBlocker("Chrome", bundle: "com.google.Chrome")
+        h.scanner.assertions = [mic, chrome]
+        h.state.tick()
+        XCTAssertEqual(h.state.audioDeviceLabel(for: mic), "AirPods Pro")
+        XCTAssertNil(h.state.audioDeviceLabel(for: chrome), "no audio resource → no device")
+        // An unattributed audio hold is titled by its device.
+        XCTAssertEqual(h.state.rowTitle(for: mic), "AirPods Pro")
+    }
+
+    // MARK: Lifetime classification + summary
+
+    func testHoldLifetimeClassification() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // -w live target → untilProcess.
+        let waitHold = agenticCaffeinate(h)  // argv has -w <getpid()>
+        h.scanner.assertions = [waitHold]
+        h.state.tick()
+        if case .untilProcess = h.state.holdLifetime(for: waitHold) {
+        } else {
+            XCTFail("caffeinate -w with a live target should be .untilProcess")
+        }
+        // -t agent → timed(reArms: true).
+        let timedHold = agentCaff(
+            h, pid: 800, cwd: "/x/repo", tty: "ttys003", created: h.clock.date)
+        h.scanner.assertions = [timedHold]
+        h.state.tick()
+        XCTAssertEqual(h.state.holdLifetime(for: timedHold), .timed(reArms: true))
+        // Plain blocker, no timeout → indefinite.
+        let plain = systemBlocker("Chrome", bundle: "com.google.Chrome")
+        h.scanner.assertions = [plain]
+        h.state.tick()
+        XCTAssertEqual(h.state.holdLifetime(for: plain), .indefinite)
+    }
+
+    func testAwakeSummary() {
+        let h = makeHarness(); defer { h.cleanup() }
+        XCTAssertNil(h.state.awakeSummary, "nil when nothing holds")
+        h.scanner.assertions = [
+            agentCaff(h, pid: 800, cwd: "/x/repo", tty: "ttys003", created: h.clock.date)
+        ]
+        h.state.tick()
+        XCTAssertEqual(
+            h.state.awakeSummary,
+            "Won't sleep while \(h.state.rowTitle(for: h.scanner.assertions[0])) is working")
     }
 }

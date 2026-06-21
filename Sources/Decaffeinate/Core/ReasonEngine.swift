@@ -147,6 +147,11 @@ enum ReasonEngine {
         return String(collapsed.prefix(maxLength - 1)) + "…"
     }
 
+    /// The known resource-class tokens (everything else is a device id/name).
+    private static let resourceClassTokens: Set<String> = [
+        "audio-in", "audio-out", "network", "gpu", "disk", "usb",
+    ]
+
     static func resourceLabels(_ resources: [String]) -> [String] {
         var labels: [String] = []
         for token in resources.map({ $0.lowercased() }) {
@@ -157,10 +162,19 @@ enum ReasonEngine {
             case "gpu": labels.append("GPU")
             case "disk": labels.append("Disk")
             case "usb": labels.append("USB")
-            default: break  // device UUIDs / names — skip the noise
+            default: break  // device UUIDs / names — surfaced via deviceTokens()
             }
         }
         return labels.removingDuplicates()
+    }
+
+    /// The device id/name token(s) in a resources array — the things
+    /// `resourceLabels` skips (e.g. "BuiltInSpeakerDevice", a device UUID). Used
+    /// to name *which* audio device is keeping the Mac awake.
+    static func deviceTokens(_ resources: [String]) -> [String] {
+        resources
+            .filter { !resourceClassTokens.contains($0.lowercased()) }
+            .removingDuplicates()
     }
 
     /// "THE CAFFEINATE TOOL IS PREVENTING SLEEP." → "The caffeinate tool is preventing sleep."
