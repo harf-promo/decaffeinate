@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// A small rounded info pill, e.g. "🔋 82%" or "Idle 4m".
+/// A small info chip, e.g. "🔋 82%" or "Idle 4m" — a stamped Harf tag: sharp 4px
+/// corner, hairline border in the tint, no fill.
 struct Chip: View {
     var systemImage: String?
     var text: String
-    var tint: Color = .secondary
+    var tint: Color = .ink3
 
     var body: some View {
         HStack(spacing: 3) {
@@ -14,15 +15,17 @@ struct Chip: View {
             }
             Text(text)
         }
-        .font(.caption2)
+        .font(HarfFont.micro)
         .foregroundStyle(tint)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, Space.s2)
         .padding(.vertical, 2)
-        .background(tint.opacity(0.12), in: Capsule())
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.soft)
+                .stroke(tint.opacity(0.35), lineWidth: 1))
     }
 }
 
-/// Uppercased, muted section header used between menu sections.
+/// The tracked UPPERCASE section eyebrow used between menu sections.
 struct SectionHeader: View {
     let title: String
     var trailing: String?
@@ -34,29 +37,15 @@ struct SectionHeader: View {
 
     var body: some View {
         HStack {
-            Text(title.uppercased())
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+            Text(title).eyebrow()
             Spacer()
             if let trailing {
-                Text(trailing)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                Text(trailing).eyebrow(.ink4)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .padding(.horizontal, Space.s3)
+        .padding(.top, Space.s2)
         .padding(.bottom, 2)
-    }
-}
-
-extension AssertionKind {
-    var tint: Color {
-        switch self {
-        case .systemSleep: return .orange
-        case .displaySleep: return .blue
-        case .other: return .secondary
-        }
     }
 }
 
@@ -81,7 +70,7 @@ struct AllowForMenu: View {
 extension View {
     /// The small muted explanatory text style used under settings/menu controls.
     func explanatory() -> some View {
-        font(.caption).foregroundStyle(.secondary)
+        font(HarfFont.caption).foregroundStyle(Color.ink3)
     }
 }
 
@@ -98,7 +87,7 @@ struct AssertionDetailView: View {
             if !reason.resourceLabels.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(reason.resourceLabels, id: \.self) { label in
-                        Chip(systemImage: resourceIcon(label), text: label, tint: .blue)
+                        Chip(systemImage: resourceIcon(label), text: label, tint: .info)
                     }
                 }
                 .padding(.bottom, 2)
@@ -115,17 +104,17 @@ struct AssertionDetailView: View {
             row("Assertion", assertion.name)
             row("PID", "\(assertion.pid)")
         }
-        .font(.caption2)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .font(HarfFont.micro)
+        .padding(.horizontal, Space.s3)
+        .padding(.vertical, Space.s2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.06))
+        .background(Color.paper2)
     }
 
     private func row(_ key: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text(key).foregroundStyle(.tertiary).frame(width: 86, alignment: .leading)
-            Text(value).foregroundStyle(.secondary).textSelection(.enabled).lineLimit(3)
+        HStack(alignment: .top, spacing: Space.s2) {
+            Text(key).foregroundStyle(Color.ink4).frame(width: 86, alignment: .leading)
+            Text(value).foregroundStyle(Color.ink2).textSelection(.enabled).lineLimit(3)
             Spacer(minLength: 0)
         }
     }

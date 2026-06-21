@@ -36,13 +36,13 @@ struct AssertionListView: View {
     }
 
     private var emptyState: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+        HStack(spacing: Space.s2) {
+            Image(systemName: "checkmark.seal.fill").foregroundStyle(Color.positive)
             Text("Nothing is holding your Mac awake.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                .font(HarfFont.body)
+                .foregroundStyle(Color.ink2)
         }
-        .padding(12)
+        .padding(Space.s3)
     }
 }
 
@@ -60,25 +60,26 @@ struct AssertionRow: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: assertion.reason.category.systemImage)
-                    .foregroundStyle(assertion.kind.tint)
+                    .foregroundStyle(Color.ink2)
                     .frame(width: 18)
 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
                         Text(assertion.displayName)
-                            .font(.callout.weight(.medium))
+                            .font(HarfFont.bodyMedium)
+                            .foregroundStyle(Color.ink1)
                             .lineLimit(1)
                         policyBadge
                     }
                     Text(rowSubtitle)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(HarfFont.micro)
+                        .foregroundStyle(Color.ink3)
                         .lineLimit(2)
                 }
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.right")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.ink4)
                     .rotationEffect(.degrees(showDetails ? 90 : 0))
                     .accessibilityHidden(true)
                 policyMenu
@@ -114,23 +115,14 @@ struct AssertionRow: View {
     @ViewBuilder private var policyBadge: some View {
         switch policy {
         case .allow:
-            tag("Allowed", .green)
+            HarfPill(label: "Allowed", variant: .positive)
         case .allowUntil:
-            tag("Allowed · timed", .green)
+            HarfPill(label: "Allowed · timed", variant: .positive)
         case .ignore:
-            tag("Ignored", .orange)
+            HarfPill(label: "Ignored", variant: .neutral)
         case .none:
             EmptyView()
         }
-    }
-
-    private func tag(_ text: String, _ color: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 1)
-            .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
     }
 
     private var policyMenu: some View {

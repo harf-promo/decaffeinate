@@ -241,7 +241,6 @@ private struct HarfButtonBody: View {
             .lineLimit(1)
             .padding(.horizontal, padH)
             .padding(.vertical, padV)
-            .frame(maxWidth: variant == .text ? nil : .infinity)
             .foregroundStyle(fg)
             .background(bg)
             .overlay(

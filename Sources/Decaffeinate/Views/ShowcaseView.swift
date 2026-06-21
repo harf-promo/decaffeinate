@@ -11,18 +11,18 @@ struct ShowcaseView: View {
     var body: some View {
         VStack(spacing: 0) {
             StatusCardView()
-            Divider()
+            Hairline()
             QuickActions()
-            Divider()
+            Hairline()
 
             VStack(alignment: .leading, spacing: 0) {
                 SectionHeader("Keeping your Mac awake")
                 ForEach(appState.assertions) { ShowcaseRow(assertion: $0) }
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, Space.s2)
         }
         .frame(width: 340)
-        .background(.background)
+        .background(Color.paper)
     }
 }
 
@@ -31,23 +31,24 @@ private struct ShowcaseRow: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Space.s2) {
             Image(systemName: assertion.reason.category.systemImage)
-                .foregroundStyle(assertion.kind.tint)
+                .foregroundStyle(Color.ink2)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(assertion.displayName)
-                    .font(.callout.weight(.medium))
+                    .font(HarfFont.bodyMedium)
+                    .foregroundStyle(Color.ink1)
                     .lineLimit(1)
                 Text(rowSubtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(HarfFont.micro)
+                    .foregroundStyle(Color.ink3)
                     .lineLimit(2)
             }
             Spacer(minLength: 4)
-            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Color.ink4)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Space.s3)
         .padding(.vertical, 5)
     }
 

@@ -11,23 +11,24 @@ struct MenuContentView: View {
             StatusCardView()
 
             if !appState.pendingClassification.isEmpty {
-                Divider()
+                Hairline()
                 FirewallPromptSection()
             }
 
-            Divider()
+            Hairline()
             QuickActions()
 
-            Divider()
+            Hairline()
             WatchSection()
 
-            Divider()
+            Hairline()
             AssertionListView()
 
-            Divider()
+            Hairline()
             FooterView()
         }
         .frame(width: 340)
+        .background(Color.paper)
     }
 }
 
@@ -36,39 +37,42 @@ struct FirewallPromptSection: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeader("New sleep blocker", trailing: "decide")
-            ForEach(appState.pendingClassification) { assertion in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sun.max.fill").foregroundStyle(.orange)
+        HStack(spacing: 0) {
+            Rectangle().fill(Color.warning).frame(width: 3)
+            VStack(alignment: .leading, spacing: 0) {
+                SectionHeader("New sleep blocker", trailing: "decide")
+                ForEach(appState.pendingClassification) { assertion in
+                    VStack(alignment: .leading, spacing: Space.s2) {
                         Text("\(assertion.displayName) is keeping your Mac awake")
-                            .font(.callout.weight(.medium))
+                            .font(HarfFont.bodyMedium)
+                            .foregroundStyle(Color.ink1)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: Space.s2) {
+                            Button("Allow") { appState.setPolicy(.allow, for: assertion) }
+                                .buttonStyle(HarfButtonStyle(variant: .accent, size: .small))
+                                .fixedSize()
+                                .help("Let this app keep the Mac awake whenever it needs to.")
+                            AllowForMenu(title: "For…", assertion: assertion)
+                                .menuStyle(.borderlessButton)
+                                .fixedSize()
+                            Button("Let it sleep") { appState.setPolicy(.ignore, for: assertion) }
+                                .buttonStyle(HarfButtonStyle(variant: .ghost, size: .small))
+                                .fixedSize()
+                                .help("Ignore this app's hold — the Mac may sleep while it runs.")
+                            Spacer()
+                            Button("Not now") { appState.dismissPending(assertion) }
+                                .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
+                                .fixedSize()
+                                .help("Dismiss without making a rule.")
+                        }
                     }
-                    HStack(spacing: 6) {
-                        Button("Allow") { appState.setPolicy(.allow, for: assertion) }
-                            .buttonStyle(.borderedProminent)
-                            .help("Let this app keep the Mac awake whenever it needs to.")
-                        AllowForMenu(title: "For…", assertion: assertion)
-                            .menuStyle(.borderlessButton)
-                            .fixedSize()
-                        Button("Let it sleep") { appState.setPolicy(.ignore, for: assertion) }
-                            .help("Ignore this app's hold — the Mac may sleep while it runs.")
-                        Spacer()
-                        Button("Not now") { appState.dismissPending(assertion) }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                            .help("Dismiss without making a rule.")
-                    }
-                    .font(.caption)
+                    .padding(.horizontal, Space.s3)
+                    .padding(.bottom, Space.s2)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
             }
         }
-        .background(Color.orange.opacity(0.06))
+        .background(Color.warningTint.opacity(0.5))
     }
 }
 
@@ -80,20 +84,19 @@ struct QuickActions: View {
     private var settings: Binding<DecaffeinateSettings> { $settingsStore.settings }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Space.s2) {
             Button {
                 appState.sleepNow()
             } label: {
                 Label("Sleep Now", systemImage: "powersleep")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(HarfButtonStyle(variant: .primary, size: .large))
             .help("Put the Mac to sleep immediately, overriding every sleep block.")
 
-            HStack(spacing: 8) {
+            HStack(spacing: Space.s2) {
                 Toggle(isOn: settings.decaffeinateEnabled) {
-                    Label("Auto-sleep", systemImage: "zzz")
+                    Label("Auto-sleep", systemImage: "moon")
                 }
                 .toggleStyle(.button)
                 .disabled(appState.settings.caffeinateEnabled)
@@ -109,12 +112,13 @@ struct QuickActions: View {
 
                 if let remaining = appState.secondsUntilForcedSleep {
                     Text(Format.countdown(remaining))
-                        .font(.system(.callout, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(HarfFont.code)
+                        .foregroundStyle(Color.ink2)
                         .help("Time until the Mac is put to sleep.")
                 }
             }
-            .font(.caption)
+            .font(HarfFont.caption)
+            .tint(Color.ink1)
 
             QuietWindowControl()
 
@@ -139,12 +143,12 @@ struct QuickActions: View {
 
             if let error = appState.lastError {
                 Text(error)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
+                    .font(HarfFont.micro)
+                    .foregroundStyle(Color.critical)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(12)
+        .padding(Space.s3)
     }
 }
 
@@ -155,25 +159,26 @@ struct QuietWindowControl: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Space.s2) {
             if let until = appState.quietUntil, appState.isQuietWindowActive {
                 if let paused = appState.quietWindowPausedReason {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.warning)
                         .accessibilityHidden(true)
                     Text("Quiet window paused — \(paused)")
-                        .font(.caption)
+                        .foregroundStyle(Color.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Image(systemName: "clock.fill").foregroundStyle(.tint)
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(Color.info)
                         .accessibilityHidden(true)
                     Text("Awake until \(ScheduleEngine.timeLabel(until))")
-                        .font(.caption)
+                        .foregroundStyle(Color.ink2)
                 }
                 Spacer()
                 Button("Cancel") { appState.clearQuietWindow() }
-                    .font(.caption)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
+                    .fixedSize()
             } else {
                 Menu {
                     Button("30 minutes") { appState.stayAwake(forMinutes: 30) }
@@ -184,12 +189,13 @@ struct QuietWindowControl: View {
                     Label("Stay awake until…", systemImage: "clock")
                 }
                 .menuStyle(.borderlessButton)
+                .tint(Color.ink2)
                 .fixedSize()
                 .help("Temporarily hold the Mac awake, then let it sleep automatically.")
                 Spacer()
             }
         }
-        .font(.caption)
+        .font(HarfFont.caption)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -200,13 +206,13 @@ struct FooterView: View {
     @EnvironmentObject var updater: UpdaterController
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.s3) {
             if let last = appState.lastSleepAt {
                 Label(
                     "Slept \(Format.relative(since: last))", systemImage: "clock.arrow.circlepath"
                 )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(HarfFont.micro)
+                .foregroundStyle(Color.ink3)
             }
             Spacer()
             if updater.isAvailable {
@@ -216,6 +222,7 @@ struct FooterView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                 }
                 .buttonStyle(.plain)
+                .foregroundStyle(Color.ink3)
                 .help("Check for Updates…")
                 .accessibilityLabel("Check for updates")
             }
@@ -223,6 +230,7 @@ struct FooterView: View {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(.plain)
+            .foregroundStyle(Color.ink3)
             .help("Settings")
             .accessibilityLabel("Settings")
 
@@ -232,11 +240,12 @@ struct FooterView: View {
                 Image(systemName: "power")
             }
             .buttonStyle(.plain)
+            .foregroundStyle(Color.ink3)
             .help("Quit Decaffeinate")
             .accessibilityLabel("Quit Decaffeinate")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Space.s3)
+        .padding(.vertical, Space.s2)
     }
 }
 
@@ -251,7 +260,7 @@ struct WatchSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Space.s2) {
             SectionHeader("Sleep when a task finishes")
 
             switch appState.watchStatus {
@@ -273,18 +282,20 @@ struct WatchSection: View {
                     Label("Pick a build or agent…", systemImage: "binoculars")
                 }
                 .menuStyle(.borderlessButton)
+                .tint(Color.ink2)
                 .fixedSize()
 
             case .waiting(let label):
-                statusRow("hourglass", "Waiting for \(label) to start…")
+                statusRow("hourglass", "Waiting for \(label) to start…", .ink3)
             case .watching(let label, let cpu):
                 let cpuText = cpu.map { String(format: " · %.0f%% CPU", $0) } ?? ""
-                statusRow("binoculars.fill", "Watching \(label)\(cpuText)")
+                statusRow("binoculars.fill", "Watching \(label)\(cpuText)", .positive)
             case .completed(let label, _):
                 if appState.isAutoSleepHeld {
-                    statusRow("pause.circle.fill", "\(label) finished — sleep paused")
+                    statusRow("pause.circle.fill", "\(label) finished — sleep paused", .warning)
                 } else {
-                    statusRow("checkmark.circle.fill", "\(label) finished — sleeping soon")
+                    statusRow(
+                        "checkmark.circle.fill", "\(label) finished — sleeping soon", .positive)
                 }
             }
 
@@ -292,27 +303,25 @@ struct WatchSection: View {
             Text(
                 "Leave a long build or AI agent running, walk away — the Mac sleeps once it goes quiet."
             )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            .harfExplanatory()
             .fixedSize(horizontal: false, vertical: true)
 
             if isActive {
                 Button("Stop watching") { appState.setWatchTarget(nil) }
-                    .font(.caption)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
+                    .fixedSize()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Space.s3)
+        .padding(.vertical, Space.s2)
     }
 
-    private func statusRow(_ icon: String, _ text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon).foregroundStyle(.tint)
+    private func statusRow(_ icon: String, _ text: String, _ tint: Color) -> some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: icon).foregroundStyle(tint)
                 .accessibilityHidden(true)  // decorative — duplicates the text
-            Text(text).font(.callout)
+            Text(text).font(HarfFont.body).foregroundStyle(Color.ink1)
                 .fixedSize(horizontal: false, vertical: true)  // wrap, don't truncate
         }
     }
