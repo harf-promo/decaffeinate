@@ -66,6 +66,14 @@ private final class ThermalBox: @unchecked Sendable {
     }
 }
 
+@MainActor private final class FakeTriggerSampler: TriggerSampling {
+    var apps: Set<String> = []
+    var cpu: Double = 0
+    func sample(onACPower: Bool) -> TriggerSignals {
+        TriggerSignals(runningAppNames: apps, onACPower: onACPower, cpuPercent: cpu)
+    }
+}
+
 // MARK: - Tests
 
 @MainActor
@@ -83,6 +91,7 @@ final class AppStateTests: XCTestCase {
         let rules: RulesEngine
         let clock: TestClock
         let thermal: ThermalBox
+        let triggers: FakeTriggerSampler
         let cleanup: () -> Void
     }
 
@@ -103,6 +112,7 @@ final class AppStateTests: XCTestCase {
         let notifier = FakeNotifier()
         let clock = TestClock()
         let thermal = ThermalBox()
+        let triggers = FakeTriggerSampler()
         let state = AppState(
             settingsStore: settings,
             rulesEngine: rules,
@@ -115,12 +125,14 @@ final class AppStateTests: XCTestCase {
             sleepController: sleeper,
             thermalProvider: { thermal.state },
             agentWatcher: watcher,
+            triggerSampler: triggers,
             now: { clock.date }
         )
         return Harness(
             state: state, scanner: scanner, idle: idle, power: power,
             sleeper: sleeper, caffeine: caffeine, notifier: notifier,
             settings: settings, rules: rules, clock: clock, thermal: thermal,
+            triggers: triggers,
             cleanup: { defaults.removePersistentDomain(forName: suite) })
     }
 
@@ -623,5 +635,50 @@ final class AppStateTests: XCTestCase {
         h.idle.seconds = 120  // finished + away, but it's active hours
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 0, "the schedule overrides the agent-completion grace")
+    }
+
+    // MARK: Triggers (conditional keep-awake)
+
+    func testTriggerHoldsAwakeAndSuppressesForceSleep() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1
+            $0.triggers = [TriggerRule(condition: .appRunning("zoom"))]
+        }
+        defer { h.cleanup() }
+        h.triggers.apps = ["zoom.us"]
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "a satisfied trigger holds the Mac awake")
+        XCTAssertTrue(h.caffeine.holdingSystem)
+        XCTAssertNotNil(h.state.activeTriggerReason)
+        XCTAssertEqual(h.state.mug, .caffeinated)
+    }
+
+    func testTriggerNotSatisfiedAllowsForceSleep() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1
+            $0.triggers = [TriggerRule(condition: .appRunning("zoom"))]
+        }
+        defer { h.cleanup() }
+        h.triggers.apps = ["safari"]  // zoom not running
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertNil(h.state.activeTriggerReason)
+        XCTAssertEqual(h.sleeper.callCount, 1, "no trigger → idle force-sleep still fires")
+    }
+
+    func testTriggerYieldsToBatteryFloor() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1
+            $0.triggers = [TriggerRule(condition: .appRunning("zoom"))]
+        }
+        defer { h.cleanup() }
+        h.triggers.apps = ["zoom.us"]
+        h.power.snap = PowerSnapshot(onBattery: true, charge: 0.10, isCharging: false)
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertNil(h.state.activeTriggerReason, "triggers are dropped below the battery floor")
+        XCTAssertFalse(h.caffeine.holdingSystem)
+        XCTAssertEqual(h.sleeper.callCount, 1, "the floor wins and force-sleep fires")
     }
 }

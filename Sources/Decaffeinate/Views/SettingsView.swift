@@ -9,6 +9,8 @@ struct SettingsView: View {
                 .tabItem { Label("Safety", systemImage: "shield.lefthalf.filled") }
             ScheduleSettings()
                 .tabItem { Label("Schedule", systemImage: "calendar") }
+            TriggersSettings()
+                .tabItem { Label("Triggers", systemImage: "bolt.horizontal.circle") }
             RulesSettings()
                 .tabItem { Label("Rules", systemImage: "list.bullet.rectangle") }
             HistorySettings()
@@ -266,6 +268,92 @@ private struct ScheduleSettings: View {
             )
             .font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct TriggersSettings: View {
+    @EnvironmentObject var store: SettingsStore
+    @EnvironmentObject var appState: AppState
+    @State private var newAppName = ""
+
+    var body: some View {
+        Form {
+            Section("Keep awake while…") {
+                if store.settings.triggers.isEmpty {
+                    Text(
+                        "No triggers yet. Add one below to keep the Mac awake whenever a condition holds — the battery floor and backpack guard still override it."
+                    )
+                    .font(.caption).foregroundStyle(Color.ink3)
+                }
+                ForEach(store.settings.triggers) { rule in
+                    HStack(spacing: Space.s2) {
+                        Toggle("", isOn: enabledBinding(rule)).labelsHidden()
+                            .accessibilityLabel(rule.condition.label)
+                        Text(rule.condition.label).font(HarfFont.body)
+                            .foregroundStyle(rule.enabled ? Color.ink1 : Color.ink4)
+                        Spacer()
+                        if let reason = appState.activeTriggerReason, rule.enabled, isActive(rule) {
+                            HarfPill(label: "Active", variant: .live, dot: true)
+                                .help(reason)
+                        }
+                        Button(role: .destructive) {
+                            remove(rule)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+            }
+
+            Section("Add a trigger") {
+                HStack {
+                    TextField("App name (e.g. Zoom, Final Cut Pro)", text: $newAppName)
+                        .onSubmit(addApp)
+                    Button("Add") { addApp() }
+                        .disabled(newAppName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                Button("While on AC power") { add(.onACPower) }
+                Button("While CPU is busy (above 50%)") { add(.cpuAbove(50)) }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func enabledBinding(_ rule: TriggerRule) -> Binding<Bool> {
+        Binding(
+            get: { store.settings.triggers.first(where: { $0.id == rule.id })?.enabled ?? false },
+            set: { newValue in
+                if let i = store.settings.triggers.firstIndex(where: { $0.id == rule.id }) {
+                    store.settings.triggers[i].enabled = newValue
+                }
+            })
+    }
+
+    private func isActive(_ rule: TriggerRule) -> Bool {
+        // Best-effort: the menu shows the single active reason; mark the rule whose
+        // label most plausibly produced it. (Display-only.)
+        guard let reason = appState.activeTriggerReason else { return false }
+        switch rule.condition {
+        case .onACPower: return reason == "On AC power"
+        case .cpuAbove: return reason.hasPrefix("CPU is busy")
+        case .appRunning(let name): return reason.contains(name)
+        }
+    }
+
+    private func add(_ condition: TriggerCondition) {
+        store.settings.triggers.append(TriggerRule(condition: condition))
+    }
+
+    private func addApp() {
+        let name = newAppName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        add(.appRunning(name))
+        newAppName = ""
+    }
+
+    private func remove(_ rule: TriggerRule) {
+        store.settings.triggers.removeAll { $0.id == rule.id }
     }
 }
 

@@ -35,6 +35,11 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// Whether keep-awake should also stop the *display* from sleeping.
     var caffeinateKeepsDisplayAwake: Bool = false
 
+    /// Conditional keep-awake: stay awake *while* a trigger is true (an app is
+    /// running, on AC power, CPU busy). Empty by default. The safety rails still
+    /// override (battery floor / thermal).
+    var triggers: [TriggerRule] = []
+
     // MARK: Safety rails
 
     /// On battery, never force sleep below this charge — instead let macOS take

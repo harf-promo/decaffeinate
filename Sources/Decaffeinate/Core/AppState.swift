@@ -43,6 +43,7 @@ final class AppState: ObservableObject {
     private let sleepController: any SystemSleeping
     private let thermalProvider: () -> ProcessInfo.ThermalState
     private let agentWatcher: AgentWatcher
+    private let triggerSampler: any TriggerSampling
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -76,6 +77,10 @@ final class AppState: ObservableObject {
     /// sleep. Cleared automatically once it elapses.
     @Published private(set) var quietUntil: Date?
 
+    /// Why a keep-awake trigger is currently holding the Mac awake (an app is
+    /// running, on AC, CPU busy), or `nil`.
+    @Published private(set) var activeTriggerReason: String?
+
     private var timer: Timer?
     private var notifiedBlockers: Set<String> = []
     private var suppressForceSleepUntil: Date?
@@ -101,6 +106,7 @@ final class AppState: ObservableObject {
             ProcessInfo.processInfo.thermalState
         },
         agentWatcher: AgentWatcher = AgentWatcher(),
+        triggerSampler: any TriggerSampling = LiveTriggerSampler(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -114,6 +120,7 @@ final class AppState: ObservableObject {
         self.sleepController = sleepController
         self.thermalProvider = thermalProvider
         self.agentWatcher = agentWatcher
+        self.triggerSampler = triggerSampler
         self.now = now
     }
 
@@ -305,10 +312,21 @@ final class AppState: ObservableObject {
         // the Mac in a "neither sleeps nor stays awake" limbo.
         let quietWindowHoldingAwake = quietWindowActive && !decision.shouldDropKeepAwake
 
+        // Triggers: conditional keep-awake while a rule is satisfied (an app is
+        // running / on AC / CPU busy). Sampled only when rules exist, and dropped
+        // under a safety rail like every other hold.
+        let triggerReason: String? = {
+            guard !s.triggers.isEmpty, !decision.shouldDropKeepAwake else { return nil }
+            let signals = triggerSampler.sample(onACPower: !power.onBattery)
+            return TriggerEngine.activeReason(rules: s.triggers, signals: signals)
+        }()
+        activeTriggerReason = triggerReason
+        let triggerHolding = triggerReason != nil
+
         // 1) Reconcile keep-awake holds (caffeine + strict takeover + quiet
-        //    window) — all dropped when a safety rail demands it.
+        //    window + triggers) — all dropped when a safety rail demands it.
         let wantsAwake =
-            (s.caffeinateEnabled || s.strictTakeoverMode || quietWindowActive)
+            (s.caffeinateEnabled || s.strictTakeoverMode || quietWindowActive || triggerHolding)
             && !decision.shouldDropKeepAwake
         let wantsDisplayAwake =
             s.caffeinateEnabled
@@ -347,7 +365,7 @@ final class AppState: ObservableObject {
         //    grace so the Mac sleeps soon after you've stepped away.
         //    Suppressed while the user is intentionally caffeinating.
         var remaining: TimeInterval?
-        if s.decaffeinateEnabled, !s.caffeinateEnabled, !quietWindowHoldingAwake {
+        if s.decaffeinateEnabled, !s.caffeinateEnabled, !quietWindowHoldingAwake, !triggerHolding {
             let base = s.effectiveIdleSeconds(onBattery: power.onBattery)
             let threshold = agentFinished ? min(base, completionGraceSeconds) : base
             let r = threshold - idleSeconds
@@ -487,6 +505,15 @@ final class AppState: ObservableObject {
             mug = .caffeinated
             headline = "Awake until \(ScheduleEngine.timeLabel(until))"
             detail = "Quiet window — auto-sleep paused"
+            secondsUntilForcedSleep = nil
+            return
+        }
+
+        // A keep-awake trigger is holding the Mac awake.
+        if let reason = activeTriggerReason, caffeine.isActive {
+            mug = .caffeinated
+            headline = "Keeping your Mac awake"
+            detail = "Trigger — \(reason)"
             secondsUntilForcedSleep = nil
             return
         }
