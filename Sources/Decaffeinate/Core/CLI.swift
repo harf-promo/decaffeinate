@@ -63,7 +63,16 @@ enum CLI {
     private static func printRow(_ a: PowerAssertion) {
         let name = a.name.isEmpty || a.name == "Unnamed" ? "—" : a.name
         let via = a.attribution.map { " (\($0))" } ?? ""
+        let reason = a.reason
+        var why = "↳ \(reason.explanation)"
+        if !reason.resourceLabels.isEmpty {
+            why += " · " + reason.resourceLabels.joined(separator: ", ")
+        }
+        if let secs = reason.autoReleaseSeconds {
+            why += " · auto-releases in \(secs)s"
+        }
         print("  • \(a.displayName)\(via)  (pid \(a.pid))")
+        print("      \(why)")
         print("      \(a.assertionType): “\(name)”")
     }
 

@@ -53,7 +53,9 @@ enum SafetyRails {
             let list = whitelistedAwakeAppNames.joined(separator: ", ")
             decision.holdForceSleepReasons.append("Allowed app keeping awake: \(list)")
         }
-        if settings.pauseForActiveMedia, isMediaActive(assertions) {
+        if settings.pauseForActiveMedia, isMicrophoneActive(assertions) {
+            decision.holdForceSleepReasons.append("Microphone is in use (likely a call)")
+        } else if settings.pauseForActiveMedia, isMediaActive(assertions) {
             decision.holdForceSleepReasons.append("Media or a call appears active")
         }
         if settings.pauseForTimeMachine, isTimeMachineActive(assertions) {
@@ -68,11 +70,18 @@ enum SafetyRails {
 
     // MARK: Detectors (in-process, from the assertion snapshot)
 
-    /// A display-sleep assertion is the macOS-blessed signal for "the user is
-    /// watching something" — video players, screen-sharing, and video calls all
-    /// raise one. Treat its presence as active media.
+    /// `audio-in` in an assertion's resources means the microphone is live —
+    /// an honest "you're probably on a call" signal from public IOKit.
+    static func isMicrophoneActive(_ assertions: [PowerAssertion]) -> Bool {
+        assertions.contains { $0.resources.contains { $0.lowercased() == "audio-in" } }
+    }
+
+    /// Active media: a display-sleep assertion (video/screen-share/call) or an
+    /// `audio-out` resource (something is playing sound).
     static func isMediaActive(_ assertions: [PowerAssertion]) -> Bool {
-        assertions.contains { $0.kind == .displaySleep }
+        assertions.contains {
+            $0.kind == .displaySleep || $0.resources.contains { $0.lowercased() == "audio-out" }
+        }
     }
 
     static func isTimeMachineActive(_ assertions: [PowerAssertion]) -> Bool {

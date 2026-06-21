@@ -32,22 +32,29 @@ private struct ShowcaseRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: assertion.kind.glyph)
+            Image(systemName: assertion.reason.category.systemImage)
                 .foregroundStyle(assertion.kind.tint)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(assertion.displayName)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
-                Text(assertion.subtitle(held: appState.heldDuration(assertion), includePID: false))
+                Text(rowSubtitle)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             Spacer(minLength: 4)
-            Image(systemName: "ellipsis.circle").foregroundStyle(.tertiary)
+            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
+    }
+
+    private var rowSubtitle: String {
+        var parts = [assertion.reason.explanation]
+        if let attribution = assertion.attribution { parts.append(attribution) }
+        if let held = appState.heldDuration(assertion) { parts.append(held) }
+        return parts.joined(separator: " · ")
     }
 }

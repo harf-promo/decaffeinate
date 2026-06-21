@@ -383,14 +383,13 @@ final class AppState: ObservableObject {
         if !nonWhitelistedBlockers.isEmpty {
             mug = .blocked
             let names = nonWhitelistedBlockers.map(\.displayName).removingDuplicates()
-            headline =
-                names.count == 1
-                ? "\(names[0]) is keeping your Mac awake"
-                : "\(names.count) apps are keeping your Mac awake"
+            headline = smartHeadline(for: nonWhitelistedBlockers, names: names)
             if !decision.canForceSleep, let reason = decision.holdForceSleepReasons.first {
                 detail = reason
             } else if !s.decaffeinateEnabled {
                 detail = "Decaffeinate engine is off"
+            } else if names.count == 1 {
+                detail = "Keeping your Mac awake"
             } else {
                 detail = names.prefix(3).joined(separator: ", ")
             }
@@ -407,6 +406,28 @@ final class AppState: ObservableObject {
             detail = idleHint(for: s)
         }
         secondsUntilForcedSleep = nil
+    }
+
+    /// Fold the *reason* into the headline when one app dominates, e.g.
+    /// "Safari is playing media" / "Your microphone is in use".
+    private func smartHeadline(for blockers: [PowerAssertion], names: [String]) -> String {
+        if names.count == 1, let blocker = blockers.first {
+            let reason = blocker.reason
+            switch reason.category {
+            case .microphone:
+                return "Your microphone is in use"
+            case .unknown:
+                return "\(names[0]) is keeping your Mac awake"
+            default:
+                return "\(names[0]) is \(lowercasedFirst(reason.explanation))"
+            }
+        }
+        return "\(names.count) apps are keeping your Mac awake"
+    }
+
+    private func lowercasedFirst(_ string: String) -> String {
+        guard let first = string.first else { return string }
+        return first.lowercased() + string.dropFirst()
     }
 
     // MARK: Convenience for the UI

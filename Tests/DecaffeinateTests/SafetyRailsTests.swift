@@ -85,6 +85,19 @@ final class SafetyRailsTests: XCTestCase {
         XCTAssertTrue(decision.canForceSleep)
     }
 
+    func testMicrophoneInUseHoldsForcedSleep() {
+        let mic = Fixtures.assertion(process: "coreaudiod", resources: ["audio-in", "DEVICE-UUID"])
+        let decision = evaluate(assertions: [mic])
+        XCTAssertFalse(decision.canForceSleep)
+        XCTAssertTrue(decision.holdForceSleepReasons.contains { $0.contains("Microphone") })
+    }
+
+    func testAudioOutputCountsAsMedia() {
+        let audio = Fixtures.assertion(process: "coreaudiod", resources: ["audio-out", "Speaker"])
+        XCTAssertTrue(SafetyRails.isMediaActive([audio]))
+        XCTAssertFalse(evaluate(assertions: [audio]).canForceSleep)
+    }
+
     func testTimeMachineDetectedFromBackupd() {
         let backup = Fixtures.assertion(process: "backupd", bundle: nil, name: "Backup")
         XCTAssertTrue(SafetyRails.isTimeMachineActive([backup]))

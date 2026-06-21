@@ -10,6 +10,15 @@ enum AssertionDetailKey {
     static let assertionID = "AssertionId"
     static let globalUniqueID = "GlobalUniqueID"
     static let onBehalfOfPID = "AssertionOnBehalfOfPID"
+    // Reason / "why" detail (public IOKit fields).
+    static let resourcesUsed = "ResourcesUsed"  // [String]: "audio-in", "audio-out", …
+    static let humanReadableReason = "HumanReadableReason"  // localized reason
+    static let details = "Details"  // caller-supplied context string
+    static let timeoutLeft = "AssertTimeoutTimeLeft"  // seconds until auto-release
+    static let timeoutAction = "TimeoutAction"  // e.g. "TimeoutActionRelease"
+    static let trueType = "AssertionTrueType"
+    static let bundlePath = "BundlePath"
+    static let isRunningboardd = "_IsRunningboardd"
 }
 
 /// Reads the live set of power assertions on the system and attributes each one
@@ -47,6 +56,18 @@ struct TelemetryEngine {
                 let onBehalfOfPID = (detail[AssertionDetailKey.onBehalfOfPID] as? Int).map(
                     pid_t.init)
 
+                // "Why" detail.
+                let resources = (detail[AssertionDetailKey.resourcesUsed] as? [String]) ?? []
+                let humanReason = detail[AssertionDetailKey.humanReadableReason] as? String
+                let details = detail[AssertionDetailKey.details] as? String
+                let timeoutAction = detail[AssertionDetailKey.timeoutAction] as? String
+                let autoRelease =
+                    (timeoutAction == "TimeoutActionRelease")
+                    ? detail[AssertionDetailKey.timeoutLeft] as? Int : nil
+                let trueType = detail[AssertionDetailKey.trueType] as? String
+                let bundlePath = detail[AssertionDetailKey.bundlePath] as? String
+                let viaRunningboard = (detail[AssertionDetailKey.isRunningboardd] as? Bool) ?? false
+
                 result.append(
                     PowerAssertion(
                         id: "\(pid)-\(assertionID ?? result.count)-\(type)",
@@ -62,7 +83,15 @@ struct TelemetryEngine {
                             ownerPID: pid,
                             onBehalfOfPID: onBehalfOfPID,
                             assertionName: assertionName
-                        )
+                        ),
+                        humanReadableReason: humanReason,
+                        details: details,
+                        resources: resources,
+                        autoReleaseSeconds: autoRelease,
+                        trueType: trueType,
+                        bundlePath: bundlePath,
+                        onBehalfOfPID: onBehalfOfPID,
+                        viaRunningboard: viaRunningboard
                     )
                 )
             }

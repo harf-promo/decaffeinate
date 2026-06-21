@@ -10,7 +10,12 @@ enum Fixtures {
         type: String = AssertionType.preventUserIdleSystemSleep,
         name: String = "Test assertion",
         created: Date? = nil,
-        realOwner: AssertionOwner? = nil
+        realOwner: AssertionOwner? = nil,
+        humanReadableReason: String? = nil,
+        details: String? = nil,
+        resources: [String] = [],
+        autoReleaseSeconds: Int? = nil,
+        viaRunningboard: Bool = false
     ) -> PowerAssertion {
         PowerAssertion(
             id: "\(pid)-\(type)",
@@ -21,7 +26,12 @@ enum Fixtures {
             name: name,
             kind: AssertionType.classify(type),
             createdAt: created,
-            realOwner: realOwner
+            realOwner: realOwner,
+            humanReadableReason: humanReadableReason,
+            details: details,
+            resources: resources,
+            autoReleaseSeconds: autoReleaseSeconds,
+            viaRunningboard: viaRunningboard
         )
     }
 

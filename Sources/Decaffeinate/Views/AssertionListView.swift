@@ -46,38 +46,60 @@ struct AssertionListView: View {
     }
 }
 
-/// One assertion row with an inline allow/block menu.
+/// One assertion row with the reason, an inline allow/block menu, and a
+/// tap-to-expand detail disclosure.
 struct AssertionRow: View {
     let assertion: PowerAssertion
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var rules: RulesEngine
+    @State private var showDetails = false
 
     private var policy: RulePolicy? { rules.policy(for: assertion) }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: assertion.kind.glyph)
-                .foregroundStyle(assertion.kind.tint)
-                .frame(width: 18)
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: assertion.reason.category.systemImage)
+                    .foregroundStyle(assertion.kind.tint)
+                    .frame(width: 18)
 
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 5) {
-                    Text(assertion.displayName)
-                        .font(.callout.weight(.medium))
-                        .lineLimit(1)
-                    policyBadge
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text(assertion.displayName)
+                            .font(.callout.weight(.medium))
+                            .lineLimit(1)
+                        policyBadge
+                    }
+                    Text(rowSubtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
-                Text(assertion.subtitle(held: appState.heldDuration(assertion), includePID: false))
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(showDetails ? 90 : 0))
+                policyMenu
             }
-            Spacer(minLength: 4)
-            policyMenu
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() } }
+            .accessibilityHint("Double-tap to show or hide details")
+
+            if showDetails {
+                AssertionDetailView(assertion: assertion)
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .help("PID \(assertion.pid) · \(assertion.assertionType)")
+    }
+
+    /// Reason-led subtitle: "Playing media · via runningboardd · for 14m".
+    private var rowSubtitle: String {
+        var parts = [assertion.reason.explanation]
+        if let attribution = assertion.attribution { parts.append(attribution) }
+        if let held = appState.heldDuration(assertion) { parts.append(held) }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder private var policyBadge: some View {

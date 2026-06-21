@@ -50,6 +50,24 @@ struct PowerAssertion: Identifiable, Hashable, Sendable {
     /// The real app behind a hold routed through a shared daemon, if resolved.
     let realOwner: AssertionOwner?
 
+    // "Why" detail straight from IOKit (all optional / empty when not reported).
+    /// macOS' localized reason, e.g. "THE CAFFEINATE TOOL IS PREVENTING SLEEP".
+    let humanReadableReason: String?
+    /// Caller-supplied context, e.g. "caffeinate asserting for 300 secs".
+    let details: String?
+    /// Resource tokens, e.g. `["audio-in"]` (mic) / `["audio-out"]` (speaker).
+    let resources: [String]
+    /// Seconds until the hold auto-releases (timeout with release action), if any.
+    let autoReleaseSeconds: Int?
+    /// The resolved assertion type (may differ from `assertionType`).
+    let trueType: String?
+    /// Path to the creating process's bundle, if reported.
+    let bundlePath: String?
+    /// The app this hold was created on behalf of, if any.
+    let onBehalfOfPID: pid_t?
+    /// Whether `runningboardd` is mediating this hold for a background app.
+    let viaRunningboard: Bool
+
     init(
         id: String,
         pid: pid_t,
@@ -59,7 +77,15 @@ struct PowerAssertion: Identifiable, Hashable, Sendable {
         name: String,
         kind: AssertionKind,
         createdAt: Date?,
-        realOwner: AssertionOwner? = nil
+        realOwner: AssertionOwner? = nil,
+        humanReadableReason: String? = nil,
+        details: String? = nil,
+        resources: [String] = [],
+        autoReleaseSeconds: Int? = nil,
+        trueType: String? = nil,
+        bundlePath: String? = nil,
+        onBehalfOfPID: pid_t? = nil,
+        viaRunningboard: Bool = false
     ) {
         self.id = id
         self.pid = pid
@@ -70,7 +96,18 @@ struct PowerAssertion: Identifiable, Hashable, Sendable {
         self.kind = kind
         self.createdAt = createdAt
         self.realOwner = realOwner
+        self.humanReadableReason = humanReadableReason
+        self.details = details
+        self.resources = resources
+        self.autoReleaseSeconds = autoReleaseSeconds
+        self.trueType = trueType
+        self.bundlePath = bundlePath
+        self.onBehalfOfPID = onBehalfOfPID
+        self.viaRunningboard = viaRunningboard
     }
+
+    /// The classified "why" — computed lazily from the captured fields.
+    var reason: AssertionReason { ReasonEngine.classify(self) }
 
     /// Whether this assertion is one of the ones that prevents the *machine*
     /// from sleeping (as opposed to merely keeping the screen on).
@@ -94,18 +131,6 @@ struct PowerAssertion: Identifiable, Hashable, Sendable {
     var attribution: String? {
         guard realOwner != nil else { return nil }
         return "via \(ownerName)"
-    }
-
-    /// The "·"-joined secondary line shown under the app name in the list/CLI.
-    /// `held` is the caller-supplied "for 12m"; `includePID` adds the raw PID
-    /// (developer detail, off in the friendly menu).
-    func subtitle(held: String?, includePID: Bool) -> String {
-        var parts: [String] = [kind.label]
-        if let attribution { parts.append(attribution) }
-        if name != "Unnamed", !name.isEmpty { parts.append("“\(name)”") }
-        if let held { parts.append(held) }
-        if includePID { parts.append("PID \(pid)") }
-        return parts.joined(separator: " · ")
     }
 }
 

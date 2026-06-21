@@ -9,11 +9,12 @@ final class PreviewSampler: PowerAssertionScanning {
         let now = Date()
         return [
             PowerAssertion(
-                id: "p1", pid: 940, processName: "Google Chrome",
-                bundleIdentifier: "com.google.Chrome",
+                id: "p1", pid: 408, processName: "coreaudiod", bundleIdentifier: nil,
                 assertionType: AssertionType.preventUserIdleSystemSleep,
-                name: "Playing audio in a background tab", kind: .systemSleep,
-                createdAt: now.addingTimeInterval(-3120)),
+                name: "com.apple.audio.AudioTap.context.preventuseridlesleep", kind: .systemSleep,
+                createdAt: now.addingTimeInterval(-540),
+                realOwner: AssertionOwner(name: "Zoom", bundleIdentifier: "us.zoom.xos"),
+                resources: ["audio-in", "DEVICE-UUID"]),
             PowerAssertion(
                 id: "p2", pid: 403, processName: "runningboardd", bundleIdentifier: nil,
                 assertionType: AssertionType.preventUserIdleSystemSleep,
@@ -21,15 +22,18 @@ final class PreviewSampler: PowerAssertionScanning {
                 createdAt: now.addingTimeInterval(-845),
                 realOwner: AssertionOwner(name: "Safari", bundleIdentifier: "com.apple.Safari")),
             PowerAssertion(
-                id: "p3", pid: 2810, processName: "caffeinate", bundleIdentifier: nil,
+                id: "p3", pid: 940, processName: "Google Chrome",
+                bundleIdentifier: "com.google.Chrome",
+                assertionType: AssertionType.preventUserIdleSystemSleep,
+                name: "com.apple.audio.BuiltInSpeakerDevice", kind: .systemSleep,
+                createdAt: now.addingTimeInterval(-3120),
+                resources: ["audio-out", "BuiltInSpeakerDevice"]),
+            PowerAssertion(
+                id: "p4", pid: 2810, processName: "caffeinate", bundleIdentifier: nil,
                 assertionType: AssertionType.preventUserIdleSystemSleep,
                 name: "caffeinate command-line tool", kind: .systemSleep,
-                createdAt: now.addingTimeInterval(-7260)),
-            PowerAssertion(
-                id: "p4", pid: 1180, processName: "zoom.us", bundleIdentifier: "us.zoom.xos",
-                assertionType: AssertionType.preventUserIdleDisplaySleep,
-                name: "In a meeting", kind: .displaySleep,
-                createdAt: now.addingTimeInterval(-300)),
+                createdAt: now.addingTimeInterval(-7260),
+                details: "caffeinate asserting for 300 secs", autoReleaseSeconds: 84),
         ]
     }
 }
