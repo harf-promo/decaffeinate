@@ -146,6 +146,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # `gh release upload` needs the release to exist. Create it if a
+          # maintainer didn't pre-create one, so a bare `git push --tags` is
+          # enough to ship (previously the upload failed with "release not found").
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 \
+            || gh release create "${GITHUB_REF_NAME}" \
+                 --title "${GITHUB_REF_NAME}" --generate-notes
           gh release upload "${GITHUB_REF_NAME}" \
             build/Decaffeinate-*.dmg build/SHA256SUMS.txt --clobber
           [ -f build/appcast.xml ] && gh release upload "${GITHUB_REF_NAME}" \
