@@ -3,8 +3,8 @@
 # and `sha256` together on each release (the sha is printed by
 # Scripts/make-dmg.sh and published as SHA256SUMS.txt on the GitHub release).
 cask "decaffeinate" do
-  version "1.5.0"
-  sha256 "24e1ff76cd0323ba4ae2cf683f5c8702523752a65d1bdaad3e5b6c198e573346"
+  version "1.5.1"
+  sha256 "4ba222c0fed9ee0e7ff51deed55291a628aa79c73379e002181b616561c141e3"
 
   url "https://github.com/harf-promo/decaffeinate/releases/download/v#{version}/Decaffeinate-#{version}.dmg"
   name "Decaffeinate"
