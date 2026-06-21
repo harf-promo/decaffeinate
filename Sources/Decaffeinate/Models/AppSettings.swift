@@ -44,8 +44,15 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// Backpack guard: if the Mac gets thermally stressed (lid closed in a bag),
     /// drop all keep-awake holds and let it sleep immediately.
     var thermalGuardEnabled: Bool = true
-    /// Don't force sleep while something is keeping the *screen* on — a strong
-    /// signal of an active video, call, or presentation.
+    /// Don't force sleep while the microphone is in use — the strongest "you're
+    /// probably on a call" signal. Kept separate from `pauseForActiveMedia` so a
+    /// user who sleeps aggressively through passive media never accidentally
+    /// disables the call guard. Unlike media, this is not idle-capped.
+    var pauseForActiveCall: Bool = true
+    /// Don't force sleep while something is keeping the *screen* on or playing
+    /// audio — a signal of active video, music, or a presentation. Released once
+    /// you've been idle well past the idle threshold (a stale/leaked token, e.g.
+    /// a forgotten background tab, must not keep the Mac awake forever).
     var pauseForActiveMedia: Bool = true
     /// Don't force sleep during a Time Machine backup.
     var pauseForTimeMachine: Bool = true

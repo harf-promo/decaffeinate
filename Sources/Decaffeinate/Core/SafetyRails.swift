@@ -22,10 +22,17 @@ struct SafetyDecision: Equatable, Sendable {
 /// detected from the same assertion snapshot the scanner already produces.
 enum SafetyRails {
 
+    /// How long past the idle threshold a *media* (audio-out / display-on) hold
+    /// is honored before it's treated as stale and force-sleep is allowed. The
+    /// microphone (call) hold is deliberately exempt — a long, passive call is
+    /// normal and wrongly sleeping through it is unacceptable.
+    static let staleMediaGraceSeconds: TimeInterval = 1800  // 30 min
+
     static func evaluate(
         assertions: [PowerAssertion],
         power: PowerSnapshot,
         thermalState: ProcessInfo.ThermalState,
+        idleSeconds: TimeInterval = 0,
         whitelistedAwakeAppNames: [String],
         settings: DecaffeinateSettings
     ) -> SafetyDecision {
@@ -53,9 +60,13 @@ enum SafetyRails {
             let list = whitelistedAwakeAppNames.joined(separator: ", ")
             decision.holdForceSleepReasons.append("Allowed app keeping awake: \(list)")
         }
-        if settings.pauseForActiveMedia, isMicrophoneActive(assertions) {
+        // Microphone/call: the strongest "don't sleep" signal, never idle-capped.
+        let mediaHoldFresh =
+            idleSeconds < settings.effectiveIdleSeconds(onBattery: power.onBattery)
+            + staleMediaGraceSeconds
+        if settings.pauseForActiveCall, isMicrophoneActive(assertions) {
             decision.holdForceSleepReasons.append("Microphone is in use (likely a call)")
-        } else if settings.pauseForActiveMedia, isMediaActive(assertions) {
+        } else if settings.pauseForActiveMedia, mediaHoldFresh, isMediaActive(assertions) {
             decision.holdForceSleepReasons.append("Media or a call appears active")
         }
         if settings.pauseForTimeMachine, isTimeMachineActive(assertions) {
@@ -84,30 +95,16 @@ enum SafetyRails {
         }
     }
 
+    /// Trust only the verified owning process, not the caller-controlled
+    /// assertion *name*: any app can register a hold named "Backup" or "Software
+    /// Update" to dodge force-sleep, so a free-text keyword match here would be a
+    /// trivial safety bypass. `processName` is resolved from the real PID.
     static func isTimeMachineActive(_ assertions: [PowerAssertion]) -> Bool {
-        assertions.contains { assertion in
-            matches(assertion, processes: ["backupd"], keywords: ["time machine", "backup"])
-        }
+        assertions.contains { $0.processName.lowercased() == "backupd" }
     }
 
     static func isSystemUpdateActive(_ assertions: [PowerAssertion]) -> Bool {
-        assertions.contains { assertion in
-            matches(
-                assertion,
-                processes: ["softwareupdated", "installd", "system_installd", "Installer"],
-                keywords: ["install macos", "software update", "softwareupdate", "os install"]
-            )
-        }
-    }
-
-    private static func matches(
-        _ assertion: PowerAssertion,
-        processes: [String],
-        keywords: [String]
-    ) -> Bool {
-        let proc = assertion.processName.lowercased()
-        if processes.contains(where: { proc == $0.lowercased() }) { return true }
-        let haystack = (assertion.name + " " + assertion.processName).lowercased()
-        return keywords.contains { haystack.contains($0) }
+        let updaters: Set<String> = ["softwareupdated", "installd", "system_installd"]
+        return assertions.contains { updaters.contains($0.processName.lowercased()) }
     }
 }

@@ -36,10 +36,12 @@ struct SleepController {
         process.arguments = arguments
         do {
             try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else {
-                return .failure(.nonZeroExit(process.terminationStatus))
-            }
+            // Deliberately do NOT block on `waitUntilExit()`: `pmset sleepnow`
+            // does not return until the kernel begins the sleep transition, and
+            // this is invoked on the @MainActor tick — waiting would freeze the
+            // menu and the run-loop timer at the exact moment of sleep. A
+            // successful launch is the signal we need; the machine is already on
+            // its way down. (`nonZeroExit` is retained for the test/protocol seam.)
             return .success(())
         } catch {
             return .failure(.launchFailed(error.localizedDescription))

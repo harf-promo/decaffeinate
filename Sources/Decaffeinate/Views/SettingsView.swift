@@ -85,10 +85,15 @@ private struct SafetySettings: View {
     var body: some View {
         Form {
             Section("Never sleep at a bad moment") {
-                Toggle("Pause for active media or calls", isOn: s.pauseForActiveMedia)
+                Toggle("Pause while the microphone is in use (calls)", isOn: s.pauseForActiveCall)
+                Toggle("Pause for active media", isOn: s.pauseForActiveMedia)
                 Toggle("Pause during Time Machine backups", isOn: s.pauseForTimeMachine)
                 Toggle("Pause during macOS updates", isOn: s.pauseForSystemUpdate)
                 Toggle("Respect apps I've allowed", isOn: s.respectWhitelist)
+                Text(
+                    "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Battery & heat") {

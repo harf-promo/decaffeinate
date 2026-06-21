@@ -8,6 +8,7 @@ final class SafetyRailsTests: XCTestCase {
         assertions: [PowerAssertion] = [],
         power: PowerSnapshot = .unknown,
         thermal: ProcessInfo.ThermalState = .nominal,
+        idleSeconds: TimeInterval = 0,
         whitelisted: [String] = [],
         settings: DecaffeinateSettings = DecaffeinateSettings()
     ) -> SafetyDecision {
@@ -15,6 +16,7 @@ final class SafetyRailsTests: XCTestCase {
             assertions: assertions,
             power: power,
             thermalState: thermal,
+            idleSeconds: idleSeconds,
             whitelistedAwakeAppNames: whitelisted,
             settings: settings
         )
@@ -124,5 +126,48 @@ final class SafetyRailsTests: XCTestCase {
         settings.respectWhitelist = false
         let decision = evaluate(whitelisted: ["Final Cut Pro"], settings: settings)
         XCTAssertTrue(decision.canForceSleep)
+    }
+
+    // MARK: Idle-cap on media, uncapped mic, anti-spoofing
+
+    func testStaleMediaHoldIsReleasedAfterLongIdle() {
+        let audio = Fixtures.assertion(process: "coreaudiod", resources: ["audio-out", "Speaker"])
+        // Within the grace: still held.
+        XCTAssertFalse(evaluate(assertions: [audio], idleSeconds: 60).canForceSleep)
+        // Idle well past the threshold + 30-min grace: a stale token must not
+        // keep the Mac awake forever.
+        let pastGrace = 10 * 60 + SafetyRails.staleMediaGraceSeconds + 1
+        XCTAssertTrue(evaluate(assertions: [audio], idleSeconds: pastGrace).canForceSleep)
+    }
+
+    func testMicrophoneHoldIsNeverIdleCapped() {
+        let mic = Fixtures.assertion(process: "coreaudiod", resources: ["audio-in", "DEVICE"])
+        let veryIdle = 10 * 60 + SafetyRails.staleMediaGraceSeconds + 10_000
+        let decision = evaluate(assertions: [mic], idleSeconds: veryIdle)
+        XCTAssertFalse(decision.canForceSleep, "a call must hold even after long passive idle")
+    }
+
+    func testCallGuardIsIndependentOfMediaToggle() {
+        var settings = DecaffeinateSettings()
+        settings.pauseForActiveMedia = false  // sleep aggressively through media…
+        let mic = Fixtures.assertion(process: "coreaudiod", resources: ["audio-in"])
+        // …but the call guard still holds.
+        XCTAssertFalse(evaluate(assertions: [mic], settings: settings).canForceSleep)
+
+        settings.pauseForActiveCall = false
+        XCTAssertTrue(evaluate(assertions: [mic], settings: settings).canForceSleep)
+    }
+
+    func testSpoofedTimeMachineNameDoesNotHoldSleep() {
+        // A rogue app cannot dodge force-sleep by *naming* its assertion "Backup".
+        let spoof = Fixtures.assertion(process: "EvilApp", name: "Backup in progress")
+        XCTAssertFalse(SafetyRails.isTimeMachineActive([spoof]))
+        XCTAssertTrue(evaluate(assertions: [spoof]).canForceSleep)
+    }
+
+    func testSpoofedUpdateNameDoesNotHoldSleep() {
+        let spoof = Fixtures.assertion(process: "EvilApp", name: "Install macOS Sequoia")
+        XCTAssertFalse(SafetyRails.isSystemUpdateActive([spoof]))
+        XCTAssertTrue(evaluate(assertions: [spoof]).canForceSleep)
     }
 }

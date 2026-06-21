@@ -450,4 +450,50 @@ final class AppStateTests: XCTestCase {
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 1, "outside active hours, idle force-sleep still fires")
     }
+
+    // MARK: Safety-rail precedence (audit fixes)
+
+    /// The "neither sleeps nor stays awake" hole: a quiet window under the battery
+    /// floor must resolve to the battery floor winning — force-sleep, not limbo.
+    func testQuietWindowUnderBatteryFloorForcesSleep() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        // 10% is below the default 20% battery floor.
+        h.power.snap = PowerSnapshot(onBattery: true, charge: 0.10, isCharging: false)
+        h.idle.seconds = 120
+        h.state.stayAwake(forMinutes: 30)  // ticks internally
+        XCTAssertEqual(h.sleeper.callCount, 1, "battery floor wins over a quiet window")
+        XCTAssertFalse(h.caffeine.holdingSystem, "the quiet window is not holding the Mac awake")
+        XCTAssertFalse(h.state.quietWindowHoldingAwake)
+    }
+
+    /// The active-hours stand-down must yield to the battery floor so the floor
+    /// can still protect the battery during work hours.
+    func testScheduleYieldsToBatteryFloor() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.scheduleEnabled = true
+        }
+        defer { h.cleanup() }
+        let hour = Calendar.current.component(.hour, from: h.clock.date)
+        h.settings.settings.activeHoursStart = hour
+        h.settings.settings.activeHoursEnd = (hour + 1) % 24
+        h.power.snap = PowerSnapshot(onBattery: true, charge: 0.10, isCharging: false)
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "battery floor overrides the active-hours hold")
+    }
+
+    /// The overheating / critical-battery guard must not be muzzled by an
+    /// unrelated idle sleep's 60s cooldown.
+    func testImmediateGuardNotMuzzledByIdleCooldown() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.tick()  // idle force-sleep → arms the 60s idle cooldown
+        XCTAssertEqual(h.sleeper.callCount, 1)
+
+        // Same clock (well within the idle cooldown): wake into a hot bag.
+        h.idle.seconds = 0
+        h.thermal.state = .critical
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 2, "backpack guard fires despite the idle cooldown")
+    }
 }

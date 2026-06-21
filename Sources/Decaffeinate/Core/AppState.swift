@@ -79,6 +79,10 @@ final class AppState: ObservableObject {
     private var timer: Timer?
     private var notifiedBlockers: Set<String> = []
     private var suppressForceSleepUntil: Date?
+    /// Separate, short cooldown for the immediate-safety guards so an unrelated
+    /// idle sleep's 60s cooldown can never muzzle the overheating / critical-
+    /// battery backpack guard.
+    private var suppressImmediateUntil: Date?
 
     /// Clock seam for tests.
     private let now: () -> Date
@@ -202,6 +206,14 @@ final class AppState: ObservableObject {
         return now() < until
     }
 
+    /// True only while a quiet window is *actually* holding the Mac awake — i.e.
+    /// it is active AND the safety rails (battery floor / thermal) haven't forced
+    /// the hold to drop. The UI must distinguish "Awake until X" from a window
+    /// that's been paused by a safety rail.
+    var quietWindowHoldingAwake: Bool {
+        isQuietWindowActive && !decision.shouldDropKeepAwake
+    }
+
     /// Hold the Mac awake for the next `minutes` minutes, then auto-release.
     func stayAwake(forMinutes minutes: Int) {
         quietUntil = now().addingTimeInterval(TimeInterval(minutes) * 60)
@@ -266,16 +278,28 @@ final class AppState: ObservableObject {
             assertions: assertions,
             power: power,
             thermalState: thermalState,
+            idleSeconds: idleSeconds,
             whitelistedAwakeAppNames: whitelistedAwake,
             settings: s
         )
-        // Schedules: stand down from forcing sleep during the user's active hours.
-        if let scheduleHold = ScheduleEngine.activeHoursHoldReason(now: now(), settings: s) {
+        // Schedules: stand down from forcing sleep during the user's active
+        // hours — but NOT when a safety rail (battery floor / thermal) wants to
+        // drop holds, so the floor can still protect the battery during work hours.
+        if !decision.shouldDropKeepAwake,
+            let scheduleHold = ScheduleEngine.activeHoursHoldReason(now: now(), settings: s)
+        {
             decision.holdForceSleepReasons.append(scheduleHold)
         }
         self.decision = decision
 
-        // 1) Reconcile keep-awake holds (caffeine + strict takeover + quiet window).
+        // A quiet window only *holds the Mac awake* while the safety rails permit
+        // it. When the battery floor / thermal pressure forces holds to drop, the
+        // window stops holding — and force-sleep must re-engage rather than leave
+        // the Mac in a "neither sleeps nor stays awake" limbo.
+        let quietWindowHoldingAwake = quietWindowActive && !decision.shouldDropKeepAwake
+
+        // 1) Reconcile keep-awake holds (caffeine + strict takeover + quiet
+        //    window) — all dropped when a safety rail demands it.
         let wantsAwake =
             (s.caffeinateEnabled || s.strictTakeoverMode || quietWindowActive)
             && !decision.shouldDropKeepAwake
@@ -297,13 +321,15 @@ final class AppState: ObservableObject {
         watchStatus = agentWatcher.status
         let agentFinished = agentWatcher.hasCompleted
 
-        // 3) Immediate-sleep guards (overheating / critically low battery).
-        //    Respects the cooldown so a persistent condition can't spawn pmset
-        //    every second or thrash sleep→wake→sleep.
+        // 3) Immediate-sleep guards (overheating / critically low battery). These
+        //    run regardless of `decaffeinateEnabled` — overheating in a bag is a
+        //    safety backstop, not an opt-in (the UI says so). They use a separate
+        //    short cooldown so a persistent condition can't spawn pmset every
+        //    second, without inheriting the idle path's 60s cooldown.
         if decision.mustSleepNow {
             if forceSleep(
                 reason: decision.immediateSleepReasons.first ?? "Safety guard",
-                bypassCooldown: false)
+                bypassCooldown: false, immediate: true)
             {
                 return
             }
@@ -314,7 +340,7 @@ final class AppState: ObservableObject {
         //    grace so the Mac sleeps soon after you've stepped away.
         //    Suppressed while the user is intentionally caffeinating.
         var remaining: TimeInterval?
-        if s.decaffeinateEnabled, !s.caffeinateEnabled, !quietWindowActive {
+        if s.decaffeinateEnabled, !s.caffeinateEnabled, !quietWindowHoldingAwake {
             let base = s.effectiveIdleSeconds(onBattery: power.onBattery)
             let threshold = agentFinished ? min(base, completionGraceSeconds) : base
             let r = threshold - idleSeconds
@@ -350,6 +376,11 @@ final class AppState: ObservableObject {
         return now() < until
     }
 
+    private var isImmediateSuppressed: Bool {
+        guard let until = suppressImmediateUntil else { return false }
+        return now() < until
+    }
+
     /// Attempts to sleep the Mac. Returns `true` only if `pmset sleepnow`
     /// succeeded (so the caller can stop processing this tick). State is updated
     /// to reflect what actually happened:
@@ -358,20 +389,24 @@ final class AppState: ObservableObject {
     ///   pmset spawn storm) but do *not* claim a sleep occurred.
     /// - cooldown active (and not bypassed) → no-op.
     @discardableResult
-    private func forceSleep(reason: String, bypassCooldown: Bool) -> Bool {
-        if !bypassCooldown, isForceSleepSuppressed { return false }
+    private func forceSleep(reason: String, bypassCooldown: Bool, immediate: Bool = false) -> Bool {
+        let suppressed = immediate ? isImmediateSuppressed : isForceSleepSuppressed
+        if !bypassCooldown, suppressed { return false }
 
         switch sleepController.sleepNow() {
         case .success:
             lastSleepAt = now()
             lastSleepReason = reason
             lastError = nil
+            // Always arm the idle cooldown so we don't re-sleep right after wake.
             suppressForceSleepUntil = now().addingTimeInterval(60)
+            if immediate { suppressImmediateUntil = now().addingTimeInterval(15) }
             history.record(SleepEvent(date: now(), reason: reason, onBattery: power.onBattery))
             return true
         case .failure(let error):
             lastError = error.description
             suppressForceSleepUntil = now().addingTimeInterval(10)
+            if immediate { suppressImmediateUntil = now().addingTimeInterval(10) }
             return false
         }
     }
