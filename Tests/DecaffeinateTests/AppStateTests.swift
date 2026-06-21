@@ -106,6 +106,7 @@ final class AppStateTests: XCTestCase {
         let state = AppState(
             settingsStore: settings,
             rulesEngine: rules,
+            history: SleepHistoryStore(defaults: defaults),
             telemetry: scanner,
             idleMonitor: idle,
             powerReader: power,
@@ -176,6 +177,7 @@ final class AppStateTests: XCTestCase {
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 1)
         XCTAssertNotNil(h.state.lastSleepAt)
+        XCTAssertEqual(h.state.history.events.count, 1, "forced sleep is logged to history")
     }
 
     func testDoesNotForceSleepWhileCaffeinated() {

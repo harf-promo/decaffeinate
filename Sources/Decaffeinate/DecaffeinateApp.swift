@@ -37,6 +37,7 @@ struct DecaffeinateApp: App {
                 .environmentObject(appState)
                 .environmentObject(appState.settingsStore)
                 .environmentObject(appState.rulesEngine)
+                .environmentObject(appState.history)
         }
     }
 }

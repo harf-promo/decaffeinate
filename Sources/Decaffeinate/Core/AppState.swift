@@ -34,6 +34,7 @@ final class AppState: ObservableObject {
     // Dependencies (injectable seams; default to the real engines in production)
     let settingsStore: SettingsStore
     let rulesEngine: RulesEngine
+    let history: SleepHistoryStore
     private let telemetry: any PowerAssertionScanning
     private let idleMonitor: any IdleReading
     private let powerReader: any PowerReading
@@ -80,6 +81,7 @@ final class AppState: ObservableObject {
     init(
         settingsStore: SettingsStore = SettingsStore(),
         rulesEngine: RulesEngine = RulesEngine(),
+        history: SleepHistoryStore = SleepHistoryStore(),
         telemetry: any PowerAssertionScanning = TelemetryEngine(),
         idleMonitor: any IdleReading = IdleMonitor(),
         powerReader: any PowerReading = PowerSourceReader(),
@@ -94,6 +96,7 @@ final class AppState: ObservableObject {
     ) {
         self.settingsStore = settingsStore
         self.rulesEngine = rulesEngine
+        self.history = history
         self.telemetry = telemetry
         self.idleMonitor = idleMonitor
         self.powerReader = powerReader
@@ -294,6 +297,7 @@ final class AppState: ObservableObject {
             lastSleepReason = reason
             lastError = nil
             suppressForceSleepUntil = now().addingTimeInterval(60)
+            history.record(SleepEvent(date: now(), reason: reason, onBattery: power.onBattery))
             return true
         case .failure(let error):
             lastError = error.description

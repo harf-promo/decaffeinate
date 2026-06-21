@@ -9,12 +9,14 @@ struct SettingsView: View {
                 .tabItem { Label("Safety", systemImage: "shield.lefthalf.filled") }
             RulesSettings()
                 .tabItem { Label("Rules", systemImage: "list.bullet.rectangle") }
+            HistorySettings()
+                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
             AdvancedSettings()
                 .tabItem { Label("Advanced", systemImage: "gearshape.2") }
             AboutView()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 440, height: 380)
+        .frame(width: 460, height: 400)
     }
 }
 
@@ -201,5 +203,56 @@ private struct AboutView: View {
 enum AppInfo {
     static var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+}
+
+private struct HistorySettings: View {
+    @EnvironmentObject var history: SleepHistoryStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if history.events.isEmpty {
+                ContentUnavailableView(
+                    "No sleeps yet",
+                    systemImage: "moon.zzz",
+                    description: Text(
+                        "When Decaffeinate forces your Mac to sleep, every one shows up here with the reason."
+                    )
+                )
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        "\(history.events.count) forced sleep\(history.events.count == 1 ? "" : "s") · \(history.batteryCount) on battery"
+                    )
+                    .font(.headline)
+                    Text(
+                        "≈ \(history.estimatedMinutesAvoided) min of needless wake avoided (rough estimate)."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(12)
+                Divider()
+                List {
+                    ForEach(history.events) { event in
+                        HStack(spacing: 8) {
+                            Image(systemName: event.onBattery ? "battery.50" : "powerplug")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(event.reason).font(.callout).lineLimit(1)
+                                Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+                HStack {
+                    Spacer()
+                    Button("Clear history", role: .destructive) { history.clear() }.padding(8)
+                }
+            }
+        }
     }
 }
