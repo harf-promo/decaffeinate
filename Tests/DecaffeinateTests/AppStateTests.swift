@@ -496,4 +496,43 @@ final class AppStateTests: XCTestCase {
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 2, "backpack guard fires despite the idle cooldown")
     }
+
+    // MARK: UX honesty (audit fixes)
+
+    /// During active hours with nothing blocking, don't claim "Free to sleep" /
+    /// "Sleeps ~N min after you step away" — say auto-sleep is paused, and why.
+    func testSchedulePausedShowsHonestHeadline() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.scheduleEnabled = true
+        }
+        defer { h.cleanup() }
+        let hour = Calendar.current.component(.hour, from: h.clock.date)
+        h.settings.settings.activeHoursStart = hour
+        h.settings.settings.activeHoursEnd = (hour + 1) % 24
+        h.idle.seconds = 120  // away, but the schedule holds
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0)
+        XCTAssertEqual(h.state.headline, "Auto-sleep paused")
+        XCTAssertTrue(h.state.detail.contains("active hours"))
+    }
+
+    /// A finished watched task uses a short 60s grace, so the countdown should
+    /// appear immediately rather than waiting for the usual 30s-idle reveal.
+    func testAgentFinishedShowsCountdownBeforeThirtySecondsIdle() {
+        let watcher = AgentWatcher(sampler: QuietSampler(pids: [500]))
+        watcher.requiredQuietSeconds = 2
+        let h = makeHarness(watcher: watcher) { $0.idleThresholdMinutes = 10 }
+        defer { h.cleanup() }
+        h.idle.seconds = 0
+        h.state.setWatchTarget(.processName("node"))
+        for _ in 0..<5 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        h.idle.seconds = 10  // below the normal 30s reveal, inside the 60s grace
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "10s < 60s grace — not yet asleep")
+        XCTAssertEqual(h.state.mug, .counting)
+        XCTAssertNotNil(h.state.secondsUntilForcedSleep)
+    }
 }

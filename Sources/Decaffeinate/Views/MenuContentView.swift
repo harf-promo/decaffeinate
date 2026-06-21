@@ -118,9 +118,16 @@ struct QuickActions: View {
 
             QuietWindowControl()
 
-            // Make the core promise legible even when no live countdown is up.
+            // Make the core promise legible even when no live countdown is up —
+            // but never promise a sleep we're currently holding off.
             if appState.settings.caffeinateEnabled {
                 Text("Auto-sleep is paused while keeping awake")
+                    .explanatory()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if !appState.decision.canForceSleep,
+                let reason = appState.decision.holdForceSleepReasons.first
+            {
+                Text("Auto-sleep paused — \(reason)")
                     .explanatory()
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else if appState.settings.decaffeinateEnabled, appState.secondsUntilForcedSleep == nil
@@ -150,9 +157,17 @@ struct QuietWindowControl: View {
     var body: some View {
         HStack(spacing: 6) {
             if let until = appState.quietUntil, appState.isQuietWindowActive {
-                Image(systemName: "clock.fill").foregroundStyle(.tint)
-                Text("Awake until \(ScheduleEngine.timeLabel(until))")
-                    .font(.caption)
+                if let paused = appState.quietWindowPausedReason {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Text("Quiet window paused — \(paused)")
+                        .font(.caption)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Image(systemName: "clock.fill").foregroundStyle(.tint)
+                    Text("Awake until \(ScheduleEngine.timeLabel(until))")
+                        .font(.caption)
+                }
                 Spacer()
                 Button("Cancel") { appState.clearQuietWindow() }
                     .font(.caption)
@@ -265,7 +280,11 @@ struct WatchSection: View {
                 let cpuText = cpu.map { String(format: " · %.0f%% CPU", $0) } ?? ""
                 statusRow("binoculars.fill", "Watching \(label)\(cpuText)")
             case .completed(let label, _):
-                statusRow("checkmark.circle.fill", "\(label) finished — sleeping soon")
+                if appState.isAutoSleepHeld {
+                    statusRow("pause.circle.fill", "\(label) finished — sleep paused")
+                } else {
+                    statusRow("checkmark.circle.fill", "\(label) finished — sleeping soon")
+                }
             }
 
             // Always explain the feature (it's the headline differentiator).

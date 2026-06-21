@@ -55,6 +55,15 @@ private struct GeneralSettings: View {
                 }
                 .disabled(
                     !store.settings.decaffeinateEnabled || !store.settings.sleepSoonerOnBattery)
+                if store.settings.sleepSoonerOnBattery,
+                    store.settings.batteryIdleThresholdMinutes
+                        >= store.settings.idleThresholdMinutes
+                {
+                    Text(
+                        "This is at least your normal idle time, so it has no effect — lower it to sleep sooner on battery."
+                    )
+                    .font(.caption).foregroundStyle(.orange)
+                }
             }
 
             Section("Keep awake (optional)") {
@@ -186,6 +195,9 @@ private struct ScheduleSettings: View {
                     .labelsHidden()
                 }
                 .disabled(!store.settings.scheduleEnabled)
+                if store.settings.scheduleEnabled {
+                    scheduleStatusRow
+                }
                 Text(
                     "During these hours Decaffeinate stands down — it won't force sleep, so a long task or your own work is never cut off. macOS's own sleep still applies. Set the end earlier than the start for an overnight window."
                 )
@@ -195,9 +207,16 @@ private struct ScheduleSettings: View {
             Section("Quiet window") {
                 if let until = appState.quietUntil, appState.isQuietWindowActive {
                     HStack {
-                        Label(
-                            "Holding awake until \(ScheduleEngine.timeLabel(until))",
-                            systemImage: "clock.fill")
+                        if let paused = appState.quietWindowPausedReason {
+                            Label(
+                                "Paused — \(paused)", systemImage: "exclamationmark.triangle.fill"
+                            )
+                            .foregroundStyle(.orange)
+                        } else {
+                            Label(
+                                "Holding awake until \(ScheduleEngine.timeLabel(until))",
+                                systemImage: "clock.fill")
+                        }
                         Spacer()
                         Button("Cancel") { appState.clearQuietWindow() }
                     }
@@ -210,6 +229,33 @@ private struct ScheduleSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// A live read of whether the schedule is suppressing sleep right now, plus a
+    /// warning when start == end makes the window a no-op.
+    @ViewBuilder private var scheduleStatusRow: some View {
+        let st = store.settings
+        if st.activeHoursStart == st.activeHoursEnd {
+            Label(
+                "Start and end are the same — this schedule does nothing.",
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.caption).foregroundStyle(.orange)
+        } else if ScheduleEngine.isWithinActiveHours(
+            Date(), start: st.activeHoursStart, end: st.activeHoursEnd)
+        {
+            Label(
+                "Active now — auto-sleep is paused until \(ScheduleEngine.hourLabel(st.activeHoursEnd))",
+                systemImage: "pause.circle.fill"
+            )
+            .font(.caption).foregroundStyle(.tint)
+        } else {
+            Label(
+                "Outside active hours — auto-sleep is on. Next pause at \(ScheduleEngine.hourLabel(st.activeHoursStart)).",
+                systemImage: "checkmark.circle"
+            )
+            .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
 

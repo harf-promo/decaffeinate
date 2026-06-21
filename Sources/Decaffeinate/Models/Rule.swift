@@ -58,7 +58,7 @@ enum RulePolicy: Codable, Hashable, Sendable {
         switch self {
         case .allow: return "Always allow"
         case .allowUntil: return "Allow temporarily"
-        case .ignore: return "Block"
+        case .ignore: return "Ignored"
         }
     }
 }

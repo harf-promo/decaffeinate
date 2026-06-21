@@ -482,9 +482,14 @@ final class AppState: ObservableObject {
         }
 
         // Counting down to a forced sleep — only surfaced once the user has
-        // actually stepped away (so we don't show "Sleeping in 9:59" mid-type).
+        // actually stepped away (so we don't show "Sleeping in 9:59" mid-type),
+        // except a finished watched task uses a short grace, so show it at once.
+        let agentFinished: Bool = {
+            if case .completed = watchStatus { return true }
+            return false
+        }()
         if s.decaffeinateEnabled, !s.caffeinateEnabled, decision.canForceSleep,
-            let remaining, idleSeconds >= 30
+            let remaining, idleSeconds >= 30 || agentFinished
         {
             secondsUntilForcedSleep = max(0, remaining)
             mug = .counting
@@ -514,14 +519,20 @@ final class AppState: ObservableObject {
             return
         }
 
-        // Nothing holding the Mac awake.
+        // Nothing is actively holding the Mac awake.
         mug = .free
         if !s.decaffeinateEnabled {
             headline = "Monitoring only"
-            detail = "Auto-sleep is off — turn it on to force sleep when idle"
+            detail = "Auto-sleep is off — overheating & critical-battery guards still apply"
+        } else if !decision.canForceSleep, let reason = decision.holdForceSleepReasons.first {
+            // Force-sleep is being held off (e.g. active-hours schedule) even
+            // though nothing is keeping the Mac awake — say so instead of
+            // promising "Sleeps ~N min after you step away", which we won't honor.
+            headline = "Auto-sleep paused"
+            detail = reason
         } else {
             headline = "Free to sleep"
-            detail = idleHint(for: s)
+            detail = idleSleepHint
         }
         secondsUntilForcedSleep = nil
     }
@@ -552,6 +563,19 @@ final class AppState: ObservableObject {
 
     var systemBlockerCount: Int { assertions.filter(\.blocksSystemSleep).count }
 
+    /// True when the idle force-sleep engine is currently held off for any reason
+    /// (keep-awake, an active quiet window, an active-hours schedule, or a safety
+    /// hold). Used so the watcher doesn't promise "sleeping soon" when it can't.
+    var isAutoSleepHeld: Bool {
+        settings.caffeinateEnabled || quietWindowHoldingAwake || !decision.canForceSleep
+    }
+
+    /// When a quiet window is set but a safety rail has paused its hold, why.
+    var quietWindowPausedReason: String? {
+        guard isQuietWindowActive, !quietWindowHoldingAwake else { return nil }
+        return decision.dropKeepAwakeReasons.first ?? "Paused by a safety rail"
+    }
+
     /// A glanceable, always-true promise (shown when no live countdown is up):
     /// how long after you step away the Mac will sleep.
     var idleSleepHint: String {
@@ -562,8 +586,6 @@ final class AppState: ObservableObject {
             ? " (on battery)" : ""
         return "Sleeps ~\(minutes) min after you step away\(onBatteryNote)"
     }
-
-    private func idleHint(for settings: DecaffeinateSettings) -> String { idleSleepHint }
 
     /// "for 12m" since the assertion was created, if known.
     func heldDuration(_ assertion: PowerAssertion) -> String? {

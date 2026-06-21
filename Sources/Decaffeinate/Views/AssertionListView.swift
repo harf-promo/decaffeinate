@@ -109,7 +109,7 @@ struct AssertionRow: View {
         case .allowUntil:
             tag("Allowed · timed", .green)
         case .ignore:
-            tag("Blocked", .orange)
+            tag("Ignored", .orange)
         case .none:
             EmptyView()
         }
@@ -117,7 +117,7 @@ struct AssertionRow: View {
 
     private func tag(_ text: String, _ color: Color) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
@@ -130,7 +130,7 @@ struct AssertionRow: View {
                 appState.setPolicy(.allow, for: assertion)
             }
             AllowForMenu(title: "Allow for…", assertion: assertion)
-            Button("Block (let Mac sleep)") {
+            Button("Let it sleep (ignore)") {
                 appState.setPolicy(.ignore, for: assertion)
             }
             if policy != nil {
