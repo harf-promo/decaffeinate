@@ -116,6 +116,8 @@ struct QuickActions: View {
             }
             .font(.caption)
 
+            QuietWindowControl()
+
             // Make the core promise legible even when no live countdown is up.
             if appState.settings.caffeinateEnabled {
                 Text("Auto-sleep is paused while keeping awake")
@@ -136,6 +138,43 @@ struct QuickActions: View {
             }
         }
         .padding(12)
+    }
+}
+
+/// A one-shot "stay awake until …" quiet window: hold the Mac awake for a preset
+/// span, then auto-release. Collapses to a live "Awake until …" row with a cancel
+/// while a window is in effect.
+struct QuietWindowControl: View {
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let until = appState.quietUntil, appState.isQuietWindowActive {
+                Image(systemName: "clock.fill").foregroundStyle(.tint)
+                Text("Awake until \(ScheduleEngine.timeLabel(until))")
+                    .font(.caption)
+                Spacer()
+                Button("Cancel") { appState.clearQuietWindow() }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+            } else {
+                Menu {
+                    Button("30 minutes") { appState.stayAwake(forMinutes: 30) }
+                    Button("1 hour") { appState.stayAwake(forMinutes: 60) }
+                    Button("2 hours") { appState.stayAwake(forMinutes: 120) }
+                    Button("Until 6 PM") { appState.stayAwake(untilHour: 18) }
+                } label: {
+                    Label("Stay awake until…", systemImage: "clock")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Temporarily hold the Mac awake, then let it sleep automatically.")
+                Spacer()
+            }
+        }
+        .font(.caption)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -356,4 +356,78 @@ final class AppStateTests: XCTestCase {
         h.state.tick()
         XCTAssertEqual(h.notifier.notifications.count, 2, "clearing a rule re-arms the prompt")
     }
+
+    // MARK: Schedules & quiet windows
+
+    func testQuietWindowHoldsAwakeAndSuppressesForceSleep() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.stayAwake(forMinutes: 30)  // ticks internally
+        XCTAssertEqual(h.sleeper.callCount, 0, "no force-sleep inside a quiet window")
+        XCTAssertTrue(h.caffeine.holdingSystem, "the Mac is actively held awake")
+        XCTAssertEqual(h.state.mug, .caffeinated)
+        XCTAssertTrue(h.state.headline.hasPrefix("Awake until"))
+        XCTAssertTrue(h.state.isQuietWindowActive)
+    }
+
+    func testQuietWindowExpiresAndForceSleepResumes() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.state.stayAwake(forMinutes: 1)
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "held awake during the window")
+
+        h.clock.advance(61)  // past the one-minute window
+        h.state.tick()
+        XCTAssertFalse(h.state.isQuietWindowActive, "the window auto-expires")
+        XCTAssertEqual(h.sleeper.callCount, 1, "force-sleep resumes once the window elapses")
+    }
+
+    func testCancelQuietWindowResumesSleep() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.stayAwake(forMinutes: 30)
+        XCTAssertEqual(h.sleeper.callCount, 0)
+        h.state.clearQuietWindow()  // ticks internally
+        XCTAssertFalse(h.state.isQuietWindowActive)
+        XCTAssertEqual(h.sleeper.callCount, 1, "cancelling the window lets idle sleep fire")
+    }
+
+    func testStayAwakeUntilHourPicksFutureTime() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let hour = Calendar.current.component(.hour, from: h.clock.date)
+        h.state.stayAwake(untilHour: (hour + 2) % 24)
+        let until = try? XCTUnwrap(h.state.quietUntil)
+        XCTAssertNotNil(until)
+        XCTAssertGreaterThan(until!, h.clock.date)
+    }
+
+    func testScheduleStandsDownDuringActiveHours() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.scheduleEnabled = true
+        }
+        defer { h.cleanup() }
+        let hour = Calendar.current.component(.hour, from: h.clock.date)
+        h.settings.settings.activeHoursStart = hour
+        h.settings.settings.activeHoursEnd = (hour + 1) % 24
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "no force-sleep during active hours")
+        XCTAssertFalse(h.state.decision.canForceSleep)
+        XCTAssertTrue(
+            h.state.decision.holdForceSleepReasons.contains { $0.contains("active hours") })
+    }
+
+    func testScheduleAllowsSleepOutsideActiveHours() {
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.scheduleEnabled = true
+        }
+        defer { h.cleanup() }
+        let hour = Calendar.current.component(.hour, from: h.clock.date)
+        h.settings.settings.activeHoursStart = (hour + 2) % 24
+        h.settings.settings.activeHoursEnd = (hour + 3) % 24
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "outside active hours, idle force-sleep still fires")
+    }
 }

@@ -55,6 +55,18 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// force sleep.
     var respectWhitelist: Bool = true
 
+    // MARK: Schedules
+
+    /// When on, Decaffeinate never *forces* sleep during your active hours — it
+    /// stands down so it can't cut off work mid-flow. (macOS's own sleep still
+    /// applies; this only suppresses the force-sleep engine.)
+    var scheduleEnabled: Bool = false
+    /// Start of the active-hours window, an hour-of-day 0...23.
+    var activeHoursStart: Int = 9
+    /// End of the active-hours window (exclusive), an hour-of-day 0...23. May be
+    /// earlier than the start to describe an overnight window (e.g. 22 → 6).
+    var activeHoursEnd: Int = 17
+
     // MARK: Firewall / notifications
 
     /// Post a notification when a *new* unclassified app starts holding the Mac

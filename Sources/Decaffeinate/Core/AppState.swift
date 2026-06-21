@@ -71,6 +71,11 @@ final class AppState: ObservableObject {
     /// Status of the "sleep when my agent/build finishes" watcher.
     @Published private(set) var watchStatus: AgentWatcher.Status = .idle
 
+    /// One-shot "stay awake until …" quiet window from the menu. While set and in
+    /// the future, Decaffeinate actively holds the Mac awake and never forces
+    /// sleep. Cleared automatically once it elapses.
+    @Published private(set) var quietUntil: Date?
+
     private var timer: Timer?
     private var notifiedBlockers: Set<String> = []
     private var suppressForceSleepUntil: Date?
@@ -169,6 +174,42 @@ final class AppState: ObservableObject {
         tick()
     }
 
+    // MARK: Quiet window ("stay awake until …")
+
+    /// True while a future quiet window is in effect.
+    var isQuietWindowActive: Bool {
+        guard let until = quietUntil else { return false }
+        return now() < until
+    }
+
+    /// Hold the Mac awake for the next `minutes` minutes, then auto-release.
+    func stayAwake(forMinutes minutes: Int) {
+        quietUntil = now().addingTimeInterval(TimeInterval(minutes) * 60)
+        tick()
+    }
+
+    /// Hold the Mac awake until the next time it hits `hour:00` (today or
+    /// tomorrow) — e.g. "until 6 PM" or "end of the work day".
+    func stayAwake(untilHour hour: Int, calendar: Calendar = .current) {
+        let start = now()
+        var comps = calendar.dateComponents([.year, .month, .day], from: start)
+        comps.hour = hour
+        comps.minute = 0
+        comps.second = 0
+        guard var target = calendar.date(from: comps) else { return }
+        if target <= start {
+            target = calendar.date(byAdding: .day, value: 1, to: target) ?? target
+        }
+        quietUntil = target
+        tick()
+    }
+
+    /// Cancel an active quiet window immediately.
+    func clearQuietWindow() {
+        quietUntil = nil
+        tick()
+    }
+
     /// Processes currently holding the Mac awake — the best "sleep when this
     /// finishes" picks because they're real and running right now.
     var runningWatchCandidates: [String] {
@@ -197,18 +238,27 @@ final class AppState: ObservableObject {
             .map(\.displayName)
             .removingDuplicates()
 
-        let decision = SafetyRails.evaluate(
+        // Expire a lapsed quiet window so the UI and logic see it as over.
+        if let until = quietUntil, now() >= until { quietUntil = nil }
+        let quietWindowActive = quietUntil != nil
+
+        var decision = SafetyRails.evaluate(
             assertions: assertions,
             power: power,
             thermalState: thermalState,
             whitelistedAwakeAppNames: whitelistedAwake,
             settings: s
         )
+        // Schedules: stand down from forcing sleep during the user's active hours.
+        if let scheduleHold = ScheduleEngine.activeHoursHoldReason(now: now(), settings: s) {
+            decision.holdForceSleepReasons.append(scheduleHold)
+        }
         self.decision = decision
 
-        // 1) Reconcile keep-awake holds (caffeine + strict takeover).
+        // 1) Reconcile keep-awake holds (caffeine + strict takeover + quiet window).
         let wantsAwake =
-            (s.caffeinateEnabled || s.strictTakeoverMode) && !decision.shouldDropKeepAwake
+            (s.caffeinateEnabled || s.strictTakeoverMode || quietWindowActive)
+            && !decision.shouldDropKeepAwake
         let wantsDisplayAwake =
             s.caffeinateEnabled
             && s.caffeinateKeepsDisplayAwake
@@ -244,7 +294,7 @@ final class AppState: ObservableObject {
         //    grace so the Mac sleeps soon after you've stepped away.
         //    Suppressed while the user is intentionally caffeinating.
         var remaining: TimeInterval?
-        if s.decaffeinateEnabled, !s.caffeinateEnabled {
+        if s.decaffeinateEnabled, !s.caffeinateEnabled, !quietWindowActive {
             let base = s.effectiveIdleSeconds(onBattery: power.onBattery)
             let threshold = agentFinished ? min(base, completionGraceSeconds) : base
             let r = threshold - idleSeconds
@@ -363,6 +413,15 @@ final class AppState: ObservableObject {
             headline = "Keeping your Mac awake"
             detail =
                 s.caffeinateKeepsDisplayAwake ? "Display stays on too" : "Display can still sleep"
+            secondsUntilForcedSleep = nil
+            return
+        }
+
+        // Temporary "stay awake until …" quiet window.
+        if let until = quietUntil, until > now(), caffeine.isActive {
+            mug = .caffeinated
+            headline = "Awake until \(ScheduleEngine.timeLabel(until))"
+            detail = "Quiet window — auto-sleep paused"
             secondsUntilForcedSleep = nil
             return
         }

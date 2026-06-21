@@ -7,6 +7,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "zzz") }
             SafetySettings()
                 .tabItem { Label("Safety", systemImage: "shield.lefthalf.filled") }
+            ScheduleSettings()
+                .tabItem { Label("Schedule", systemImage: "calendar") }
             RulesSettings()
                 .tabItem { Label("Rules", systemImage: "list.bullet.rectangle") }
             HistorySettings()
@@ -153,6 +155,55 @@ private struct RulesSettings: View {
                 }
             }
         }
+    }
+}
+
+private struct ScheduleSettings: View {
+    @EnvironmentObject var store: SettingsStore
+    @EnvironmentObject var appState: AppState
+    private var s: Binding<DecaffeinateSettings> { $store.settings }
+
+    var body: some View {
+        Form {
+            Section("Active hours") {
+                Toggle("Don't force sleep during my active hours", isOn: s.scheduleEnabled)
+                HStack {
+                    Text("From")
+                    Picker("", selection: s.activeHoursStart) {
+                        ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
+                    }
+                    .labelsHidden()
+                    Text("to")
+                    Picker("", selection: s.activeHoursEnd) {
+                        ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
+                    }
+                    .labelsHidden()
+                }
+                .disabled(!store.settings.scheduleEnabled)
+                Text(
+                    "During these hours Decaffeinate stands down — it won't force sleep, so a long task or your own work is never cut off. macOS's own sleep still applies. Set the end earlier than the start for an overnight window."
+                )
+                .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section("Quiet window") {
+                if let until = appState.quietUntil, appState.isQuietWindowActive {
+                    HStack {
+                        Label(
+                            "Holding awake until \(ScheduleEngine.timeLabel(until))",
+                            systemImage: "clock.fill")
+                        Spacer()
+                        Button("Cancel") { appState.clearQuietWindow() }
+                    }
+                } else {
+                    Text(
+                        "No quiet window active. Start one any time from the menu's “Stay awake until…”."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
