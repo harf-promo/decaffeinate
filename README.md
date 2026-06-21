@@ -79,13 +79,13 @@ Now**, auto-sleep, and keep-awake.
 <img src="assets/onboarding.png" width="360" alt="Decaffeinate first-run welcome — safe by default" />
 </div>
 
-**Menu-bar at a glance** — a custom mug tells you the state without opening the menu:
+**Menu-bar at a glance** — a moon ↔ sun tells you the state without opening the menu:
 
 <div align="center">
-<img src="assets/menubar-icons.png" width="280" alt="Menu-bar mug states" />
+<img src="assets/menubar-icons.png" width="280" alt="Menu-bar states" />
 </div>
 
-> empty *(free to sleep)* · half-full *(winding down to sleep)* · steaming *(something's keeping it awake)* · bolt *(intentionally awake)*
+> crescent *(free to sleep)* · crescent + star *(winding down to sleep)* · sun *(something's keeping it awake)* · bolt *(intentionally awake)*
 
 ---
 
@@ -189,7 +189,7 @@ Open areas where you can make a dent today:
 
 ## Roadmap
 
-**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · agentic "sleep when the build finishes" detection · assertion attribution · custom mug icons · universal (Intel + Apple Silicon) build.
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · agentic "sleep when the build finishes" detection · assertion attribution · custom menu-bar icons · universal (Intel + Apple Silicon) build.
 
 **Next:** localization · schedules & quiet windows · sleep history & battery-saved insights · triggers/automation · first-run onboarding. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

@@ -1,61 +1,46 @@
 #!/usr/bin/env swift
 import AppKit
 
-// Renders the Decaffeinate app icon: a "decaffeinated" mug (with a Zzz) on a
-// warm gradient, then assembles an .icns. Run from the repo root:
+// Renders the Decaffeinate app icon — a crescent moon + a single green dot on a
+// flat "night" field, in the Harf design language (no gradients; harf-grey mark
+// + one harf-green accent). Then assembles an .icns. Run from the repo root:
 //     swift Scripts/generate-icon.swift
 // Output: assets/AppIcon.icns and assets/icon-1024.png
+
+// Harf brand colours (sRGB).
+let night = NSColor(srgbRed: 0x1A / 255.0, green: 0x1B / 255.0, blue: 0x1D / 255.0, alpha: 1)  // grey-900
+let grey = NSColor(srgbRed: 0x93 / 255.0, green: 0x95 / 255.0, blue: 0x98 / 255.0, alpha: 1)  // harf-grey
+let green = NSColor(srgbRed: 0xA4 / 255.0, green: 0xCD / 255.0, blue: 0x39 / 255.0, alpha: 1)  // harf-green
+
+func circle(_ cx: CGFloat, _ cy: CGFloat, _ r: CGFloat) -> NSBezierPath {
+    NSBezierPath(ovalIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+}
 
 func renderIcon(size: CGFloat) -> NSImage {
     let image = NSImage(size: NSSize(width: size, height: size))
     image.lockFocus()
     defer { image.unlockFocus() }
-    guard let ctx = NSGraphicsContext.current?.cgContext else { return image }
 
     let rect = CGRect(x: 0, y: 0, width: size, height: size)
 
-    // Rounded-rect background with a warm coffee gradient.
-    let corner = size * 0.2237 // Apple's "squircle"-ish corner ratio
-    let path = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
-    path.addClip()
-    let colors = [
-        NSColor(calibratedRed: 0.36, green: 0.22, blue: 0.13, alpha: 1).cgColor,
-        NSColor(calibratedRed: 0.20, green: 0.12, blue: 0.07, alpha: 1).cgColor
-    ] as CFArray
-    if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                 colors: colors, locations: [0, 1]) {
-        ctx.drawLinearGradient(gradient,
-                               start: CGPoint(x: 0, y: size),
-                               end: CGPoint(x: size, y: 0),
-                               options: [])
-    }
+    // Flat night field, clipped to the macOS squircle.
+    let corner = size * 0.2237
+    let clip = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
+    clip.addClip()
+    night.setFill()
+    clip.fill()
 
-    // The mug, drawn from an SF Symbol in cream white.
-    let cream = NSColor(calibratedRed: 0.97, green: 0.93, blue: 0.86, alpha: 1)
-    let config = NSImage.SymbolConfiguration(pointSize: size * 0.46, weight: .regular)
-        .applying(.init(paletteColors: [cream]))
-    if let symbol = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: nil)?
-        .withSymbolConfiguration(config) {
-        let s = symbol.size
-        let scale = (size * 0.5) / max(s.width, s.height)
-        let drawSize = NSSize(width: s.width * scale, height: s.height * scale)
-        let origin = NSPoint(x: (size - drawSize.width) / 2,
-                             y: (size - drawSize.height) / 2 - size * 0.03)
-        symbol.draw(in: NSRect(origin: origin, size: drawSize))
-    }
+    // Crescent = a harf-grey disc with an offset night-coloured disc carved out
+    // (set difference, not even-odd — crisp at every size).
+    grey.setFill()
+    circle(size * 0.50, size * 0.515, size * 0.300).fill()
+    night.setFill()
+    circle(size * 0.635, size * 0.605, size * 0.288).fill()
 
-    // A rising "z z z" to signal sleep — Decaffeinate's whole point.
-    let zzzPlacements: [(x: CGFloat, y: CGFloat, fontScale: CGFloat)] = [
-        (0.62, 0.66, 0.10), (0.70, 0.74, 0.13), (0.78, 0.83, 0.16)
-    ]
-    for placement in zzzPlacements {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: size * placement.fontScale, weight: .heavy),
-            .foregroundColor: cream.withAlphaComponent(0.92)
-        ]
-        ("z" as NSString).draw(at: NSPoint(x: size * placement.x, y: size * placement.y),
-                               withAttributes: attributes)
-    }
+    // A single green dot — the "star" in the crescent's opening (green is
+    // punctuation: one mark per surface).
+    green.setFill()
+    circle(size * 0.700, size * 0.300, size * 0.052).fill()
 
     return image
 }
@@ -66,7 +51,8 @@ func png(_ image: NSImage, size: CGFloat) -> Data? {
     image.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
     target.unlockFocus()
     guard let tiff = target.tiffRepresentation,
-          let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        let rep = NSBitmapImageRep(data: tiff)
+    else { return nil }
     rep.size = NSSize(width: size, height: size)
     return rep.representation(using: .png, properties: [:])
 }
@@ -88,7 +74,7 @@ let variants: [(String, CGFloat)] = [
     ("icon_32x32", 32), ("icon_32x32@2x", 64),
     ("icon_128x128", 128), ("icon_128x128@2x", 256),
     ("icon_256x256", 256), ("icon_256x256@2x", 512),
-    ("icon_512x512", 512), ("icon_512x512@2x", 1024)
+    ("icon_512x512", 512), ("icon_512x512@2x", 1024),
 ]
 for (name, size) in variants {
     if let data = png(master, size: size) {
