@@ -2,37 +2,37 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Decaffeinate</string>
-    <key>CFBundleDisplayName</key>
-    <string>Decaffeinate</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.harfpromo.Decaffeinate</string>
-    <key>CFBundleExecutable</key>
-    <string>Decaffeinate</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.3.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHumanReadableCopyright</key>
-    <string>© 2026 Harf Promo. MIT Licensed.</string>
-    <key>NSSupportsAutomaticTermination</key>
-    <false/>
-    <key>NSSupportsSuddenTermination</key>
-    <false/>
-    <key>SUFeedURL</key>
-    <string>https://github.com/harf-promo/decaffeinate/releases/latest/download/appcast.xml</string>
-    <key>SUPublicEDKey</key>
-    <string>t8ABhQm2a5BQmzDaD+MGNFenm+A2j5UbaE7QXTwTwVI=</string>
-    <key>SUEnableAutomaticChecks</key>
-    <true/>
+	<key>CFBundleDisplayName</key>
+	<string>Decaffeinate</string>
+	<key>CFBundleExecutable</key>
+	<string>Decaffeinate</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.harfpromo.Decaffeinate</string>
+	<key>CFBundleName</key>
+	<string>Decaffeinate</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.4.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Harf Promo. MIT Licensed.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/harf-promo/decaffeinate/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>t8ABhQm2a5BQmzDaD+MGNFenm+A2j5UbaE7QXTwTwVI=</string>
 </dict>
 </plist>

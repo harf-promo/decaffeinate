@@ -16,16 +16,14 @@ durations; an injectable, integration-tested decision loop; and the full
 **1.3.0** — **universal binary** (Intel + Apple Silicon); "sleep sooner on
 battery"; a UX/visual/copy polish pass and dead-code cleanup.
 
+**1.4.0** — the **reason engine**: *why* each app keeps the Mac awake (incl.
+honest **microphone-in-use** detection via the public `audio-in` resource key),
+with per-blocker detail; **onboarding**; **sleep history**; **schedules** &
+**quiet windows**; and an optional **menu-bar countdown**.
+
 ## Near term
 
 - [ ] **Submit to homebrew/cask core** (removes the one-time `brew trust`).
-- [ ] 🙋 **Onboarding** — a first-run explainer of what the app does and why it's safe.
-
-## Smarter sleep
-
-- [ ] **Schedules** — per-app and per-time-of-day rules (e.g. never force sleep
-  during work hours; always sleep after midnight).
-- [ ] **Quiet windows** — temporary "stay awake until X" without a permanent rule.
 - [ ] **Triggers / automation** — stay awake while app X runs / on AC / above a
   CPU threshold (the main feature gap vs Amphetamine).
 
@@ -34,12 +32,14 @@ battery"; a UX/visual/copy polish pass and dead-code cleanup.
 - [ ] **SMC sensors** — real temperature and fan reads for a smarter Backpack
   Guard, beyond `ProcessInfo.thermalState`. *(Reverse-engineered only — weigh the
   maintenance cost.)*
-- [ ] ~~Camera / mic in-use detection~~ — no public API exists; not pursuing.
+- [x] **Microphone-in-use detection** — shipped in 1.4.0 via the public
+  `ResourcesUsed`/`audio-in` assertion key (no private API needed). Camera has no
+  equivalent public signal; not pursuing.
 
 ## Insight & polish
 
-- [ ] **Sleep history** — a timeline of forced sleeps and what triggered them.
-- [ ] **Battery saved** estimate — show the impact over time.
+- [x] **Sleep history** — shipped in 1.4.0 (Settings → History), with a rough
+  "needless wake avoided" estimate.
 - [ ] 🙋 **Localization** — translations beyond English.
 - [ ] 🙋 **More tests** — a sleep-simulation harness; broader coverage.
 

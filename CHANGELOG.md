@@ -4,6 +4,37 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-06-21
+
+The "why", not just the "what" — Decaffeinate now explains *why* each app is
+holding your Mac awake, and finishes the v1 roadmap.
+
+### Added
+- **Reason engine** — every sleep blocker now carries a plain-English reason and
+  an icon, read from public IOKit assertion keys: **microphone in use** (honest
+  `audio-in` detection — "likely a call"), **playing media / audio**, **software
+  update**, **Time Machine backup**, **Handoff/Continuity**, **keeps display on**,
+  and **auto-releases in N s** for timed assertions. The real owner behind shared
+  daemons (`coreaudiod`, `runningboardd`) is attributed where macOS exposes it.
+- **Per-blocker detail** — tap any row to expand the full picture: reason,
+  resource chips (Microphone/Speaker), real owner, how long it's been held,
+  auto-release countdown, assertion type, and bundle path. `--scan` prints it too.
+- **First-run onboarding** (#7) — a three-panel welcome (what it does · the safety
+  promise · the one notification permission), replayable from About.
+- **Sleep history & insights** (#9) — a rolling log of forced sleeps with the
+  reason and a rough "needless wake avoided" estimate (Settings → History).
+- **Schedules** (#8) — "active hours" during which Decaffeinate never *forces*
+  sleep, so long tasks and your own work are never cut off (Settings → Schedule).
+- **Quiet windows** (#8) — a one-shot "Stay awake until…" from the menu (30 m / 1 h
+  / 2 h / until 6 PM) that holds the Mac awake, then auto-releases.
+- **Menu-bar countdown** (#10) — optionally show the live "M:SS" to sleep beside
+  the menu-bar icon.
+
+### Changed
+- Smarter headline that folds the dominant blocker's reason in ("Safari is playing
+  media", "Your microphone is in use").
+- The media safety rail now also honours `audio-in`/`audio-out` resource signals.
+
 ## [1.3.0] — 2026-06-20
 
 ### Added
