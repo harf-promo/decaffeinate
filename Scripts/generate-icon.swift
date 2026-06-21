@@ -1,48 +1,83 @@
 #!/usr/bin/env swift
 import AppKit
 
-// Renders the Decaffeinate app icon — a crescent moon + a single green dot on a
-// flat "night" field, in the Harf design language (no gradients; harf-grey mark
-// + one harf-green accent). Then assembles an .icns. Run from the repo root:
+// Renders the Decaffeinate app icon — the "nightcap": a flat geometric coffee
+// cup (harf-grey) with a single harf-green crescent moon rising like steam, on a
+// flat ink "night" field. Coffee is the app's domain; the crescent is the sleep
+// it brings. No gradient. Then assembles an .icns. Run from the repo root:
 //     swift Scripts/generate-icon.swift
 // Output: assets/AppIcon.icns and assets/icon-1024.png
 
-// Harf brand colours (sRGB).
 let night = NSColor(srgbRed: 0x1A / 255.0, green: 0x1B / 255.0, blue: 0x1D / 255.0, alpha: 1)  // grey-900
 let grey = NSColor(srgbRed: 0x93 / 255.0, green: 0x95 / 255.0, blue: 0x98 / 255.0, alpha: 1)  // harf-grey
 let green = NSColor(srgbRed: 0xA4 / 255.0, green: 0xCD / 255.0, blue: 0x39 / 255.0, alpha: 1)  // harf-green
 
-func circle(_ cx: CGFloat, _ cy: CGFloat, _ r: CGFloat) -> NSBezierPath {
-    NSBezierPath(ovalIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+func cupBody(_ s: CGFloat) -> NSBezierPath {
+    // A tapered, rounded coffee cup, filled.
+    let topY = s * 0.62, botY = s * 0.34
+    let topHalf = s * 0.165, botHalf = s * 0.135
+    let cx = s * 0.46
+    let r = s * 0.05
+    let p = NSBezierPath()
+    p.move(to: CGPoint(x: cx - topHalf, y: topY))
+    p.line(to: CGPoint(x: cx - botHalf, y: botY + r))
+    p.appendArc(
+        withCenter: CGPoint(x: cx - botHalf + r, y: botY + r), radius: r, startAngle: 180,
+        endAngle: 270)
+    p.line(to: CGPoint(x: cx + botHalf - r, y: botY))
+    p.appendArc(
+        withCenter: CGPoint(x: cx + botHalf - r, y: botY + r), radius: r, startAngle: 270,
+        endAngle: 360)
+    p.line(to: CGPoint(x: cx + topHalf, y: topY))
+    p.close()
+    return p
 }
 
-func renderIcon(size: CGFloat) -> NSImage {
-    let image = NSImage(size: NSSize(width: size, height: size))
-    image.lockFocus()
-    defer { image.unlockFocus() }
+func crescent(_ cx: CGFloat, _ cy: CGFloat, _ r: CGFloat) -> NSBezierPath {
+    let r2 = r * 0.80
+    let d = r - r2
+    let path = NSBezierPath()
+    path.appendOval(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+    let ox = cx + d * 0.85, oy = cy + d * 0.5
+    path.appendOval(in: CGRect(x: ox - r2, y: oy - r2, width: r2 * 2, height: r2 * 2))
+    path.windingRule = .evenOdd
+    return path
+}
 
-    let rect = CGRect(x: 0, y: 0, width: size, height: size)
+func renderIcon(size s: CGFloat) -> NSImage {
+    let img = NSImage(size: NSSize(width: s, height: s))
+    img.lockFocus()
 
-    // Flat night field, clipped to the macOS squircle.
-    let corner = size * 0.2237
-    let clip = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
+    let corner = s * 0.2237
+    let clip = NSBezierPath(
+        roundedRect: CGRect(x: 0, y: 0, width: s, height: s), xRadius: corner, yRadius: corner)
     clip.addClip()
     night.setFill()
     clip.fill()
 
-    // Crescent = a harf-grey disc with an offset night-coloured disc carved out
-    // (set difference, not even-odd — crisp at every size).
+    let cx = s * 0.46
+    grey.setStroke()
     grey.setFill()
-    circle(size * 0.50, size * 0.515, size * 0.300).fill()
-    night.setFill()
-    circle(size * 0.635, size * 0.605, size * 0.288).fill()
 
-    // A single green dot — the "star" in the crescent's opening (green is
-    // punctuation: one mark per surface).
+    // Saucer.
+    NSBezierPath(
+        ovalIn: CGRect(x: cx - s * 0.225, y: s * 0.235, width: s * 0.45, height: s * 0.075)).fill()
+    // Handle.
+    let handle = NSBezierPath()
+    handle.appendArc(
+        withCenter: CGPoint(x: cx + s * 0.175, y: s * 0.475), radius: s * 0.10, startAngle: -80,
+        endAngle: 80)
+    handle.lineWidth = s * 0.055
+    handle.lineCapStyle = .round
+    handle.stroke()
+    // Cup body.
+    cupBody(s).fill()
+    // Crescent (green) rising at the upper-right, like steam.
     green.setFill()
-    circle(size * 0.700, size * 0.300, size * 0.052).fill()
+    crescent(cx + s * 0.16, s * 0.74, s * 0.075).fill()
 
-    return image
+    img.unlockFocus()
+    return img
 }
 
 func png(_ image: NSImage, size: CGFloat) -> Data? {
@@ -50,9 +85,9 @@ func png(_ image: NSImage, size: CGFloat) -> Data? {
     target.lockFocus()
     image.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
     target.unlockFocus()
-    guard let tiff = target.tiffRepresentation,
-        let rep = NSBitmapImageRep(data: tiff)
-    else { return nil }
+    guard let tiff = target.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else {
+        return nil
+    }
     rep.size = NSSize(width: size, height: size)
     return rep.representation(using: .png, properties: [:])
 }

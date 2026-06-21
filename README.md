@@ -79,13 +79,13 @@ Now**, auto-sleep, and keep-awake.
 <img src="assets/onboarding.png" width="360" alt="Decaffeinate first-run welcome — safe by default" />
 </div>
 
-**Menu-bar at a glance** — a moon ↔ sun tells you the state without opening the menu:
+**Menu-bar at a glance** — a coffee cup tells you the state without opening the menu:
 
 <div align="center">
 <img src="assets/menubar-icons.png" width="280" alt="Menu-bar states" />
 </div>
 
-> crescent *(free to sleep)* · crescent + star *(winding down to sleep)* · sun *(something's keeping it awake)* · bolt *(intentionally awake)*
+> empty + crescent *(decaffeinated; free to sleep)* · draining *(winding down)* · full & steaming *(something's keeping it awake)* · with a bolt *(intentionally awake)*
 
 ---
 
@@ -189,7 +189,7 @@ Open areas where you can make a dent today:
 
 ## Roadmap
 
-**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + new crescent logo · universal (Intel + Apple Silicon) build.
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the coffee "nightcap" mark · universal (Intel + Apple Silicon) build.
 
 **Next:** localization · homebrew/cask-core submission · SMC temperature sensors. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

@@ -1,15 +1,15 @@
 import AppKit
 
-/// Draws Decaffeinate's menu-bar glyphs at runtime as **template** images (so the
-/// menu bar tints them automatically and they adapt to light/dark). Runtime
-/// drawing avoids shipping/locating resource bundles in the hand-assembled `.app`.
+/// Draws Decaffeinate's menu-bar glyphs at runtime as **template** images (the
+/// menu bar tints them and they adapt to light/dark). Runtime drawing avoids
+/// shipping/locating resource bundles in the hand-assembled `.app`.
 ///
-/// The four states map to a moon ↔ sun metaphor (sleep ↔ awake), matching the
-/// crescent app icon:
-/// - `.free` — a crescent moon (free to sleep; the resting state)
-/// - `.counting` — crescent + a star dot (settling into night; winding down)
-/// - `.blocked` — a sun (something's keeping it awake against your wishes)
-/// - `.caffeinated` — a bolt (intentionally awake)
+/// The "nightcap" family: a constant coffee cup whose *fill* carries the state
+/// (more coffee = more awake), with a small crescent moon on the resting state.
+/// - `.free` — empty cup + a crescent (decaffeinated; free to sleep)
+/// - `.counting` — cup draining (winding down)
+/// - `.blocked` — full cup, steaming (something's keeping it awake)
+/// - `.caffeinated` — full cup + a bolt (intentionally wired)
 enum MugIcon {
     static func image(for state: MugState, size: CGFloat = 18) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size))
@@ -21,66 +21,106 @@ enum MugIcon {
     }
 
     private static func draw(_ state: MugState, size s: CGFloat) {
-        NSColor.black.setFill()
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
         NSColor.black.setStroke()
+        NSColor.black.setFill()
+
+        // Cup body — a slightly tapered rounded vessel.
+        let cup = CGRect(x: s * 0.22, y: s * 0.24, width: s * 0.44, height: s * 0.42)
+        let r = s * 0.07
+        let body = NSBezierPath()
+        body.move(to: CGPoint(x: cup.minX, y: cup.maxY))
+        body.line(to: CGPoint(x: cup.minX + s * 0.04, y: cup.minY + r))
+        body.appendArc(
+            withCenter: CGPoint(x: cup.minX + s * 0.04 + r, y: cup.minY + r),
+            radius: r, startAngle: 180, endAngle: 270)
+        body.line(to: CGPoint(x: cup.maxX - s * 0.04 - r, y: cup.minY))
+        body.appendArc(
+            withCenter: CGPoint(x: cup.maxX - s * 0.04 - r, y: cup.minY + r),
+            radius: r, startAngle: 270, endAngle: 360)
+        body.line(to: CGPoint(x: cup.maxX, y: cup.maxY))
+        body.close()
+
+        // Handle.
+        let handle = NSBezierPath()
+        handle.appendArc(
+            withCenter: CGPoint(x: cup.maxX + s * 0.02, y: cup.midY - s * 0.01),
+            radius: s * 0.12, startAngle: -78, endAngle: 78)
+        handle.lineWidth = s * 0.075
+        handle.stroke()
+
+        // Saucer.
+        let saucer = NSBezierPath(
+            ovalIn: CGRect(x: s * 0.13, y: s * 0.12, width: s * 0.60, height: s * 0.10))
+        saucer.lineWidth = s * 0.07
+        saucer.stroke()
+
+        // Coffee fill — the state lives here.
+        let fill: CGFloat
+        switch state {
+        case .free: fill = 0
+        case .counting: fill = 0.40
+        case .blocked, .caffeinated: fill = 0.85
+        }
+        if fill > 0 {
+            ctx.saveGState()
+            body.addClip()
+            let h = cup.height * fill
+            NSBezierPath(rect: CGRect(x: cup.minX, y: cup.minY, width: cup.width, height: h)).fill()
+            ctx.restoreGState()
+        }
+        body.lineWidth = s * 0.075
+        body.stroke()
 
         switch state {
         case .free:
-            crescent(cx: s * 0.50, cy: s * 0.50, r: s * 0.36).fill()
-        case .counting:
-            crescent(cx: s * 0.44, cy: s * 0.46, r: s * 0.34).fill()
-            dot(cx: s * 0.74, cy: s * 0.74, r: s * 0.075).fill()
+            // A small crescent — the nightcap, resting.
+            crescent(cx: s * 0.74, cy: s * 0.78, r: s * 0.14).fill()
         case .blocked:
-            sun(cx: s * 0.50, cy: s * 0.50, size: s)
+            steam(centerX: cup.midX, top: cup.maxY, size: s)
         case .caffeinated:
-            bolt(cx: s * 0.50, cy: s * 0.50, size: s)
+            bolt(centerX: cup.midX, baseY: cup.maxY + s * 0.05, size: s)
+        case .counting:
+            break
         }
     }
 
-    /// A clean crescent: the outer disc minus an internally-tangent smaller disc
-    /// (even-odd), so the horns meet to a point — no opaque background needed.
+    /// A clean filled crescent via an internally-tangent carve (even-odd).
     private static func crescent(cx: CGFloat, cy: CGFloat, r: CGFloat) -> NSBezierPath {
-        let r2 = r * 0.76
-        let d = r - r2  // internal tangency → a closed crescent, not a ring
+        let r2 = r * 0.78
+        let d = r - r2
         let path = NSBezierPath()
         path.appendOval(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
-        let ox = cx + d * 0.78  // offset up-and-right (~40°) so it opens toward the star
-        let oy = cy + d * 0.62
+        let ox = cx + d * 0.85
+        let oy = cy + d * 0.55
         path.appendOval(in: CGRect(x: ox - r2, y: oy - r2, width: r2 * 2, height: r2 * 2))
         path.windingRule = .evenOdd
         return path
     }
 
-    private static func dot(cx: CGFloat, cy: CGFloat, r: CGFloat) -> NSBezierPath {
-        NSBezierPath(ovalIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
-    }
-
-    /// A small filled disc with eight short rays.
-    private static func sun(cx: CGFloat, cy: CGFloat, size s: CGFloat) {
-        let core = s * 0.18
-        dot(cx: cx, cy: cy, r: core).fill()
-        let inner = core + s * 0.06
-        let outer = core + s * 0.16
-        let rays = NSBezierPath()
-        rays.lineWidth = s * 0.075
-        rays.lineCapStyle = .round
-        for i in 0..<8 {
-            let a = Double(i) * .pi / 4
-            rays.move(to: CGPoint(x: cx + cos(a) * inner, y: cy + sin(a) * inner))
-            rays.line(to: CGPoint(x: cx + cos(a) * outer, y: cy + sin(a) * outer))
+    private static func steam(centerX x: CGFloat, top: CGFloat, size s: CGFloat) {
+        for dx in [-s * 0.09, s * 0.09] {
+            let p = NSBezierPath()
+            p.lineWidth = s * 0.05
+            p.move(to: CGPoint(x: x + dx, y: top + s * 0.06))
+            p.curve(
+                to: CGPoint(x: x + dx, y: top + s * 0.21),
+                controlPoint1: CGPoint(x: x + dx + s * 0.07, y: top + s * 0.11),
+                controlPoint2: CGPoint(x: x + dx - s * 0.07, y: top + s * 0.16))
+            p.stroke()
         }
-        rays.stroke()
     }
 
-    /// A filled lightning bolt, centred.
-    private static func bolt(cx: CGFloat, cy: CGFloat, size s: CGFloat) {
+    private static func bolt(centerX x: CGFloat, baseY y: CGFloat, size s: CGFloat) {
         let b = NSBezierPath()
-        b.move(to: CGPoint(x: cx + s * 0.07, y: cy + s * 0.34))
-        b.line(to: CGPoint(x: cx - s * 0.16, y: cy - s * 0.02))
-        b.line(to: CGPoint(x: cx - s * 0.01, y: cy - s * 0.02))
-        b.line(to: CGPoint(x: cx - s * 0.07, y: cy - s * 0.34))
-        b.line(to: CGPoint(x: cx + s * 0.16, y: cy + s * 0.04))
-        b.line(to: CGPoint(x: cx + s * 0.01, y: cy + s * 0.04))
+        b.move(to: CGPoint(x: x + s * 0.05, y: y + s * 0.22))
+        b.line(to: CGPoint(x: x - s * 0.09, y: y + s * 0.07))
+        b.line(to: CGPoint(x: x - s * 0.005, y: y + s * 0.07))
+        b.line(to: CGPoint(x: x - s * 0.05, y: y - s * 0.07))
+        b.line(to: CGPoint(x: x + s * 0.11, y: y + s * 0.10))
+        b.line(to: CGPoint(x: x + s * 0.02, y: y + s * 0.10))
         b.close()
         b.fill()
     }

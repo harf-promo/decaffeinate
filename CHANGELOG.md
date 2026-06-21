@@ -4,6 +4,32 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] — 2026-06-21
+
+A menu UX overhaul and a new unified mark.
+
+### Fixed
+- **Settings is reachable again.** The popover had no height cap or scroll, so a
+  tall stack got clipped and the footer (Settings/quit) went off-screen. Rebuilt
+  as three zones — a pinned header, one scrolling body, and a pinned footer (fixed
+  360×460) — so Settings is always on screen and the blocker list has real room.
+
+### Changed
+- **New "nightcap" mark, everywhere.** Replaced the crescent/sun set with a single
+  ownable mark — a flat coffee cup with one green crescent moon rising like steam.
+  Used consistently across the app icon (cup + crescent on an ink "night" field),
+  the menu-bar family (empty + crescent → draining → full & steaming → bolt; no
+  sun), onboarding, About, and the README.
+- **Fewer buttons, more meaning.** One hero "Sleep Now" + a single "Keep awake"
+  menu (keep awake · stay awake until… · auto-sleep · sleep-when-a-task-finishes)
+  replace the old toggle pair, quiet-window control, and watch block; a single
+  cancelable line shows the active mode.
+- **Context to approve.** The firewall is merged into the list — an item needing a
+  decision shows inline Allow / Allow for… / Let it sleep, highlighted. Every row
+  now carries the **real app icon**, the plain reason, **who's behind it** ("via
+  coreaudiod" / the real app), and held-for / auto-release. Tap → a readable,
+  copyable detail (Why · Held by · Real app · Routed via · Where on disk · …).
+
 ## [1.5.0] — 2026-06-21
 
 A visual redesign in the **Harf design system**, a **new logo**, and the
