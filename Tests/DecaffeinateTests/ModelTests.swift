@@ -18,6 +18,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(s.idleThresholdMinutes, 10, accuracy: 0.001)
         XCTAssertFalse(s.autoSleepWhenAgentFinishes)
         XCTAssertFalse(s.hasSeenAwakeExplainer)
+        XCTAssertEqual(s.restartRecommendationDays, 7)
     }
 
     func testSettingsRoundTrip() throws {

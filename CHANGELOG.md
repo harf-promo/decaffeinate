@@ -4,6 +4,40 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] — 2026-06-22
+
+Rest properly: sleep daily, restart weekly. A new pillar that tracks how long your
+Mac has been up and recommends a restart before staleness — or the ~50-day
+networking cliff — bites.
+
+### Added
+- **A "Rest & Restart" pillar.** Sleep isn't the same as a restart: sleep *pauses*
+  your Mac (work held in RAM, ~0.21 W on Apple silicon); a restart *resets* it —
+  clearing memory leaks and caches, resetting the kernel, WindowServer and network
+  stack, and applying pending macOS updates. Decaffeinate now makes that difference
+  visible and acts on it.
+- **An uptime hero + restart recommendation.** A new Settings pane shows how long
+  you've been up since the last restart and, when it's been a while, a calm
+  recommendation — *"a restart would freshen things up"* — escalating to a real
+  heads-up as uptime nears the **~49.7-day mark where macOS networking can start
+  failing** (`tcp_now` overflow). Recommend-only: no buttons, no new permissions —
+  you restart from the  menu on your own terms.
+- **A "what each one does" explainer.** Four sourced cards spell out Display off vs
+  Sleep vs Restart vs Shut down, and what each actually refreshes.
+- **A rest timeline.** Forced sleeps, system sleep/wake, screen off/on and inferred
+  restarts are recorded (public `NSWorkspace` events + `KERN_BOOTTIME`, capped at
+  50, on-device only) so the pane can show *last sleep / last screen-rest / last
+  restart* at a glance.
+- **A header hint.** When a restart is due, the menu surfaces a one-line nudge below
+  the awake summary — neutral for "consider", firmer (and amber) only when urgent.
+- **A "Recommend a restart after N days" setting** (default 7 — the expert-consensus
+  weekly cadence), with a resilient migration so existing settings are never wiped.
+
+### Notes
+- Sources behind the copy: Apple Support, Macworld, Intego, Eclectic Light, Tom's
+  Hardware. Everything stays public-API-only and on-device — no root, no kernel
+  extensions, no new entitlement.
+
 ## [1.8.0] — 2026-06-22
 
 Clearer holds: stable order, audio source, lifetime, and an at-a-glance answer.

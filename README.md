@@ -55,6 +55,7 @@ Every match is something quietly voting to keep your Mac awake. Decaffeinate sho
 | Allow / block individual apps (a sleep firewall) |                  ❌                     |        ✅         |
 | **Sleep when your build / agent finishes** |                  ❌                     |        ✅         |
 | Battery-floor + overheating safety guards |                ➖                     |        ✅         |
+| **Track uptime & recommend a weekly restart** |              ❌                     |        ✅         |
 | Headless `--scan` from the terminal |                  ❌                     |        ✅         |
 
 Keeping a Mac awake is a one-liner. **Knowing when it's safe to sleep — and making it happen without losing your work — is the hard, useful part.** That's the part we built.
@@ -96,6 +97,21 @@ A live, honest list of every process holding your Mac awake — pulled straight 
 
 ### 💤 The Decaffeinate Engine *(the headline)*
 When you've been idle past your threshold (default 10 min) and nothing important is happening, Decaffeinate puts the Mac to sleep with `pmset sleepnow` — overriding stale "keep awake" assertions. Perfect for the *"my agent finished, let the laptop rest"* moment.
+
+### ↻ Rest & Restart — *sleep daily, restart weekly*
+Sleep isn't a substitute for a restart. **Sleep pauses** your Mac (your work held in
+RAM, ~0.21 W on Apple silicon); a **restart resets** it — clearing memory leaks and
+caches, resetting the kernel, WindowServer and network stack, and applying pending
+macOS updates. Decaffeinate tracks how long you've been up since the last restart
+and gives a calm recommendation when it's been a while — escalating to a real
+heads-up as uptime nears the **~49.7-day mark where macOS networking can start
+failing**. It also spells out the difference between *display off · sleep · restart ·
+shut down*, and keeps a small on-device timeline of your Mac's rest. **Recommend-only:
+no buttons, no new permissions** — you restart from the  menu on your own terms.
+
+<div align="center">
+<img src="assets/rest-restart.png" width="520" alt="Rest & Restart — up 9 days since last restart, a restart would freshen things up" />
+</div>
 
 ### 🧱 The Sleep Firewall
 New app trying to keep your Mac awake? Get a prompt: **Always Allow**, **Allow for 1 hour**, or **Block**. Build a whitelist of apps that are genuinely allowed to hold the line (Final Cut exports, big builds) and let everything else fall asleep.
@@ -214,7 +230,7 @@ Open areas where you can make a dent today:
 
 ## Roadmap
 
-**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the coffee "nightcap" mark · universal (Intel + Apple Silicon) build.
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · **the Rest & Restart pillar (uptime tracking + a weekly-restart recommendation)** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the coffee "nightcap" mark · universal (Intel + Apple Silicon) build.
 
 **Next:** localization · homebrew/cask-core submission · SMC temperature sensors. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

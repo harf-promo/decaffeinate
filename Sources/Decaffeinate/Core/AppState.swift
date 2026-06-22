@@ -35,6 +35,7 @@ final class AppState: ObservableObject {
     let settingsStore: SettingsStore
     let rulesEngine: RulesEngine
     let history: SleepHistoryStore
+    let restHistory: RestHistoryStore
     private let telemetry: any PowerAssertionScanning
     private let idleMonitor: any IdleReading
     private let powerReader: any PowerReading
@@ -46,6 +47,7 @@ final class AppState: ObservableObject {
     private let triggerSampler: any TriggerSampling
     private let provenanceResolver: any ProcessProvenanceResolving
     private let audioResolver: any AudioDeviceResolving
+    private let systemState: any SystemStateReading
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -89,7 +91,12 @@ final class AppState: ObservableObject {
     /// running, on AC, CPU busy), or `nil`.
     @Published private(set) var activeTriggerReason: String?
 
+    /// When the Mac last booted (read once at `start()`); `uptime` derives from it.
+    @Published private(set) var bootTime: Date?
+
     private var timer: Timer?
+    private var restObserverTokens: [NSObjectProtocol] = []
+    private static let lastBootKey = "DecaffeinateLastBootTime.v1"
     private var notifiedBlockers: Set<String> = []
 
     /// First time each live session key was observed — the anchor for a stable
@@ -116,6 +123,7 @@ final class AppState: ObservableObject {
         settingsStore: SettingsStore = SettingsStore(),
         rulesEngine: RulesEngine = RulesEngine(),
         history: SleepHistoryStore = SleepHistoryStore(),
+        restHistory: RestHistoryStore = RestHistoryStore(),
         telemetry: any PowerAssertionScanning = TelemetryEngine(),
         idleMonitor: any IdleReading = IdleMonitor(),
         powerReader: any PowerReading = PowerSourceReader(),
@@ -129,11 +137,13 @@ final class AppState: ObservableObject {
         triggerSampler: any TriggerSampling = LiveTriggerSampler(),
         provenanceResolver: any ProcessProvenanceResolving = ProcessProvenanceResolver(),
         audioResolver: any AudioDeviceResolving = AudioDeviceResolver(),
+        systemState: any SystemStateReading = SystemStateReader(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
         self.rulesEngine = rulesEngine
         self.history = history
+        self.restHistory = restHistory
         self.telemetry = telemetry
         self.idleMonitor = idleMonitor
         self.powerReader = powerReader
@@ -145,6 +155,7 @@ final class AppState: ObservableObject {
         self.triggerSampler = triggerSampler
         self.provenanceResolver = provenanceResolver
         self.audioResolver = audioResolver
+        self.systemState = systemState
         self.now = now
     }
 
@@ -224,6 +235,8 @@ final class AppState: ObservableObject {
         if settings.hasCompletedOnboarding {
             notifier.requestAuthorizationIfNeeded()
         }
+        readBootTimeAndInferRestart()
+        registerRestObservers()
         tick()
         let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
@@ -239,7 +252,55 @@ final class AppState: ObservableObject {
     func shutDown() {
         timer?.invalidate()
         timer = nil
+        let center = NSWorkspace.shared.notificationCenter
+        restObserverTokens.forEach(center.removeObserver)
+        restObserverTokens.removeAll()
         caffeine.releaseAll()
+    }
+
+    // MARK: Rest tracking
+
+    /// Read boot time once, and record a `.restart` if the Mac has booted since
+    /// the last time we ran (a boot-time jump can't tell restart from shutdown —
+    /// we label it "Restarted" honestly). Persists the boot time for next launch.
+    func readBootTimeAndInferRestart() {
+        let boot = systemState.bootTime()
+        bootTime = boot
+        guard let boot else { return }
+        let key = Self.lastBootKey
+        let previous = settingsStore.defaults.object(forKey: key) as? Date
+        if previous == nil || boot.timeIntervalSince(previous!) > 1 {
+            if previous != nil {
+                restHistory.record(
+                    RestEvent(date: now(), kind: .restart, uptimeSeconds: uptime))
+            }
+            restHistory.record(RestEvent(date: now(), kind: .launch, uptimeSeconds: uptime))
+        }
+        settingsStore.defaults.set(boot, forKey: key)
+    }
+
+    /// Observe the system's natural rest rhythm (public NSWorkspace events) and
+    /// log it. These are local AppKit callbacks, not user notifications.
+    private func registerRestObservers() {
+        guard restObserverTokens.isEmpty else { return }
+        let center = NSWorkspace.shared.notificationCenter
+        let pairs: [(Notification.Name, RestEvent.Kind)] = [
+            (NSWorkspace.willSleepNotification, .systemSleep),
+            (NSWorkspace.didWakeNotification, .wake),
+            (NSWorkspace.screensDidSleepNotification, .displayOff),
+            (NSWorkspace.screensDidWakeNotification, .displayOn),
+        ]
+        for (name, kind) in pairs {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) {
+                [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.restHistory.record(
+                        RestEvent(date: self.now(), kind: kind, onBattery: self.power.onBattery))
+                }
+            }
+            restObserverTokens.append(token)
+        }
     }
 
     // MARK: User actions
@@ -425,6 +486,27 @@ final class AppState: ObservableObject {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+
+    // MARK: Rest & restart (uptime + recommendation)
+
+    /// Seconds since the Mac last booted, or nil if boot time couldn't be read.
+    var uptime: TimeInterval? { bootTime.map { now().timeIntervalSince($0) } }
+
+    /// "9 days" / "3 hours" — the headline uptime label.
+    var uptimeLabel: String? { uptime.map(RestartAdvisor.uptimeLabel) }
+
+    /// How fresh the system is, by uptime vs the user's recommendation window.
+    var restartAdvice: RestartAdvice {
+        guard let uptime else { return .fresh }
+        return RestartAdvisor.advice(
+            uptime: uptime, recommendAfterDays: settings.restartRecommendationDays)
+    }
+
+    /// The calm header line — only when a restart is at least worth considering.
+    var restartHint: String? {
+        guard let label = uptimeLabel, restartAdvice != .fresh else { return nil }
+        return RestartAdvisor.message(restartAdvice, uptimeLabel: label)
     }
 
     /// A one-glance "what will end this?" line for the header — the single most
@@ -680,6 +762,8 @@ final class AppState: ObservableObject {
             suppressForceSleepUntil = now().addingTimeInterval(60)
             if immediate { suppressImmediateUntil = now().addingTimeInterval(15) }
             history.record(SleepEvent(date: now(), reason: reason, onBattery: power.onBattery))
+            restHistory.record(
+                RestEvent(date: now(), kind: .forcedSleep, onBattery: power.onBattery))
             return true
         case .failure(let error):
             lastError = error.description

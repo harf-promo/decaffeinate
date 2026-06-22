@@ -94,6 +94,8 @@ final class AppStateTests: XCTestCase {
         let triggers: FakeTriggerSampler
         let provenance: FakeProvenanceResolver
         let audio: FakeAudioDeviceResolver
+        let system: FakeSystemStateReader
+        let restHistory: RestHistoryStore
         let cleanup: () -> Void
     }
 
@@ -101,6 +103,7 @@ final class AppStateTests: XCTestCase {
         watcher: AgentWatcher = AgentWatcher(),
         provenance: FakeProvenanceResolver = FakeProvenanceResolver(),
         audio: FakeAudioDeviceResolver = FakeAudioDeviceResolver(),
+        system: FakeSystemStateReader = FakeSystemStateReader(),
         _ configure: (inout DecaffeinateSettings) -> Void = { _ in }
     ) -> Harness {
         let suite = "decaf.appstate.\(UUID().uuidString)"
@@ -108,6 +111,7 @@ final class AppStateTests: XCTestCase {
         let settings = SettingsStore(defaults: defaults)
         configure(&settings.settings)
         let rules = RulesEngine(defaults: defaults)
+        let restHistory = RestHistoryStore(defaults: defaults)
         let scanner = FakeScanner()
         let idle = FakeIdle()
         let power = FakePower()
@@ -121,6 +125,7 @@ final class AppStateTests: XCTestCase {
             settingsStore: settings,
             rulesEngine: rules,
             history: SleepHistoryStore(defaults: defaults),
+            restHistory: restHistory,
             telemetry: scanner,
             idleMonitor: idle,
             powerReader: power,
@@ -132,6 +137,7 @@ final class AppStateTests: XCTestCase {
             triggerSampler: triggers,
             provenanceResolver: provenance,
             audioResolver: audio,
+            systemState: system,
             now: { clock.date }
         )
         return Harness(
@@ -139,6 +145,7 @@ final class AppStateTests: XCTestCase {
             sleeper: sleeper, caffeine: caffeine, notifier: notifier,
             settings: settings, rules: rules, clock: clock, thermal: thermal,
             triggers: triggers, provenance: provenance, audio: audio,
+            system: system, restHistory: restHistory,
             cleanup: { defaults.removePersistentDomain(forName: suite) })
     }
 
@@ -968,5 +975,58 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(
             h.state.awakeSummary,
             "Won't sleep while \(h.state.rowTitle(for: h.scanner.assertions[0])) is working")
+    }
+
+    // MARK: Rest & restart (v1.9.0)
+
+    func testUptimeAndAdviceFromFakeBootTime() {
+        let h = makeHarness(system: FakeSystemStateReader()); defer { h.cleanup() }
+        h.system.boot = h.clock.date.addingTimeInterval(-9 * 86_400)  // up 9 days
+        h.state.readBootTimeAndInferRestart()
+        XCTAssertEqual(h.state.uptime ?? 0, 9 * 86_400, accuracy: 1)
+        XCTAssertEqual(h.state.restartAdvice, .consider)
+        XCTAssertEqual(h.state.restartHint, "Up 9 days — a restart would freshen things up.")
+    }
+
+    func testFreshUptimeProducesNoHeaderHint() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.system.boot = h.clock.date.addingTimeInterval(-1 * 86_400)  // up 1 day
+        h.state.readBootTimeAndInferRestart()
+        XCTAssertEqual(h.state.restartAdvice, .fresh)
+        XCTAssertNil(h.state.restartHint)
+    }
+
+    func testUrgentUptimeViaClockSeam() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.system.boot = h.clock.date.addingTimeInterval(-47 * 86_400)  // near the ~49-day cliff
+        h.state.readBootTimeAndInferRestart()
+        XCTAssertEqual(h.state.restartAdvice, .urgent)
+    }
+
+    func testForcedSleepAlsoRecordsRestEvent() {
+        let h = makeHarness { $0.idleThresholdMinutes = 10 }; defer { h.cleanup() }
+        h.idle.seconds = 700  // well past threshold → force sleep
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1)
+        XCTAssertEqual(h.restHistory.events.first?.kind, .forcedSleep)
+    }
+
+    func testRestartInferredOnBootTimeAdvance() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // A previous, earlier boot is on record → a later boot means it restarted.
+        h.settings.defaults.set(
+            h.clock.date.addingTimeInterval(-20 * 86_400), forKey: "DecaffeinateLastBootTime.v1")
+        h.system.boot = h.clock.date.addingTimeInterval(-1 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        XCTAssertTrue(h.restHistory.events.contains { $0.kind == .restart })
+    }
+
+    func testNoRestartWhenBootTimeUnchanged() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let boot = h.clock.date.addingTimeInterval(-5 * 86_400)
+        h.settings.defaults.set(boot, forKey: "DecaffeinateLastBootTime.v1")
+        h.system.boot = boot
+        h.state.readBootTimeAndInferRestart()
+        XCTAssertFalse(h.restHistory.events.contains { $0.kind == .restart })
     }
 }

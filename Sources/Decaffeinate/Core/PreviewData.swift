@@ -90,6 +90,12 @@ struct PreviewPower: PowerReading {
     }
 }
 
+@MainActor
+struct PreviewSystemState: SystemStateReading {
+    /// Booted ~9 days ago so the "a restart would freshen things up" hint shows.
+    func bootTime() -> Date? { Date().addingTimeInterval(-9 * 86_400) }
+}
+
 extension AppState {
     /// An `AppState` wired to deterministic sample data, for screenshot rendering.
     /// Uses a throwaway `UserDefaults` suite so it never touches real prefs.
@@ -100,16 +106,24 @@ extension AppState {
         // Keep the one-time explainer collapsed so the README menu shot is clean.
         settings.settings.hasSeenAwakeExplainer = true
         let rules = RulesEngine(defaults: defaults)
+        let restHistory = RestHistoryStore(defaults: defaults)
+        let now = Date()
+        restHistory.record(RestEvent(date: now.addingTimeInterval(-9 * 86_400), kind: .restart))
+        restHistory.record(RestEvent(date: now.addingTimeInterval(-3 * 3_600), kind: .systemSleep))
+        restHistory.record(RestEvent(date: now.addingTimeInterval(-1_800), kind: .displayOff))
         let state = AppState(
             settingsStore: settings,
             rulesEngine: rules,
+            restHistory: restHistory,
             telemetry: PreviewSampler(),
             idleMonitor: PreviewIdle(),
             powerReader: PreviewPower(),
             thermalProvider: { .nominal },
             provenanceResolver: PreviewProvenance(),
-            audioResolver: PreviewAudio()
+            audioResolver: PreviewAudio(),
+            systemState: PreviewSystemState()
         )
+        state.readBootTimeAndInferRestart()  // sets bootTime without start()'s timer/observers
         state.tick()
         return state
     }

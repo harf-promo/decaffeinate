@@ -88,6 +88,13 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// a forced sleep is approaching. Off by default to keep the menu bar quiet.
     var showMenuBarCountdown: Bool = false
 
+    // MARK: Rest & restart
+
+    /// Recommend a restart once the Mac has been up this many days. Consensus
+    /// cadence is ~weekly; low-RAM Macs may prefer shorter. A hard warning still
+    /// fires approaching macOS's ~49-day uptime cliff regardless of this value.
+    var restartRecommendationDays: Int = 7
+
     // MARK: Firewall / notifications
 
     /// Post a notification when a *new* unclassified app starts holding the Mac
@@ -177,6 +184,9 @@ extension DecaffeinateSettings {
         if let v = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarCountdown) {
             showMenuBarCountdown = v
         }
+        if let v = try c.decodeIfPresent(Int.self, forKey: .restartRecommendationDays) {
+            restartRecommendationDays = v
+        }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .notifyOnNewBlocker) {
             notifyOnNewBlocker = v
         }
@@ -203,7 +213,7 @@ final class SettingsStore: ObservableObject {
         didSet { persist() }
     }
 
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults

@@ -93,6 +93,17 @@ private struct RDHeader: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, Space.s2)
             }
+
+            // A calm uptime/restart nudge when the Mac has been up a while.
+            if let hint = appState.restartHint {
+                HStack(spacing: Space.s1) {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 10))
+                    Text(hint).fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(appState.restartAdvice == .urgent ? Color.warning : theme.ink3)
+                .padding(.top, Space.s2)
+            }
         }
         .padding(.horizontal, theme.contentInset)
         .padding(.top, Space.s4)

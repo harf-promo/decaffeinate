@@ -90,6 +90,14 @@ final class FakeProvenanceResolver: ProcessProvenanceResolving {
     }
 }
 
+/// A canned boot-time reader for tests.
+@MainActor
+final class FakeSystemStateReader: SystemStateReading {
+    var boot: Date?
+    init(boot: Date? = nil) { self.boot = boot }
+    func bootTime() -> Date? { boot }
+}
+
 /// A canned audio-device resolver for tests (no CoreAudio).
 @MainActor
 final class FakeAudioDeviceResolver: AudioDeviceResolving {

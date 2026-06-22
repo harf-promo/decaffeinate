@@ -53,6 +53,12 @@ protocol ProcessSampling {
 }
 
 @MainActor
+protocol SystemStateReading {
+    /// The kernel boot time, or nil if it can't be read. Uptime = now − bootTime.
+    func bootTime() -> Date?
+}
+
+@MainActor
 protocol ProcessProvenanceResolving {
     /// Resolve where a holder pid came from (terminal / agent / project). Lazy &
     /// cached; safe on row-expand / first-seen. Nil when the process is gone or

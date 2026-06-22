@@ -6,7 +6,12 @@ import SwiftUI
 /// brand green so Settings and the menu read as one product.
 struct SettingsView: View {
     @Environment(\.theme) private var theme
-    @State private var pane: SettingsPane = .general
+    @State private var pane: SettingsPane
+
+    /// Defaults to General; the screenshot renderer opens a specific pane.
+    init(initialPane: SettingsPane = .general) {
+        _pane = State(initialValue: initialPane)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -23,7 +28,7 @@ struct SettingsView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 1) {
             sidebarLabel("Settings")
-            ForEach([SettingsPane.general, .schedule, .automation]) { sidebarRow($0) }
+            ForEach([SettingsPane.general, .schedule, .automation, .freshness]) { sidebarRow($0) }
             sidebarLabel("Info").padding(.top, Space.s3)
             ForEach([SettingsPane.history, .about]) { sidebarRow($0) }
             Spacer(minLength: 0)
@@ -69,14 +74,15 @@ struct SettingsView: View {
         case .general: GeneralSettings()
         case .schedule: ScheduleSettings()
         case .automation: AutomationSettings()
+        case .freshness: FreshnessSettings()
         case .history: HistorySettings()
         case .about: AboutView()
         }
     }
 }
 
-private enum SettingsPane: String, CaseIterable, Identifiable {
-    case general, schedule, automation, history, about
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case general, schedule, automation, freshness, history, about
     var id: String { rawValue }
 
     var title: String {
@@ -84,6 +90,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: return "General"
         case .schedule: return "Schedule"
         case .automation: return "Automation"
+        case .freshness: return "Rest & Restart"
         case .history: return "History"
         case .about: return "About"
         }
@@ -93,6 +100,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: return "zzz"
         case .schedule: return "calendar"
         case .automation: return "bolt.horizontal.circle"
+        case .freshness: return "arrow.clockwise.circle"
         case .history: return "clock.arrow.circlepath"
         case .about: return "info.circle"
         }
@@ -394,6 +402,127 @@ private struct AutomationSettings: View {
     }
     private func remove(_ rule: TriggerRule) {
         store.settings.triggers.removeAll { $0.id == rule.id }
+    }
+}
+
+// ── Rest & Restart: uptime, the restart recommendation, and the difference
+//    between display-off / sleep / shutdown / restart. ──
+private struct FreshnessSettings: View {
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var store: SettingsStore
+    @EnvironmentObject var restHistory: RestHistoryStore
+
+    private var adviceColor: Color {
+        switch appState.restartAdvice {
+        case .fresh: return .positive
+        case .consider, .overdue: return .warning
+        case .urgent: return .critical
+        }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    Text("Up \(appState.uptimeLabel ?? "—") since last restart")
+                        .font(HarfFont.title).foregroundStyle(Color.ink1)
+                    Label {
+                        Text(
+                            RestartAdvisor.message(
+                                appState.restartAdvice, uptimeLabel: appState.uptimeLabel ?? "—"))
+                    } icon: {
+                        Image(systemName: appState.restartAdvice.symbol)
+                    }
+                    .font(HarfFont.body).foregroundStyle(adviceColor)
+                    Text(RestartAdvisor.reason(appState.restartAdvice)).settingsCaption()
+                }
+                .padding(.vertical, Space.s1)
+            }
+
+            Section("Last rest") {
+                restRow("Last sleep", restHistory.lastSystemSleep?.date)
+                restRow("Last screen rest", restHistory.lastDisplayOff?.date)
+                restRow("Last restart", restHistory.lastRestart?.date)
+            }
+
+            Section("Recommendation") {
+                LabeledSlider(
+                    "Recommend a restart after",
+                    value: Binding(
+                        get: { Double(store.settings.restartRecommendationDays) },
+                        set: { store.settings.restartRecommendationDays = Int($0) }),
+                    range: 1...30, unit: "days", width: 56)
+                Text(
+                    "Most experts suggest restarting about weekly. A hard reminder still appears near macOS's ~49-day uptime limit, where networking can fail."
+                )
+                .settingsCaption()
+            }
+
+            Section("What each one does") {
+                stateCard(
+                    "Display off",
+                    "Only the screen sleeps — everything keeps running. Refreshes nothing.")
+                stateCard(
+                    "Sleep",
+                    "Pauses the Mac with your work held in RAM (~0.21 W on Apple silicon). Instant wake — but it doesn't clear memory leaks, caches, or stuck state."
+                )
+                stateCard(
+                    "Restart",
+                    "Resets the Mac: clears RAM and caches, resets the kernel, WindowServer and network, and applies pending updates. Sleep can't do this — aim for about weekly."
+                )
+                stateCard(
+                    "Shut down",
+                    "Clears everything and powers off — best for long storage or travel. For daily use, sleep + a weekly restart keeps a Mac fresh."
+                )
+                Text(
+                    "A healthy Mac rests: sleep it daily, restart it about weekly. Sources: Apple Support, Macworld, Intego, Eclectic Light, Tom's Hardware."
+                )
+                .settingsCaption()
+            }
+
+            if !restHistory.events.isEmpty {
+                Section("Recent activity") {
+                    ForEach(restHistory.events.prefix(12)) { event in
+                        HStack(spacing: Space.s2) {
+                            Image(systemName: event.kind.symbol)
+                                .foregroundStyle(Color.ink3).frame(width: 18)
+                            Text(event.kind.label).foregroundStyle(Color.ink1)
+                            Spacer()
+                            Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption).foregroundStyle(Color.ink3)
+                        }
+                    }
+                    Button("Clear activity", role: .destructive) { restHistory.clear() }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+
+    private func restRow(_ label: String, _ date: Date?) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(
+                date.map { Self.relativeFormatter.localizedString(for: $0, relativeTo: Date()) }
+                    ?? "—"
+            )
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func stateCard(_ title: String, _ body: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(HarfFont.bodyMedium).foregroundStyle(Color.ink1)
+            Text(body).settingsCaption()
+        }
+        .padding(.vertical, 2)
     }
 }
 

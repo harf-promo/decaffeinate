@@ -60,11 +60,26 @@ enum ScreenshotRenderer {
                 .environmentObject(state.settingsStore)
                 .environmentObject(state.rulesEngine)
                 .environmentObject(state.history)
+                .environmentObject(state.restHistory)
                 .environmentObject(updater)
             ok =
                 capture(
                     settings, size: NSSize(width: 660, height: 480), appearance: appearance,
                     to: dir.appendingPathComponent("settings-\(suffix).png")) && ok
+
+            // The new Rest & Restart pillar pane, opened directly.
+            let freshness = SettingsView(initialPane: .freshness)
+                .environment(\.theme, theme)
+                .environmentObject(state)
+                .environmentObject(state.settingsStore)
+                .environmentObject(state.rulesEngine)
+                .environmentObject(state.history)
+                .environmentObject(state.restHistory)
+                .environmentObject(updater)
+            ok =
+                capture(
+                    freshness, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    to: dir.appendingPathComponent("rest-restart-\(suffix).png")) && ok
         }
         renderMugStrip(to: dir.appendingPathComponent("mug-states.png"))
         renderMenubarStrip(to: dir.appendingPathComponent("menubar-icons.png"))
