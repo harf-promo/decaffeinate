@@ -54,8 +54,12 @@ final class Notifier {
     // MARK: Private
 
     private func post(title: String, body: String) {
-        guard isBundled else { return }
-        requestAuthorizationIfNeeded()
+        // Only post once the user has explicitly granted notification permission.
+        // `requestAuthorizationIfNeeded()` is called by the onboarding flow so the
+        // OS prompt arrives with context rather than cold at app launch. Never
+        // auto-request here — that would bypass the onboarding deferral, surfacing
+        // the system sheet on first run before the user understands what it's for.
+        guard isBundled, authorized else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

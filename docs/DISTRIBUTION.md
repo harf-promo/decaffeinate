@@ -75,8 +75,21 @@ brew trust harf-promo/tap        # Homebrew 5+ requires trusting third-party tap
 brew install --cask decaffeinate
 ```
 
-**Per release:** bump `version` + `sha256` in the tap's cask together — the sha is
-printed by `make-dmg.sh` and published as `SHA256SUMS.txt` on the GitHub release.
+**Per-release tap mirror (REQUIRED — do not skip):**
+1. Bump `version` + `sha256` in **this repo's** `Casks/decaffeinate.rb` (done by CI
+   workflow after the sha is known).
+2. **Also mirror those same two values** into the separate
+   `harf-promo/homebrew-tap` repo's `Casks/decaffeinate.rb` — Homebrew reads
+   the _tap_, not this repo. Without this step, `brew upgrade --cask decaffeinate`
+   never sees the new release. Use the GitHub UI or API to edit the file directly.
+   The `url` line interpolates `#{version}` so it re-resolves automatically — only
+   `version` and `sha256` need changing.
+
+> **Note:** `SUFeedURL` uses `/releases/latest/download/` which resolves to the
+> latest **non-prerelease, non-draft** GitHub release. Never mark a production
+> release tag as prerelease or draft — if you do, `latest` will point at the
+> previous release and in-app updates will stop working until you un-mark it.
+
 Submitting to **homebrew/cask core** later removes the `brew trust` step (and
 requires the pinned `sha256` + notarized artifact we already produce).
 

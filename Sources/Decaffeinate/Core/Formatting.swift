@@ -17,14 +17,16 @@ enum Format {
         return String(format: "%d:%02d", minutes, secs)
     }
 
-    /// Compact "how long ago", e.g. `just now`, `3m ago`, `2h ago`.
+    /// Compact "how long ago", e.g. `just now`, `3m ago`, `2h ago`, `5d ago`.
     static func relative(since date: Date, now: Date = Date()) -> String {
         let elapsed = max(0, now.timeIntervalSince(date))
         switch elapsed {
         case ..<10: return "just now"
         case ..<60: return "\(Int(elapsed))s ago"
         case ..<3600: return "\(Int(elapsed / 60))m ago"
-        default: return "\(Int(elapsed / 3600))h ago"
+        case ..<86_400: return "\(Int(elapsed / 3600))h ago"
+        case ..<604_800: return "\(Int(elapsed / 86_400))d ago"
+        default: return "\(Int(elapsed / 604_800))wk ago"
         }
     }
 

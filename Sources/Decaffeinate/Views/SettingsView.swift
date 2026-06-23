@@ -179,7 +179,9 @@ private struct GeneralSettings: View {
 
             Section("Notifications & startup") {
                 Toggle("Notify me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
-                Toggle("Notify me when I force the Mac to sleep", isOn: s.notifyOnForcedSleep)
+                Toggle(
+                    "Notify me when Decaffeinate puts the Mac to sleep",
+                    isOn: s.notifyOnForcedSleep)
                 Toggle(
                     "Notify me when a watched agent or build finishes",
                     isOn: s.notifyOnAgentFinished)
@@ -330,14 +332,23 @@ private struct AutomationSettings: View {
                         .disabled(newAppName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 Button("While on AC power") { add(.onACPower) }
-                HStack {
-                    LabeledSlider(
-                        "Keep awake when CPU above",
-                        value: $cpuThreshold,
-                        range: 10...90, step: 5, unit: "%", width: 44)
-                    Button("Add") { add(.cpuAbove(Int(cpuThreshold))) }
-                        .buttonStyle(HarfButtonStyle(variant: .ghost, size: .small))
-                        .fixedSize()
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    HStack {
+                        LabeledSlider(
+                            "Keep awake when CPU above",
+                            value: $cpuThreshold,
+                            range: 10...90, step: 5, unit: "%", width: 44)
+                        Button("Add") { add(.cpuAbove(Int(cpuThreshold))) }
+                            .buttonStyle(HarfButtonStyle(variant: .ghost, size: .small))
+                            .fixedSize()
+                            .disabled(hasCpuAboveTrigger)
+                    }
+                    Text(
+                        hasCpuAboveTrigger
+                            ? "A CPU trigger is already active — remove it first to change the threshold."
+                            : "Holds the Mac awake while any process pushes total CPU above this threshold. The battery floor and backpack guard still override it."
+                    )
+                    .settingsCaption()
                 }
             }
 
@@ -400,6 +411,13 @@ private struct AutomationSettings: View {
                     store.settings.triggers[i].enabled = newValue
                 }
             })
+    }
+
+    private var hasCpuAboveTrigger: Bool {
+        store.settings.triggers.contains {
+            if case .cpuAbove = $0.condition { return true }
+            return false
+        }
     }
 
     private func isActive(_ rule: TriggerRule) -> Bool {
@@ -570,6 +588,12 @@ private struct HistorySettings: View {
                         "≈ \(history.measuredMinutesAsleep) min of measured sleep started by Decaffeinate."
                     )
                     .font(.caption).foregroundStyle(Color.ink3)
+                    if history.unmeasuredSleepCount > 0 {
+                        Text(
+                            "\(history.unmeasuredSleepCount) sleep\(history.unmeasuredSleepCount == 1 ? "" : "s") not yet measured."
+                        )
+                        .font(.caption).foregroundStyle(Color.ink3)
+                    }
                 }
                 .padding(Space.s4)
                 Hairline()
@@ -643,8 +667,13 @@ private struct AboutView: View {
         switch updater.state {
         case .idle:
             VStack(spacing: Space.s1) {
-                Text("Last checked: \(lastChecked)")
-                    .font(HarfFont.caption).foregroundStyle(Color.ink3)
+                if updater.lastCheckedAt == nil {
+                    Text("Not checked yet")
+                        .font(HarfFont.caption).foregroundStyle(Color.ink3)
+                } else {
+                    Text("Last checked: \(lastChecked)")
+                        .font(HarfFont.caption).foregroundStyle(Color.ink3)
+                }
                 Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
                     .padding(.top, 2)
             }
@@ -674,6 +703,10 @@ private struct AboutView: View {
             VStack(spacing: Space.s1) {
                 HarfPill(label: "Couldn't check", variant: .critical, dot: true)
                     .help(reason)
+                    .accessibilityLabel("Update check failed: \(reason)")
+                Text(reason)
+                    .font(HarfFont.caption).foregroundStyle(Color.ink3)
+                    .fixedSize(horizontal: false, vertical: true)
                 Button("Try Again") { updater.checkForUpdatesUserInitiated() }
                     .padding(.top, 2)
             }

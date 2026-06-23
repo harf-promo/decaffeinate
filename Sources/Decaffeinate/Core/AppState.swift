@@ -97,6 +97,9 @@ final class AppState: ObservableObject {
     private var timer: Timer?
     private var restObserverTokens: [NSObjectProtocol] = []
     private static let lastBootKey = "DecaffeinateLastBootTime.v1"
+    /// Persisted restart-advice state — keyed by boot time so it auto-resets after
+    /// a real restart. Stores { "bootSecs": Double, "advice": String }.
+    private static let lastNotifiedAdviceKey = "Decaffeinate.lastNotifiedAdvice.v1"
     private var notifiedBlockers: Set<String> = []
 
     /// First time each live session key was observed — the anchor for a stable
@@ -252,11 +255,11 @@ final class AppState: ObservableObject {
             notifier.requestAuthorizationIfNeeded()
         }
         readBootTimeAndInferRestart()
-        // Seed the restart-notification guard with the current advice so we
-        // never fire a notification at launch just because the Mac is already
-        // overdue when Decaffeinate opens. The guard re-arms after a restart
-        // (advice drops back to .fresh, then a future crossing re-fires once).
-        lastNotifiedRestartAdvice = restartAdvice
+        // Restore the last-notified restart advice for this boot session so we
+        // never nag again in a band we already fired in — even across relaunches.
+        // Falls back to the current advice when no persisted state exists for this
+        // boot (first run, or a different boot), which prevents a launch-time nag.
+        lastNotifiedRestartAdvice = loadPersistedRestartNotificationState() ?? restartAdvice
         registerRestObservers()
         tick()
         let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -776,21 +779,45 @@ final class AppState: ObservableObject {
 
     // MARK: Restart-overdue notification
 
-    /// Fire a one-shot notification the first time uptime crosses into the
-    /// overdue/urgent band, then stay silent until a restart resets the advice
-    /// back to `.fresh` and the crossing happens again.
+    /// Fire a notification on the first crossing into `.overdue`, and again when
+    /// escalating to `.urgent` (the networking-cliff threshold). Silent on every
+    /// other tick. Persisted per boot session so relaunches don't re-nag.
     private func evaluateRestartOverdueNotification() {
         guard settings.notifyOnRestartOverdue, let label = uptimeLabel else { return }
         let advice = restartAdvice
-        let wasOverdue =
-            lastNotifiedRestartAdvice.map {
-                $0 == .overdue || $0 == .urgent
-            } ?? false
-        let isOverdue = advice == .overdue || advice == .urgent
-        if isOverdue, !wasOverdue {
+        let prevIsOverdueOrHigher =
+            lastNotifiedRestartAdvice.map { $0 == .overdue || $0 == .urgent } ?? false
+        let isOverdueOrHigher = advice == .overdue || advice == .urgent
+        // Re-fire when escalating from .overdue → .urgent — that's the serious
+        // networking-cliff threshold and deserves its own nudge.
+        let isEscalatingToUrgent = lastNotifiedRestartAdvice == .overdue && advice == .urgent
+        if isOverdueOrHigher, !prevIsOverdueOrHigher || isEscalatingToUrgent {
             notifier.notifyRestartOverdue(uptimeLabel: label)
         }
-        lastNotifiedRestartAdvice = advice
+        updateLastNotifiedRestartAdvice(advice)
+    }
+
+    // MARK: Restart-advice persistence (survives relaunches, resets on real restart)
+
+    private func loadPersistedRestartNotificationState() -> RestartAdvice? {
+        guard
+            let dict = UserDefaults.standard.dictionary(forKey: Self.lastNotifiedAdviceKey),
+            let storedBootSecs = dict["bootSecs"] as? Double,
+            let rawAdvice = dict["advice"] as? String,
+            let storedAdvice = RestartAdvice(rawValue: rawAdvice),
+            let currentBoot = bootTime,
+            abs(currentBoot.timeIntervalSince1970 - storedBootSecs) < 60
+        else { return nil }
+        return storedAdvice
+    }
+
+    private func updateLastNotifiedRestartAdvice(_ newAdvice: RestartAdvice) {
+        guard newAdvice != lastNotifiedRestartAdvice else { return }
+        lastNotifiedRestartAdvice = newAdvice
+        guard let currentBoot = bootTime else { return }
+        UserDefaults.standard.set(
+            ["bootSecs": currentBoot.timeIntervalSince1970, "advice": newAdvice.rawValue],
+            forKey: Self.lastNotifiedAdviceKey)
     }
 
     // MARK: Force sleep

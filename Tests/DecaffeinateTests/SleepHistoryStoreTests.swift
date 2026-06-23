@@ -54,13 +54,26 @@ final class SleepHistoryStoreTests: XCTestCase {
         XCTAssertEqual(b.events.first?.reason, "persisted")
     }
 
-    func testMeasuredMinutesAsleep_fallsBackTo15PerUnmeasuredEvent() {
+    func testMeasuredMinutesAsleep_zeroWhenNoWakesObserved() {
         let (store, cleanup) = makeStore()
         defer { cleanup() }
-        // Two events with no measured sleptSeconds → 2 × 15 = 30 min fallback.
+        // Two events with no observed wakes → measured minutes = 0 (no fabricated estimate).
         store.record(SleepEvent(date: Date(), reason: "x", onBattery: false))
         store.record(SleepEvent(date: Date(), reason: "y", onBattery: false))
-        XCTAssertEqual(store.measuredMinutesAsleep, 30)
+        XCTAssertEqual(store.measuredMinutesAsleep, 0)
+    }
+
+    func testUnmeasuredSleepCount() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        let t0 = Date(timeIntervalSince1970: 1_000_000)
+        store.record(SleepEvent(date: t0, reason: "a", onBattery: false))
+        store.record(SleepEvent(date: t0.addingTimeInterval(-1), reason: "b", onBattery: false))
+        XCTAssertEqual(store.unmeasuredSleepCount, 2, "both events start unmeasured")
+        // Pair the newer event with a wake; only one should remain unmeasured.
+        store.recordWakeDuration(at: t0.addingTimeInterval(600))
+        XCTAssertEqual(store.unmeasuredSleepCount, 1)
+        XCTAssertEqual(store.measuredMinutesAsleep, 10)
     }
 
     // MARK: Old-schema array persistence
@@ -103,14 +116,25 @@ final class SleepHistoryStoreTests: XCTestCase {
         XCTAssertNil(store.events[0].sleptSeconds, "event after wake date must not be paired")
     }
 
-    func testRecordWakeDurationRespects24HourClamp() {
+    func testRecordWakeDurationRespects4HourClamp() {
         let (store, cleanup) = makeStore()
         defer { cleanup() }
         let t0 = Date(timeIntervalSince1970: 1_000_000)
         store.record(SleepEvent(date: t0, reason: "idle", onBattery: false))
-        store.recordWakeDuration(at: t0.addingTimeInterval(25 * 3600))  // 25 h — implausible
+        store.recordWakeDuration(at: t0.addingTimeInterval(5 * 3600))  // 5 h — beyond 4 h clamp
         XCTAssertNil(
-            store.events[0].sleptSeconds, "gaps > 24 h exceed the clamp and must be ignored")
+            store.events[0].sleptSeconds,
+            "gaps > 4 h exceed the default clamp and must not be paired")
+    }
+
+    func testRecordWakeDurationPairsWithin4HourClamp() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        let t0 = Date(timeIntervalSince1970: 1_000_000)
+        store.record(SleepEvent(date: t0, reason: "idle", onBattery: false))
+        store.recordWakeDuration(at: t0.addingTimeInterval(3 * 3600))  // 3 h — within 4 h clamp
+        XCTAssertNotNil(store.events[0].sleptSeconds, "3 h gap is within the clamp and must pair")
+        XCTAssertEqual(store.events[0].sleptSeconds ?? 0, 3 * 3600, accuracy: 1)
     }
 
     func testRecordWakeDurationPairsOnlyMostRecentUnmatched() {
@@ -137,7 +161,7 @@ final class SleepHistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.measuredMinutesAsleep, 30)
     }
 
-    func testMeasuredMinutesAsleep_mixedMeasuredAndFallback() {
+    func testMeasuredMinutesAsleep_measuredOnlyIgnoresUnobservedEvent() {
         let (store, cleanup) = makeStore()
         defer { cleanup() }
         let t0 = Date(timeIntervalSince1970: 1_000_000)
@@ -145,8 +169,9 @@ final class SleepHistoryStoreTests: XCTestCase {
         store.record(SleepEvent(date: t0.addingTimeInterval(-1), reason: "older", onBattery: false))
         store.record(SleepEvent(date: t0, reason: "newer", onBattery: false))
         store.recordWakeDuration(at: t0.addingTimeInterval(1800))  // newer: 30 min measured
-        // older: nil → 15 min fallback; total = 30 + 15 = 45.
-        XCTAssertEqual(store.measuredMinutesAsleep, 45)
+        // older: nil → excluded from measured total; count = 30 min (no fabricated estimate).
+        XCTAssertEqual(store.measuredMinutesAsleep, 30)
+        XCTAssertEqual(store.unmeasuredSleepCount, 1)
     }
 
     func testCorruptDataDecodesToEmpty() {

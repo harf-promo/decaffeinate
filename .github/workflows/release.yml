@@ -133,6 +133,7 @@ jobs:
           fi
           KEYFILE="$(mktemp)"; printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEYFILE"
           BIN=".build/artifacts/sparkle/Sparkle/bin/generate_appcast"
+          [ -x "$BIN" ] || { echo "::error::generate_appcast not found at $BIN — Sparkle layout may have changed"; exit 1; }
           STAGE="$(mktemp -d)"; cp build/Decaffeinate-*.dmg "$STAGE/"
           "$BIN" --ed-key-file "$KEYFILE" \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/" \
@@ -157,5 +158,9 @@ jobs:
                  --title "${GITHUB_REF_NAME}" --generate-notes
           gh release upload "${GITHUB_REF_NAME}" \
             build/Decaffeinate-*.dmg build/SHA256SUMS.txt --clobber
-          [ -f build/appcast.xml ] && gh release upload "${GITHUB_REF_NAME}" \
-            build/appcast.xml --clobber || true
+          # Upload the appcast only when it was generated; but if it exists, a
+          # real upload failure must surface as an error (never || true here —
+          # a silently missing appcast breaks every in-app updater).
+          if [ -f build/appcast.xml ]; then
+            gh release upload "${GITHUB_REF_NAME}" build/appcast.xml --clobber
+          fi

@@ -94,9 +94,16 @@ final class UpdaterController: NSObject, ObservableObject, SPUUpdaterDelegate {
     ) {
         // Record when the last check completed. The find/not-found callbacks have
         // already set the terminal state; only override it here on error.
+        // Also resolve a stuck `.checking` state: if a cycle ends with neither a
+        // find/not-found callback AND no error (throttled, aborted, or dismissed),
+        // Sparkle has finished — treat it as "up to date" so the UI never hangs.
         MainActor.assumeIsolated {
             stampChecked()
-            if let error { state = .failed(reason: error.localizedDescription) }
+            if let error {
+                state = .failed(reason: error.localizedDescription)
+            } else if state == .checking {
+                state = .upToDate
+            }
         }
     }
 }

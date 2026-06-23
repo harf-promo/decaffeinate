@@ -4,6 +4,76 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] — 2026-06-23
+
+Council-verified hardening: honesty, correctness, accessibility, and pipeline
+reliability — all grounded in code-level evidence, none speculative.
+
+### Fixed
+- **Measured sleep metric is now truly measured.** The history headline "≈ X min
+  of measured sleep" previously included a hard-coded 15-min estimate per sleep
+  whose wake was never observed — quietly violating the app's honesty promise.
+  The headline now shows only genuinely measured minutes (real sleep→wake pairs);
+  a secondary line "N sleeps not yet measured" appears when there are unobserved
+  events, so no data is hidden. Wake-pairing clamp tightened from 24 h to 4 h so
+  a user's overnight manual sleep can no longer be mis-attributed to Decaffeinate.
+- **Restart-overdue notification no longer re-nags on every relaunch.** The
+  last-notified advice band was in-memory only, so a quit-and-relaunch while still
+  in the "consider" band could re-fire the "overdue" notification the user already
+  saw. The state is now persisted to `UserDefaults` keyed by the current boot time,
+  so it survives relaunches and auto-resets after a real restart.
+- **Restart urgency escalation now fires.** `.overdue` and `.urgent` were treated
+  as one band, so the more serious `.urgent` threshold (approaching the ~50-day
+  networking cliff) never produced a notification. It now re-fires when crossing
+  `.overdue → .urgent`.
+- **Notifications can no longer fire before authorization.** `post()` was calling
+  `requestAuthorizationIfNeeded()` inline, which could surface the OS permission
+  sheet cold on first run — defeating the onboarding deferral. `post()` now only
+  submits when `authorized == true`; the prompt still arrives via the onboarding
+  flow with context.
+- **Forced-sleep toggle label now matches behavior.** "Notify me when *I* force
+  the Mac to sleep" implied the manual Sleep Now button, but the notification fires
+  for all Decaffeinate-triggered sleeps (idle, agent-finished, etc.). Reworded to
+  "Notify me when Decaffeinate puts the Mac to sleep."
+- **Updater status can no longer get stuck on "Checking…"** If a check cycle
+  ended without Sparkle emitting a find/not-found callback (throttled, aborted, or
+  dismissed), the UI stayed in the checking state indefinitely. Now resolved to
+  `.upToDate` when the cycle ends cleanly without a categorized result.
+- **Update failure reason is now visible to all users.** The "Couldn't check"
+  reason was previously only reachable via a hover tooltip — invisible to
+  VoiceOver and keyboard users. The reason is now also rendered as visible body
+  text, and the pill carries an `.accessibilityLabel` that folds it in.
+- **`version.sh` widened to prevent minor-≥100 collision.** The old
+  `major×10000 + minor×100 + patch` formula collides at `minor ≥ 100`
+  (e.g. `1.100.0 == 2.0.0`). Widened to `major×1_000_000 + minor×1_000 + patch`,
+  safe to minor/patch < 1000. Verified monotonic: `1.10.1 → 1010001 > 1010000
+  (1.10.0) > 11000 (installed)`.
+- **`release.yml` now fails on a real appcast upload error.** The trailing `|| true`
+  masked genuine `gh release upload` failures, meaning a release could ship without
+  an appcast and break every in-app updater silently. Replaced with a clean
+  conditional that only tolerates file-absent; real errors surface and fail the job.
+  Added an assertion that `generate_appcast` exists before it's invoked.
+
+### Changed
+- **"Not checked yet"** replaces a stale "Last checked: … ago" in Settings → About
+  when no check has run this session.
+- **Relative timestamps now show days and weeks** ("5d ago", "2wk ago") instead of
+  capping at hours ("120h ago") — improving readability in the About update row.
+- **CPU trigger slider explains itself.** A caption under the slider describes what
+  the threshold does and that the battery floor / backpack guard still override it.
+  The "Add" button is disabled (and the caption changes) when a CPU trigger already
+  exists, preventing accidental duplicates.
+
+### Internal
+- `SleepHistoryStore.unmeasuredSleepCount` added alongside the cleaned-up
+  `measuredMinutesAsleep`. Wake-pairing `maxGap` lowered to 4 h.
+- `AppState.updateLastNotifiedRestartAdvice(_:)` + `loadPersistedRestartNotificationState()`
+  persist the notification de-dup state to UserDefaults keyed by boot time.
+- `UpdaterController.didFinishUpdateCycleFor` resolves stuck `.checking` state.
+- `Notifier.post()` no longer auto-requests authorization; only `authorized == true`
+  lets notifications through.
+- 18 new tests in previous release; 247 total passing.
+
 ## [1.10.0] — 2026-06-23
 
 Smarter, more honest, more communicative — and the in-app updater now actually
