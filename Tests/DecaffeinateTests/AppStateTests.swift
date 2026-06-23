@@ -1059,7 +1059,8 @@ final class AppStateTests: XCTestCase {
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 0, "caffeinated, no forced sleep")
         h.confirmKernelSleep()
-        XCTAssertEqual(h.restHistory.events.last?.kind, .systemSleep,
+        XCTAssertEqual(
+            h.restHistory.events.last?.kind, .systemSleep,
             "a willSleep with no pending forced sleep is a natural sleep")
         XCTAssertNil(h.state.lastSleepAt, "lastSleepAt only set for forced sleeps")
         XCTAssertTrue(h.state.history.events.isEmpty, "force-sleep history stays empty")
@@ -1076,11 +1077,14 @@ final class AppStateTests: XCTestCase {
         // Advance past the confirmation window (>30 s) before confirming.
         h.clock.advance(31)
         h.confirmKernelSleep()
-        XCTAssertEqual(h.restHistory.events.last?.kind, .systemSleep,
+        XCTAssertEqual(
+            h.restHistory.events.last?.kind, .systemSleep,
             "lapsed pending → treated as natural sleep")
-        XCTAssertNil(h.state.lastSleepAt,
+        XCTAssertNil(
+            h.state.lastSleepAt,
             "lastSleepAt not set for a lapsed confirmation")
-        XCTAssertTrue(h.state.history.events.isEmpty,
+        XCTAssertTrue(
+            h.state.history.events.isEmpty,
             "force-sleep history stays empty for lapsed confirmation")
     }
 

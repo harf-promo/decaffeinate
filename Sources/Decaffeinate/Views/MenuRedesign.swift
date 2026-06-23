@@ -152,7 +152,9 @@ private struct RDActionBar: View {
                         Button("30 minutes") { appState.stayAwake(forMinutes: 30) }
                         Button("1 hour") { appState.stayAwake(forMinutes: 60) }
                         Button("2 hours") { appState.stayAwake(forMinutes: 120) }
-                        Button(untilWorkHoursLabel) { appState.stayAwake(untilHour: settingsStore.settings.activeHoursEnd) }
+                        Button(untilWorkHoursLabel) {
+                            appState.stayAwake(untilHour: settingsStore.settings.activeHoursEnd)
+                        }
                     }
                 } label: {
                     Label("Keep awake", systemImage: "bolt")

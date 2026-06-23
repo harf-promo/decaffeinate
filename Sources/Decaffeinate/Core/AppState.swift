@@ -799,7 +799,8 @@ final class AppState: ObservableObject {
     func systemWillSleep() {
         let when = now()
         if let pending = pendingForcedSleep,
-            when.timeIntervalSince(pending.requestedAt) <= forcedSleepConfirmationWindow {
+            when.timeIntervalSince(pending.requestedAt) <= forcedSleepConfirmationWindow
+        {
             lastSleepAt = when
             lastSleepReason = pending.reason
             history.record(
