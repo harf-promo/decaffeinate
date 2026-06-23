@@ -28,6 +28,11 @@ enum CLI {
             _ = ScreenshotRenderer.renderAll(to: dir)
             return true
         }
+        if let index = arguments.firstIndex(of: "--icon") {
+            let dir = arguments.indices.contains(index + 1) ? arguments[index + 1] : "assets"
+            _ = IconRenderer.renderAll(to: dir)
+            return true
+        }
         if let index = arguments.firstIndex(of: "--provenance") {
             let pid = arguments.indices.contains(index + 1) ? pid_t(arguments[index + 1]) : nil
             runProvenance(pid: pid)
@@ -123,8 +128,9 @@ enum CLI {
 
             USAGE:
               Decaffeinate                Run the menu-bar app
-              Decaffeinate --scan         Print active sleep assertions and exit
+              Decaffeinate --scan           Print active sleep assertions and exit
               Decaffeinate --provenance   Trace each holder to its window / agent / project
+              Decaffeinate --icon [dir]   Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)
               Decaffeinate --version      Print the version and exit
               Decaffeinate --help         Show this help
 
