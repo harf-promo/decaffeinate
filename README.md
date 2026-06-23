@@ -4,7 +4,7 @@
 
 # Decaffeinate
 
-### The first Mac utility built to make your Mac **sleep** — not stay awake.
+### The Mac utility built to make your Mac **sleep** — not just stay awake.
 
 **Decaffeinate tells you the truth about what's keeping your Mac awake, and gives you the power to put it to sleep — even when rogue apps, stray `caffeinate` processes, and background tabs refuse to let go.**
 
@@ -32,7 +32,7 @@ There is almost nothing built for the opposite, far more common problem:
 
 This happens constantly in the age of agentic coding. You kick off a long job in **Claude Code**, Cursor, a big `xcodebuild`, a Docker build, or a download — these tools (rightly) hold a *power assertion* so the Mac doesn't sleep mid-work. The problem is what happens **after** the work is done: the assertion gets left behind, a terminal stays "busy," a browser tab keeps an audio line open, or you forgot a `caffeinate` running in some tab. macOS gives you **no built-in way** to see these, question them, or override them — short of force-quitting the app.
 
-> On the very machine this was built on, a quick scan found **six** stray `caffeinate` processes silently holding the Mac awake. That's the problem, live.
+> On the machine this was built on, a quick scan found **six** stray `caffeinate` processes silently holding the Mac awake. (Your own scan may show none, or more — but the point is: you had no way to know until now.)
 
 **Don't believe me? Run this in your terminal right now:**
 ```sh
@@ -40,7 +40,7 @@ pmset -g assertions | grep -c -i "Prevent.*Sleep"
 ```
 Every match is something quietly voting to keep your Mac awake. Decaffeinate shows you *who* — and overrules them.
 
-**Decaffeinate is the firewall for sleep.** It watches every power assertion on your system, attributes each one to the real process behind it, and — when you've stepped away and nothing important is actually happening — **forces a clean, safe sleep** regardless of who's complaining.
+**Decaffeinate fills that gap.** It watches every process keeping your Mac awake, attributes each one to the real app behind it, and — when you've stepped away and nothing important is actually happening — **issues a clean, safe sleep** via the same mechanism as  → Sleep: `pmset sleepnow`. Every other app's "please stay awake" request gets overridden by the kernel's normal sleep transition.
 
 ---
 
@@ -52,7 +52,7 @@ Every match is something quietly voting to keep your Mac awake. Decaffeinate sho
 | Make the Mac **sleep** on demand |                    ❌                     |        ✅         |
 | Force sleep **after you're idle**, overriding rogue holds |          ❌                     |        ✅         |
 | Show you **what's** keeping it awake (by process) |                 ❌                     |        ✅         |
-| Allow / block individual apps (a sleep firewall) |                  ❌                     |        ✅         |
+| Per-app rules — allow or block individual apps  |                  ❌                     |        ✅         |
 | **Sleep when your build / agent finishes** |                  ❌                     |        ✅         |
 | Battery-floor + overheating safety guards |                ➖                     |        ✅         |
 | **Track uptime & recommend a weekly restart** |              ❌                     |        ✅         |
@@ -113,8 +113,8 @@ no buttons, no new permissions** — you restart from the  menu on your own term
 <img src="assets/rest-restart.png" width="520" alt="Rest & Restart — up 9 days since last restart, a restart would freshen things up" />
 </div>
 
-### 🧱 The Sleep Firewall
-New app trying to keep your Mac awake? Get a prompt: **Always Allow**, **Allow for 1 hour**, or **Block**. Build a whitelist of apps that are genuinely allowed to hold the line (Final Cut exports, big builds) and let everything else fall asleep.
+### 🧱 Per-App Rules
+New app trying to keep your Mac awake? Get a prompt: **Always Allow**, **Allow for 1 hour**, or **Block**. Build a list of apps that are genuinely allowed to hold the line (Final Cut exports, big builds) and let everything else fall asleep.
 
 ### 🛟 Safety Rails
 Decaffeinate refuses to sleep at a bad moment, and *forces* sleep at a dangerous one:

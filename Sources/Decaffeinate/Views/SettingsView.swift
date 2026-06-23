@@ -183,7 +183,11 @@ private struct GeneralSettings: View {
                 if LoginItem.isAvailable {
                     Toggle("Launch at login", isOn: s.launchAtLogin)
                         .onChange(of: store.settings.launchAtLogin) { _, newValue in
-                            LoginItem.setEnabled(newValue)
+                            // Revert the toggle if SMAppService registration fails
+                            // so it always reflects the actual login-item state.
+                            if !LoginItem.setEnabled(newValue) {
+                                store.settings.launchAtLogin = !newValue
+                            }
                         }
                 }
             }

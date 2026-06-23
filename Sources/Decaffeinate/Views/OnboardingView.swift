@@ -115,7 +115,7 @@ private struct OnboardingPanel: Identifiable {
             step: "01 — What it does",
             title: "Your Mac, finally asleep",
             body:
-                "Caffeine apps keep Macs awake. Decaffeinate does the opposite: when you step away, it puts your Mac to sleep — even when a rogue app is trying to keep it up."
+                "Running Claude Code, a build, or a long download? These hold your Mac awake until they\u{2019}re done — and sometimes after. Decaffeinate watches what\u{2019}s keeping your Mac up and puts it to sleep the moment it\u{2019}s safe, even when a rogue process disagrees."
         ),
         OnboardingPanel(
             step: "02 — Safe by default",
@@ -232,8 +232,10 @@ final class OnboardingPresenter: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        // Treat any dismissal as "seen it" so first-run only nags once.
-        settingsStore?.settings.hasCompletedOnboarding = true
+        // Restores the accessory-app activation policy now that the window is gone.
+        // Do NOT mark onboarding complete here — only the Skip and "Get started"
+        // buttons should do that. A plain red-button close means the user just
+        // dismissed it temporarily, so it should reappear next launch.
         window = nil
         NSApp.setActivationPolicy(.accessory)
     }

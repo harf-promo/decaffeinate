@@ -116,6 +116,16 @@ final class AppState: ObservableObject {
     /// battery backpack guard.
     private var suppressImmediateUntil: Date?
 
+    /// A forced sleep we asked for via pmset but haven't confirmed the kernel
+    /// performed. Recorded only when a willSleep notification confirms it; left to
+    /// lapse (recording nothing) if a PreventSystemSleep hold aborts the transition.
+    private var pendingForcedSleep: (reason: String, requestedAt: Date, onBattery: Bool)?
+    /// How long after launching `pmset sleepnow` a willSleep still counts as
+    /// confirmation of *that* forced sleep. Generous enough to cover a slow sleep
+    /// transition, bounded so an unrelated natural sleep minutes later isn't
+    /// misattributed.
+    private let forcedSleepConfirmationWindow: TimeInterval = 30
+
     /// Clock seam for tests.
     private let now: () -> Date
 
@@ -284,8 +294,18 @@ final class AppState: ObservableObject {
     private func registerRestObservers() {
         guard restObserverTokens.isEmpty else { return }
         let center = NSWorkspace.shared.notificationCenter
+        // willSleep routes to systemWillSleep() so forced-sleep confirmation
+        // and natural-sleep recording share one code path.
+        let willSleepToken = center.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.systemWillSleep()
+            }
+        }
+        restObserverTokens.append(willSleepToken)
         let pairs: [(Notification.Name, RestEvent.Kind)] = [
-            (NSWorkspace.willSleepNotification, .systemSleep),
             (NSWorkspace.didWakeNotification, .wake),
             (NSWorkspace.screensDidSleepNotification, .displayOff),
             (NSWorkspace.screensDidWakeNotification, .displayOn),
@@ -755,15 +775,13 @@ final class AppState: ObservableObject {
 
         switch sleepController.sleepNow() {
         case .success:
-            lastSleepAt = now()
-            lastSleepReason = reason
             lastError = nil
-            // Always arm the idle cooldown so we don't re-sleep right after wake.
+            // Arm the idle cooldown so we don't re-sleep right after wake.
             suppressForceSleepUntil = now().addingTimeInterval(60)
             if immediate { suppressImmediateUntil = now().addingTimeInterval(15) }
-            history.record(SleepEvent(date: now(), reason: reason, onBattery: power.onBattery))
-            restHistory.record(
-                RestEvent(date: now(), kind: .forcedSleep, onBattery: power.onBattery))
+            // Don't claim we slept yet — "pmset launched" isn't "the kernel slept."
+            // systemWillSleep() records it only if the transition actually happens.
+            pendingForcedSleep = (reason, now(), power.onBattery)
             return true
         case .failure(let error):
             lastError = error.description
@@ -771,6 +789,29 @@ final class AppState: ObservableObject {
             if immediate { suppressImmediateUntil = now().addingTimeInterval(10) }
             return false
         }
+    }
+
+    /// The kernel is beginning a real sleep transition (NSWorkspace.willSleep).
+    /// If we recently launched a forced sleep, this confirms it actually took, so
+    /// now — and only now — do we record it. Otherwise it's a natural/user sleep
+    /// (lid close, Apple menu → Sleep, macOS idle) and we log it as such.
+    /// Internal (not private) so tests can drive it without a live NSWorkspace.
+    func systemWillSleep() {
+        let when = now()
+        if let pending = pendingForcedSleep,
+            when.timeIntervalSince(pending.requestedAt) <= forcedSleepConfirmationWindow
+        {
+            lastSleepAt = when
+            lastSleepReason = pending.reason
+            history.record(
+                SleepEvent(date: when, reason: pending.reason, onBattery: pending.onBattery))
+            restHistory.record(
+                RestEvent(date: when, kind: .forcedSleep, onBattery: pending.onBattery))
+        } else {
+            restHistory.record(
+                RestEvent(date: when, kind: .systemSleep, onBattery: power.onBattery))
+        }
+        pendingForcedSleep = nil
     }
 
     // MARK: Firewall queue
