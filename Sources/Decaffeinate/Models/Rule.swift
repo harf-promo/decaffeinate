@@ -58,11 +58,23 @@ enum RulePolicy: Codable, Hashable, Sendable {
         }
     }
 
+    /// Settled-state adjective shown in pills/tags — e.g. "Allowed", "Sleeping anyway".
+    /// Used by the Settings pill (`SettingsView`) and the menu row tag (`MenuRedesign`).
     var shortLabel: String {
         switch self {
+        case .allow: return "Allowed"
+        case .allowUntil: return "Allowed · timed"
+        case .ignore: return "Sleeping anyway"
+        }
+    }
+
+    /// Imperative verb shown on action buttons — e.g. "Always allow", "Sleep anyway".
+    /// Single source of truth for both the menu approval buttons and the overflow menu.
+    var menuActionLabel: String {
+        switch self {
         case .allow: return "Always allow"
-        case .allowUntil: return "Allow temporarily"
-        case .ignore: return "Ignored"
+        case .allowUntil: return "Allow for\u{2026}"
+        case .ignore: return "Sleep anyway"
         }
     }
 }

@@ -146,9 +146,11 @@ private struct RDActionBar: View {
                 .buttonStyle(RDPrimaryButton())
                 .help("Put the Mac to sleep now, overriding every sleep block.")
 
+                // "More…" folds in Keep-awake durations and Sleep-when-done
+                // watch targets so they're accessible but not shouting.
                 Menu {
-                    Toggle("Keep awake now", isOn: settings.caffeinateEnabled)
-                    Section("Stay awake until") {
+                    Section("Keep awake") {
+                        Toggle("Keep awake now", isOn: settings.caffeinateEnabled)
                         Button("30 minutes") { appState.stayAwake(forMinutes: 30) }
                         Button("1 hour") { appState.stayAwake(forMinutes: 60) }
                         Button("2 hours") { appState.stayAwake(forMinutes: 120) }
@@ -156,13 +158,25 @@ private struct RDActionBar: View {
                             appState.stayAwake(untilHour: settingsStore.settings.activeHoursEnd)
                         }
                     }
+                    Section("Sleep when done") {
+                        if !appState.runningWatchCandidates.isEmpty {
+                            ForEach(appState.runningWatchCandidates, id: \.self) { name in
+                                Button(name) { appState.setWatchTarget(.processName(name)) }
+                            }
+                        }
+                        ForEach(appState.commonWatchCandidates, id: \.self) { name in
+                            Button(name) { appState.setWatchTarget(.processName(name)) }
+                        }
+                    }
                 } label: {
-                    Label("Keep awake", systemImage: "bolt")
+                    Label("More\u{2026}", systemImage: "ellipsis.circle")
                 }
                 .menuStyle(.button)
                 .buttonStyle(RDSecondaryButton())
                 .fixedSize()
-                .help("Hold the Mac awake on purpose — with all safety rails still active.")
+                .help(
+                    "Keep the Mac awake on purpose, or sleep it the moment a build or agent finishes."
+                )
             }
 
             autoSleepRow
@@ -190,8 +204,8 @@ private struct RDActionBar: View {
         return "Until \(display) \(suffix)"
     }
 
-    /// A top-level row that surfaces Auto-sleep's on/off — no longer buried two
-    /// levels deep in the "Keep awake" menu. Also hosts the task-finish watcher.
+    /// Auto-sleep toggle row — surfaces the master on/off without extra clutter.
+    /// Keep-awake and Sleep-when-done controls have moved to the More… menu above.
     private var autoSleepRow: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: "moon.zzz").font(.system(size: 12))
@@ -199,26 +213,6 @@ private struct RDActionBar: View {
             Text("Auto-sleep when idle")
                 .font(.system(size: 13)).foregroundStyle(theme.ink2)
             Spacer()
-            Menu {
-                if !appState.runningWatchCandidates.isEmpty {
-                    Section("Running now") {
-                        ForEach(appState.runningWatchCandidates, id: \.self) { name in
-                            Button(name) { appState.setWatchTarget(.processName(name)) }
-                        }
-                    }
-                }
-                Section("Common tools") {
-                    ForEach(appState.commonWatchCandidates, id: \.self) { name in
-                        Button(name) { appState.setWatchTarget(.processName(name)) }
-                    }
-                }
-            } label: {
-                Label("When done", systemImage: "binoculars")
-            }
-            .menuStyle(.button)
-            .buttonStyle(RDSecondaryButton(compact: true))
-            .fixedSize()
-            .help("Sleep the Mac the moment a build, agent, or tool finishes.")
             Toggle("", isOn: settings.decaffeinateEnabled)
                 .labelsHidden()
                 .toggleStyle(.switch)
@@ -301,6 +295,7 @@ private struct RDList: View {
             } else {
                 sectionHeader
                 if showExplainer { explainerCard }
+                if let verdict = appState.sleepVerdict { verdictBanner(verdict) }
                 groupRows(appState.groupedSystemBlockers)
                 if !others.isEmpty {
                     RDSectionLabel(text: "Screen-only / background", trailing: nil)
@@ -341,10 +336,12 @@ private struct RDList: View {
 
     private var explainerCard: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            Text("What's keeping your Mac awake?")
+            Text("What\u{2019}s keeping your Mac awake?")
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.ink1)
             Text(
-                "These apps asked macOS to stay awake — each row shows who, why, and how long. Decaffeinate still puts your Mac to sleep once you step away. Tap any row to see the full technical details."
+                "Each row shows something that asked macOS to stay awake. "
+                    + "\u{2713} rows end on their own \u{2014} your Mac will sleep when the job is done. "
+                    + "\u{26A0} rows hold indefinitely \u{2014} tap the row for options."
             )
             .font(.system(size: 12)).foregroundStyle(theme.ink3)
             .fixedSize(horizontal: false, vertical: true)
@@ -354,6 +351,27 @@ private struct RDList: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.soft).stroke(theme.hairline, lineWidth: 1))
         .padding(.horizontal, theme.contentInset)
         .padding(.bottom, Space.s2)
+    }
+
+    /// One-line verdict banner across all system-sleep holds.
+    private func verdictBanner(
+        _ verdict: (glyph: String, text: String, bounded: Bool)
+    ) -> some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: verdict.glyph)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(verdict.bounded ? theme.teal : Color.warning)
+                .accessibilityHidden(true)
+            Text(verdict.text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(verdict.bounded ? theme.teal : Color.warning)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, theme.contentInset)
+        .padding(.bottom, Space.s1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(verdict.text)
     }
 
     @ViewBuilder private func groupRows(_ list: [HoldGroup]) -> some View {
@@ -477,6 +495,24 @@ private struct RDRow: View {
                 }
                 contextText
                     .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                // Plain-English answer: "Will sleep when the build finishes" / "Won't
+                // sleep on its own — held until you act". Only for system-sleep holds
+                // so a screen-only row never shows a spurious "won't sleep" warning.
+                if !pending, assertion.blocksSystemSleep {
+                    let v = appState.holdLifetime(for: assertion).rowVerdict
+                    HStack(spacing: 4) {
+                        Image(systemName: v.glyph)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(v.bounded ? theme.teal : Color.warning)
+                            .accessibilityHidden(true)
+                        Text(v.text)
+                            .font(.system(size: 12))
+                            .foregroundStyle(v.bounded ? theme.teal : Color.warning)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(v.text)
+                    .padding(.top, 1)
+                }
                 if pending { approvalButtons.padding(.top, Space.s1) }
                 if !pending, appState.shouldOfferWatch(for: assertion) { watchOffer }
             }
@@ -524,16 +560,6 @@ private struct RDRow: View {
         if !tail.isEmpty {
             t = t + Text(" · " + tail.joined(separator: " · ")).foregroundStyle(theme.ink4)
         }
-        // The lifetime — until done / timed / indefinite — as a quiet trailing
-        // mark so you can tell at a glance whether it ends on its own.
-        if !pending {
-            let lifetime = appState.holdLifetime(for: assertion)
-            t =
-                t
-                + Text("  ·  " + lifetime.badgeLabel)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(lifetime.isBounded ? theme.teal : theme.ink4)
-        }
         return t.font(.system(size: 12))
     }
 
@@ -567,38 +593,44 @@ private struct RDRow: View {
 
     @ViewBuilder private var tag: some View {
         switch policy {
-        case .allow:
-            allowedTag(timed: false)
-        case .allowUntil:
-            allowedTag(timed: true)
+        case .allow, .allowUntil:
+            // Route through RulePolicy.shortLabel so menu tag and Settings pill
+            // always read the same word.
+            let label = policy?.shortLabel ?? ""
+            HStack(spacing: Space.s1) {
+                Circle().fill(theme.teal).frame(width: 5, height: 5)
+                Text(label)
+                    .textCase(.uppercase).font(.system(size: 10, weight: .semibold))
+                    .tracking(0.7).foregroundStyle(theme.ink3)
+            }
         case .ignore:
-            Text("Ignored").textCase(.uppercase).font(.system(size: 10, weight: .semibold))
+            Text(RulePolicy.ignore.shortLabel)
+                .textCase(.uppercase).font(.system(size: 10, weight: .semibold))
                 .tracking(0.7).foregroundStyle(theme.ink4)
         case .none:
             EmptyView()
         }
     }
 
-    private func allowedTag(timed: Bool) -> some View {
-        HStack(spacing: Space.s1) {
-            Circle().fill(theme.teal).frame(width: 5, height: 5)
-            Text(timed ? "Allowed · timed" : "Allowed")
-                .textCase(.uppercase).font(.system(size: 10, weight: .semibold))
-                .tracking(0.7).foregroundStyle(theme.ink3)
-        }
-    }
-
     private var approvalButtons: some View {
         HStack(spacing: Space.s2) {
-            Button("Allow") { appState.setPolicy(.allow, for: assertion) }
-                .buttonStyle(RDPrimaryButton(compact: true))
-                .fixedSize()
-                .accessibilityLabel("Allow \(assertion.displayName) to keep the Mac awake")
-            Button("Let it sleep") { appState.setPolicy(.ignore, for: assertion) }
-                .buttonStyle(RDSecondaryButton(compact: true))
-                .fixedSize()
-                .accessibilityLabel("Ignore \(assertion.displayName); let the Mac sleep")
-            AllowForMenu(title: "For…", assertion: assertion)
+            Button(RulePolicy.allow.menuActionLabel) {
+                appState.setPolicy(.allow, for: assertion)
+            }
+            .buttonStyle(RDPrimaryButton(compact: true))
+            .fixedSize()
+            .accessibilityLabel(
+                "Always allow \(assertion.displayName) to keep the Mac awake"
+            )
+            Button(RulePolicy.ignore.menuActionLabel) {
+                appState.setPolicy(.ignore, for: assertion)
+            }
+            .buttonStyle(RDSecondaryButton(compact: true))
+            .fixedSize()
+            .accessibilityLabel(
+                "Sleep anyway — ignore \(assertion.displayName) and force sleep when idle"
+            )
+            AllowForMenu(title: RulePolicy.allowUntil(Date()).menuActionLabel, assertion: assertion)
                 .menuStyle(.borderlessButton)
                 .tint(theme.ink3)
                 .fixedSize()
@@ -609,9 +641,13 @@ private struct RDRow: View {
 
     private var rowMenu: some View {
         Menu {
-            Button("Always allow to keep awake") { appState.setPolicy(.allow, for: assertion) }
-            AllowForMenu(title: "Allow for…", assertion: assertion)
-            Button("Let it sleep (ignore)") { appState.setPolicy(.ignore, for: assertion) }
+            Button(RulePolicy.allow.menuActionLabel) {
+                appState.setPolicy(.allow, for: assertion)
+            }
+            AllowForMenu(title: "Allow for\u{2026}", assertion: assertion)
+            Button(RulePolicy.ignore.menuActionLabel) {
+                appState.setPolicy(.ignore, for: assertion)
+            }
             if policy != nil {
                 Button("Clear rule") { appState.clearRule(for: assertion) }
             }

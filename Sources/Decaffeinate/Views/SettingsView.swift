@@ -148,7 +148,7 @@ private struct GeneralSettings: View {
                 Toggle("Pause for active media", isOn: s.pauseForActiveMedia)
                 Toggle("Pause during Time Machine backups", isOn: s.pauseForTimeMachine)
                 Toggle("Pause during macOS updates", isOn: s.pauseForSystemUpdate)
-                Toggle("Respect apps I've allowed", isOn: s.respectWhitelist)
+                Toggle("Respect apps set to \u{201C}Always allow\u{201D}", isOn: s.respectWhitelist)
                 Text(
                     "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
                 )
@@ -352,10 +352,19 @@ private struct AutomationSettings: View {
                 }
             }
 
-            Section("Allowed / blocked apps") {
+            Section("App sleep permissions") {
+                Text(
+                    "Choices you\u{2019}ve made from the menu. "
+                        + "\u{201C}Always allow\u{201D} lets an app hold the Mac awake; "
+                        + "\u{201C}Sleep anyway\u{201D} makes Decaffeinate force sleep regardless."
+                )
+                .settingsCaption()
                 if rules.rules.isEmpty {
-                    Text("Allow or block apps from the menu and they'll show up here.")
-                        .settingsCaption()
+                    Text(
+                        "Choose \u{201C}Always allow\u{201D} or \u{201C}Sleep anyway\u{201D} "
+                            + "for an app from the menu and it\u{2019}ll show up here."
+                    )
+                    .settingsCaption()
                 } else {
                     ForEach(rules.rules) { rule in
                         HStack {

@@ -575,6 +575,26 @@ final class AppState: ObservableObject {
         return "Holding on a timer — auto-releases"
     }
 
+    /// Aggregate "will the Mac sleep on its own?" verdict for the list banner.
+    /// Distinct from `awakeSummary` (which drives the header) — this answers the
+    /// owner's core question across all system-sleep blockers at once.
+    /// Returns nil when there are no system-sleep blockers (use the empty state instead).
+    var sleepVerdict: (glyph: String, text: String, bounded: Bool)? {
+        let groups = groupedSystemBlockers
+        guard !groups.isEmpty else { return nil }
+        let anyIndefinite = groups.contains {
+            holdLifetime(for: $0.representative) == .indefinite
+        }
+        if anyIndefinite {
+            return (
+                "exclamationmark.triangle",
+                "Something is holding your Mac awake indefinitely",
+                false
+            )
+        }
+        return ("checkmark", "Your Mac will sleep on its own when these finish", true)
+    }
+
     /// Whether a hold's provenance traces back to a known AI agent (Claude Code…).
     func isAgentSession(_ assertion: PowerAssertion) -> Bool {
         guard let provenance = provenanceResolver.provenance(for: assertion.pid) else {

@@ -4,6 +4,47 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — UX simplification: answer-first menu
+
+Radically simplifies the menu so it answers one question per hold: "Will my Mac
+sleep on its own, or is something holding it awake indefinitely?" Removes firewall
+jargon; reduces top-of-menu clutter; ensures menu and Settings speak the same language.
+
+### Changed
+- **Each hold row now leads with a plain verdict.** Below the app name every row
+  shows either ✓ "Will sleep when the build finishes" / "Will sleep shortly after
+  your agent finishes" / "Auto-releases on a timer" — or ⚠ "Won't sleep on its own
+  — held until you act". This is derived from the existing `HoldLifetime` data the
+  app already computed; it was previously buried as a tiny trailing badge.
+- **Aggregate verdict banner.** Above the hold rows a single teal/amber line
+  summarises the whole picture: "Your Mac will sleep on its own when these finish"
+  or "Something is holding your Mac awake indefinitely". Any indefinite hold turns
+  the banner amber.
+- **Top action area simplified.** The menu's action area is now: one primary
+  "Sleep Now" button · one "More…" menu (holds "Keep awake" durations and
+  "Sleep when done" watch targets) · one "Auto-sleep when idle" on/off toggle.
+  The previous four competing controls ("Keep awake" split-menu, embedded "When done"
+  watcher menu, auto-sleep toggle, Sleep Now) have been consolidated.
+- **"Allow"/"Block" renamed to plain language everywhere.** The pending-row buttons
+  that were "Allow" / "Let it sleep" are now **"Always allow"** / **"Sleep anyway"**
+  / **"Allow for…"**. The overflow menu and the per-row status tag use the same words.
+  Settings now shows "App sleep permissions" (was "Allowed / blocked apps") with a
+  one-line caption explaining what each rule does.
+- **Single source of truth for policy verbs.** `RulePolicy` now exposes
+  `menuActionLabel` (imperative: "Always allow" / "Sleep anyway" / "Allow for…")
+  alongside the updated `shortLabel` (settled state: "Allowed" / "Sleeping anyway" /
+  "Allowed · timed"). Both the menu tag and the Settings pill draw from these
+  properties so they can never read different words for the same rule.
+- **Explainer card reworded** to describe the ✓/⚠ glyphs rather than "tap any row
+  to see technical details".
+
+### Internal
+- `HoldLifetime.rowVerdict` — new pure property; 5 new tests covering all cases
+  including the agent re-arming case ("Will sleep shortly after your agent finishes").
+- `AppState.sleepVerdict` — new aggregate property; 4 new tests (empty / all-bounded
+  / any-indefinite / mixed).
+- 256 tests, 0 failures; `swift format lint --strict` clean.
+
 ## [1.10.1] — 2026-06-23
 
 Council-verified hardening: honesty, correctness, accessibility, and pipeline

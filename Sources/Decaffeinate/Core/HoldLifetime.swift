@@ -40,4 +40,29 @@ enum HoldLifetime: Equatable, Sendable {
         case .indefinite: return false
         }
     }
+
+    /// Plain-English verdict for the menu row — answers "will my Mac sleep on its own?"
+    /// Returns `(glyph, text, bounded)` where `bounded` drives the teal/amber colour.
+    var rowVerdict: (glyph: String, text: String, bounded: Bool) {
+        switch self {
+        case .untilProcess(let name):
+            return ("checkmark", "Will sleep when \(name) finishes", true)
+        case .untilWatchedFinishes:
+            return ("checkmark", "Will sleep when the watched task finishes", true)
+        case .timed(let reArms):
+            if reArms {
+                // Agent keeps re-arming caffeinate while it works; last timer
+                // expires when the agent stops — honest and reassuring.
+                return ("checkmark", "Will sleep shortly after your agent finishes", true)
+            } else {
+                return ("checkmark", "Auto-releases on a timer", true)
+            }
+        case .indefinite:
+            return (
+                "exclamationmark.triangle",
+                "Won\u{2019}t sleep on its own \u{2014} held until you act",
+                false
+            )
+        }
+    }
 }

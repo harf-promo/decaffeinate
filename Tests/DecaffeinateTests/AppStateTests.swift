@@ -1247,4 +1247,61 @@ final class AppStateTests: XCTestCase {
             h.notifier.restartOverdues.count, 2,
             "notification must re-arm after a restart that resets advice to .fresh")
     }
+
+    // MARK: sleepVerdict (v1.11.0)
+
+    func testSleepVerdictNilWhenNoBlockers() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = []
+        h.state.tick()
+        XCTAssertNil(
+            h.state.sleepVerdict,
+            "No blockers → nil (empty state handles 'free to sleep')"
+        )
+    }
+
+    func testSleepVerdictAllBounded() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // A caffeinate -t hold has a timeout → timed → bounded.
+        h.scanner.assertions = [
+            agentCaff(h, pid: 800, cwd: "/x/repo", tty: "ttys003", created: h.clock.date)
+        ]
+        h.state.tick()
+        let verdict = h.state.sleepVerdict
+        XCTAssertNotNil(verdict, "Agent hold (timed) → non-nil verdict")
+        XCTAssertTrue(verdict?.bounded == true, "timed hold → bounded verdict")
+        XCTAssertEqual(verdict?.glyph, "checkmark")
+    }
+
+    func testSleepVerdictAnyIndefiniteWins() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // An indefinite system-sleep assertion (no timeout, no -w target).
+        h.scanner.assertions = [
+            Fixtures.assertion(
+                pid: 100, process: "Zoom", bundle: "us.zoom.xos",
+                type: AssertionType.preventUserIdleSystemSleep)
+        ]
+        h.state.tick()
+        let verdict = h.state.sleepVerdict
+        XCTAssertNotNil(verdict, "Indefinite hold → non-nil verdict")
+        XCTAssertFalse(verdict?.bounded == true, "Indefinite hold → bounded=false")
+        XCTAssertEqual(verdict?.glyph, "exclamationmark.triangle")
+    }
+
+    func testSleepVerdictMixedIndefiniteWinsOverBounded() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // One agent (bounded) + one bare Zoom-style indefinite hold.
+        let zoomAssertion = Fixtures.assertion(
+            pid: 100, process: "Zoom", bundle: "us.zoom.xos",
+            type: AssertionType.preventUserIdleSystemSleep)
+        h.scanner.assertions = [
+            agentCaff(h, pid: 800, cwd: "/x/repo", tty: "ttys003", created: h.clock.date),
+            zoomAssertion,
+        ]
+        h.state.tick()
+        let verdict = h.state.sleepVerdict
+        XCTAssertFalse(
+            verdict?.bounded == true,
+            "Any indefinite hold makes the aggregate verdict 'indefinite'")
+    }
 }
