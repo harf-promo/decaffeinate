@@ -97,6 +97,12 @@ final class AppStateTests: XCTestCase {
         let system: FakeSystemStateReader
         let restHistory: RestHistoryStore
         let cleanup: () -> Void
+
+        /// Simulate the kernel beginning a real sleep transition
+        /// (NSWorkspace.willSleep) — in production what confirms a forced sleep
+        /// truly took. Drives AppState.systemWillSleep() directly, bypassing the
+        /// NSWorkspace observer wiring that only exists under start().
+        @MainActor func confirmKernelSleep() { state.systemWillSleep() }
     }
 
     private func makeHarness(
@@ -236,7 +242,13 @@ final class AppStateTests: XCTestCase {
         h.idle.seconds = 120
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 1)
+        // pmset launched but the kernel hasn't confirmed sleep yet — nothing recorded.
+        XCTAssertNil(h.state.lastSleepAt, "sleep not recorded until kernel confirms it")
+        XCTAssertTrue(h.state.history.events.isEmpty, "history not written until willSleep fires")
+        // Kernel confirms the transition → now we record it.
+        h.confirmKernelSleep()
         XCTAssertNotNil(h.state.lastSleepAt)
+        XCTAssertNotNil(h.state.lastSleepReason)
         XCTAssertEqual(h.state.history.events.count, 1, "forced sleep is logged to history")
     }
 
@@ -1008,7 +1020,68 @@ final class AppStateTests: XCTestCase {
         h.idle.seconds = 700  // well past threshold → force sleep
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 1)
-        XCTAssertEqual(h.restHistory.events.first?.kind, .forcedSleep)
+        // No .forcedSleep recorded yet — waiting for kernel confirmation.
+        XCTAssertFalse(
+            h.restHistory.events.contains { $0.kind == .forcedSleep },
+            "forcedSleep not recorded until willSleep fires")
+        // Kernel confirms → .forcedSleep is now recorded.
+        h.confirmKernelSleep()
+        XCTAssertEqual(h.restHistory.events.last?.kind, .forcedSleep)
+    }
+
+    // MARK: Honesty: deferred forced-sleep recording
+
+    func testForcedSleepNotRecordedWhenKernelNeverSleeps() {
+        // A PreventSystemSleep hold can abort the pmset transition. In that case
+        // the Mac stays awake and we must record nothing — no false "Slept N ago".
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "pmset was attempted")
+        // No willSleep fires — a hold aborted the transition.
+        XCTAssertNil(h.state.lastSleepAt, "must not claim a sleep that never happened")
+        XCTAssertTrue(h.state.history.events.isEmpty, "history must stay empty")
+        XCTAssertFalse(
+            h.restHistory.events.contains { $0.kind == .forcedSleep },
+            "restHistory must not show a forced sleep")
+        // After the cooldown the engine retries — it's not wedged.
+        h.clock.advance(61)
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 2, "retried after cooldown")
+    }
+
+    func testNaturalSleepRecordedWhenNoForcedSleepPending() {
+        // Lid-close or Apple menu → Sleep while Decaffeinate isn't in forced-sleep
+        // mode → recorded as .systemSleep (natural), not .forcedSleep.
+        let h = makeHarness { $0.caffeinateEnabled = true }; defer { h.cleanup() }
+        // Caffeinated → no forced sleep attempted.
+        h.idle.seconds = 999
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "caffeinated, no forced sleep")
+        h.confirmKernelSleep()
+        XCTAssertEqual(h.restHistory.events.last?.kind, .systemSleep,
+            "a willSleep with no pending forced sleep is a natural sleep")
+        XCTAssertNil(h.state.lastSleepAt, "lastSleepAt only set for forced sleeps")
+        XCTAssertTrue(h.state.history.events.isEmpty, "force-sleep history stays empty")
+    }
+
+    func testForcedSleepConfirmationWindowLapsesToNatural() {
+        // If the willSleep fires more than 30 s after the pmset launch, we treat
+        // it as an unrelated natural sleep (e.g. user closed the lid long after the
+        // forced-sleep attempt was already forgotten).
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1)
+        // Advance past the confirmation window (>30 s) before confirming.
+        h.clock.advance(31)
+        h.confirmKernelSleep()
+        XCTAssertEqual(h.restHistory.events.last?.kind, .systemSleep,
+            "lapsed pending → treated as natural sleep")
+        XCTAssertNil(h.state.lastSleepAt,
+            "lastSleepAt not set for a lapsed confirmation")
+        XCTAssertTrue(h.state.history.events.isEmpty,
+            "force-sleep history stays empty for lapsed confirmation")
     }
 
     func testRestartInferredOnBootTimeAdvance() {

@@ -152,24 +152,7 @@ private struct RDActionBar: View {
                         Button("30 minutes") { appState.stayAwake(forMinutes: 30) }
                         Button("1 hour") { appState.stayAwake(forMinutes: 60) }
                         Button("2 hours") { appState.stayAwake(forMinutes: 120) }
-                        Button("Until 6 PM") { appState.stayAwake(untilHour: 18) }
-                    }
-                    Section("Sleep automation") {
-                        Toggle("Auto-sleep when idle", isOn: settings.decaffeinateEnabled)
-                        Menu("Sleep when a task finishes…") {
-                            if !appState.runningWatchCandidates.isEmpty {
-                                Section("Running now") {
-                                    ForEach(appState.runningWatchCandidates, id: \.self) { name in
-                                        Button(name) { appState.setWatchTarget(.processName(name)) }
-                                    }
-                                }
-                            }
-                            Section("Common tools") {
-                                ForEach(appState.commonWatchCandidates, id: \.self) { name in
-                                    Button(name) { appState.setWatchTarget(.processName(name)) }
-                                }
-                            }
-                        }
+                        Button(untilWorkHoursLabel) { appState.stayAwake(untilHour: settingsStore.settings.activeHoursEnd) }
                     }
                 } label: {
                     Label("Keep awake", systemImage: "bolt")
@@ -177,8 +160,10 @@ private struct RDActionBar: View {
                 .menuStyle(.button)
                 .buttonStyle(RDSecondaryButton())
                 .fixedSize()
-                .help("Keep the Mac awake, on a timer, or until a task finishes.")
+                .help("Hold the Mac awake on purpose — with all safety rails still active.")
             }
+
+            autoSleepRow
 
             RDActiveControls()
 
@@ -192,6 +177,51 @@ private struct RDActionBar: View {
         .padding(.horizontal, theme.contentInset)
         .padding(.top, Space.s5)
         .padding(.bottom, theme.usesCards ? Space.s2 : Space.s4)
+    }
+
+    /// Label for the "end of work day" quiet-window option — respects the user's
+    /// configured active-hours end rather than hard-coding 6 PM.
+    private var untilWorkHoursLabel: String {
+        let h = settingsStore.settings.activeHoursEnd
+        let suffix = h >= 12 ? "PM" : "AM"
+        let display = h > 12 ? h - 12 : (h == 0 ? 12 : h)
+        return "Until \(display) \(suffix)"
+    }
+
+    /// A top-level row that surfaces Auto-sleep's on/off — no longer buried two
+    /// levels deep in the "Keep awake" menu. Also hosts the task-finish watcher.
+    private var autoSleepRow: some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: "moon.zzz").font(.system(size: 12))
+                .foregroundStyle(theme.ink3).accessibilityHidden(true)
+            Text("Auto-sleep when idle")
+                .font(.system(size: 13)).foregroundStyle(theme.ink2)
+            Spacer()
+            Menu {
+                if !appState.runningWatchCandidates.isEmpty {
+                    Section("Running now") {
+                        ForEach(appState.runningWatchCandidates, id: \.self) { name in
+                            Button(name) { appState.setWatchTarget(.processName(name)) }
+                        }
+                    }
+                }
+                Section("Common tools") {
+                    ForEach(appState.commonWatchCandidates, id: \.self) { name in
+                        Button(name) { appState.setWatchTarget(.processName(name)) }
+                    }
+                }
+            } label: {
+                Label("When done", systemImage: "binoculars")
+            }
+            .menuStyle(.button)
+            .buttonStyle(RDSecondaryButton(compact: true))
+            .fixedSize()
+            .help("Sleep the Mac the moment a build, agent, or tool finishes.")
+            Toggle("", isOn: settings.decaffeinateEnabled)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .help("Auto-sleep the Mac after you step away")
+        }
     }
 }
 
@@ -308,7 +338,7 @@ private struct RDList: View {
             Text("What's keeping your Mac awake?")
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.ink1)
             Text(
-                "macOS lets any app place a *power assertion* — a request that stops the Mac (or just the screen) from sleeping. Each row is one app's live request: what it's doing, who started it, and how long it's been held (\"held 9m\" is the real age). Decaffeinate still forces sleep once you step away."
+                "These apps asked macOS to stay awake — each row shows who, why, and how long. Decaffeinate still puts your Mac to sleep once you step away. Tap any row to see the full technical details."
             )
             .font(.system(size: 12)).foregroundStyle(theme.ink3)
             .fixedSize(horizontal: false, vertical: true)
