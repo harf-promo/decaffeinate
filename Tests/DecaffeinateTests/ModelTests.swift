@@ -74,6 +74,57 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(rule.matches(Fixtures.assertion(process: "python", bundle: nil)))
     }
 
+    // MARK: Resilient decoding — decode-survival for added / renamed fields
+
+    func testSleepEventOldSchemaDecodesSurvives() throws {
+        // JSON written by v1.9.0: no `sleptSeconds` field.
+        let json =
+            #"[{"id":"A0000000-0000-0000-0000-000000000001","date":978307200,"reason":"idle","onBattery":false}]"#
+            .data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let events = try decoder.decode([SleepEvent].self, from: json)
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events[0].reason, "idle")
+        XCTAssertNil(
+            events[0].sleptSeconds,
+            "absent sleptSeconds must decode to nil, not crash the whole array")
+    }
+
+    func testRuleOldSchemaDefaultsToPolicyIgnore() throws {
+        // Old JSON missing the policy field — must never silently grant .allow.
+        let json =
+            #"{"id":"A0000000-0000-0000-0000-000000000002","bundleIdentifier":"com.example.App","processName":"App","displayName":"My App"}"#
+            .data(using: .utf8)!
+        let rule = try JSONDecoder().decode(Rule.self, from: json)
+        XCTAssertEqual(rule.policy, .ignore, "absent policy must default to .ignore — never .allow")
+    }
+
+    func testRestEventOldSchemaDecodesSurvives() throws {
+        // Old JSON without uptimeSeconds (added alongside the Rest & Restart pillar).
+        let json =
+            #"{"id":"A0000000-0000-0000-0000-000000000003","date":978307200,"kind":"systemSleep","onBattery":false}"#
+            .data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let event = try decoder.decode(RestEvent.self, from: json)
+        XCTAssertEqual(event.kind, .systemSleep)
+        XCTAssertNil(event.uptimeSeconds, "absent uptimeSeconds must decode to nil, not a crash")
+    }
+
+    func testRestEventUnknownKindDegradesToSystemSleep() throws {
+        // A future `kind` string that this binary doesn't know about must not crash
+        // the entire rest-history array.
+        let json =
+            #"{"id":"A0000000-0000-0000-0000-000000000004","date":978307200,"kind":"futureKindXYZ","onBattery":true}"#
+            .data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let event = try decoder.decode(RestEvent.self, from: json)
+        XCTAssertEqual(
+            event.kind, .systemSleep, "unknown kind string must degrade to .systemSleep")
+    }
+
     // MARK: Settings clamp
 
     func testIdleThresholdClampedToAtLeastOneMinute() {

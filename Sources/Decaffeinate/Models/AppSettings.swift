@@ -101,6 +101,20 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// awake, so you can choose to allow or block it.
     var notifyOnNewBlocker: Bool = true
 
+    /// Post a notification when Decaffeinate confirms the Mac actually went to
+    /// sleep after a forced sleep. Off by default — informational, not urgent.
+    var notifyOnForcedSleep: Bool = false
+
+    /// Post a notification when a watched build or AI agent finishes and
+    /// Decaffeinate is about to let the Mac sleep. On by default — the user
+    /// intentionally armed the watch and wants to know it fired.
+    var notifyOnAgentFinished: Bool = true
+
+    /// Post a one-time nudge when the restart recommendation crosses into the
+    /// overdue band. Off by default — opt-in so it never nags. Re-arms after
+    /// each restart.
+    var notifyOnRestartOverdue: Bool = false
+
     // MARK: First run
 
     /// Set once the user has seen the welcome flow, so it only shows on first run.
@@ -189,6 +203,15 @@ extension DecaffeinateSettings {
         }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .notifyOnNewBlocker) {
             notifyOnNewBlocker = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .notifyOnForcedSleep) {
+            notifyOnForcedSleep = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .notifyOnAgentFinished) {
+            notifyOnAgentFinished = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .notifyOnRestartOverdue) {
+            notifyOnRestartOverdue = v
         }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) {
             hasCompletedOnboarding = v

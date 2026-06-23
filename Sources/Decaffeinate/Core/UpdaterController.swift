@@ -5,16 +5,40 @@ import Sparkle
 /// (e.g. `--scan` from a terminal or in CI), where Sparkle has no Info.plist
 /// feed/key to work with.
 ///
-/// Publishes `updateAvailable` (set by Sparkle's scheduled background check) so
-/// the menu can surface a clear "Update available" affordance, and exposes the
-/// standard Settings controls (check now, automatic checks, last-checked).
+/// Publishes `state` (and the derived `updateAvailable`) so the menu and
+/// Settings → About can surface clear, contextual feedback after every check.
 @MainActor
 final class UpdaterController: NSObject, ObservableObject, SPUUpdaterDelegate {
-    @Published private(set) var updateAvailable = false
+
+    /// The lifecycle of an update check — drives status UI in Settings → About.
+    enum UpdateState: Equatable {
+        case idle
+        case checking
+        case upToDate
+        case updateAvailable
+        case failed(reason: String)
+
+        static func == (lhs: UpdateState, rhs: UpdateState) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle), (.checking, .checking),
+                (.upToDate, .upToDate), (.updateAvailable, .updateAvailable):
+                return true
+            case (.failed(let a), .failed(let b)):
+                return a == b
+            default:
+                return false
+            }
+        }
+    }
+
+    @Published private(set) var state: UpdateState = .idle
     @Published private(set) var lastCheckedAt: Date?
     @Published var automaticChecksEnabled: Bool = true {
         didSet { controller?.updater.automaticallyChecksForUpdates = automaticChecksEnabled }
     }
+
+    /// Derived convenience — keeps existing call sites compiling unchanged.
+    var updateAvailable: Bool { state == .updateAvailable }
 
     private var controller: SPUStandardUpdaterController?
     private static let lastCheckedKey = "Decaffeinate.lastUpdateCheck"
@@ -35,12 +59,14 @@ final class UpdaterController: NSObject, ObservableObject, SPUUpdaterDelegate {
     var isAvailable: Bool { controller != nil }
 
     func checkForUpdates() {
+        state = .checking
         controller?.checkForUpdates(nil)
     }
 
     /// A user-initiated "Check for Updates…" (Settings / app menu). Stamps the
     /// last-checked time immediately so the UI reflects the action.
     func checkForUpdatesUserInitiated() {
+        state = .checking
         stampChecked()
         controller?.checkForUpdates(nil)
     }
@@ -51,26 +77,26 @@ final class UpdaterController: NSObject, ObservableObject, SPUUpdaterDelegate {
         UserDefaults.standard.set(now, forKey: Self.lastCheckedKey)
     }
 
-    // MARK: SPUUpdaterDelegate — flip the published flag as Sparkle discovers /
+    // MARK: SPUUpdaterDelegate — drive the published state as Sparkle discovers /
     // resolves updates (delegate callbacks arrive on the main thread).
 
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        MainActor.assumeIsolated { updateAvailable = true }
+        MainActor.assumeIsolated { state = .updateAvailable }
     }
 
     nonisolated func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
-        MainActor.assumeIsolated { updateAvailable = false }
+        MainActor.assumeIsolated { state = .upToDate }
     }
 
     nonisolated func updater(
         _ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
         error: (any Error)?
     ) {
-        // Record when the last check completed; clear the badge on error (a later
-        // scheduled check will re-raise it if needed).
+        // Record when the last check completed. The find/not-found callbacks have
+        // already set the terminal state; only override it here on error.
         MainActor.assumeIsolated {
             stampChecked()
-            if error != nil { updateAvailable = false }
+            if let error { state = .failed(reason: error.localizedDescription) }
         }
     }
 }

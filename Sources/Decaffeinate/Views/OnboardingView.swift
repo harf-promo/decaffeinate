@@ -124,14 +124,24 @@ private struct OnboardingPanel: Identifiable {
             bullets: [
                 "Calls, screen sharing and active media",
                 "Time Machine backups and macOS updates",
-                "Apps you've explicitly allowed",
+                "Apps you\u{2019}ve explicitly allowed",
             ]
         ),
         OnboardingPanel(
-            step: "03 — Stay informed",
-            title: "Know what's keeping you up",
+            step: "03 — More than sleep",
+            title: "It can keep you awake, too",
+            body: "Sometimes you want the opposite. Decaffeinate also knows how to:",
+            bullets: [
+                "Hold the Mac awake on demand — calls, downloads, a presentation",
+                "Watch a build or AI agent and sleep the moment it finishes",
+                "Nudge you to restart when your Mac has been up too long",
+            ]
+        ),
+        OnboardingPanel(
+            step: "04 — Stay informed",
+            title: "Know what\u{2019}s keeping you up",
             body:
-                "Decaffeinate tells you the moment a new app starts holding your Mac awake — with the real reason, like “microphone in use” or “playing media” — so you decide what to allow. Turn on notifications to get the heads-up."
+                "Decaffeinate tells you the moment a new app starts holding your Mac awake — with the real reason, like \u{201c}microphone in use\u{201d} or \u{201c}playing media\u{201d} — so you decide what to allow. Turn on notifications to get the heads-up."
         ),
     ]
 }

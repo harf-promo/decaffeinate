@@ -43,6 +43,12 @@ protocol BlockerNotifying {
     /// media"), never raw app-supplied assertion text — notifications surface on
     /// the lock screen.
     func notifyNewBlocker(appName: String, reason: String)
+    /// Posted when a confirmed forced sleep actually happens.
+    func notifyForcedSleep(reason: String)
+    /// Posted when a watched build/agent finishes and the Mac is sleeping now.
+    func notifyAgentFinished(label: String)
+    /// Posted once when uptime crosses into the overdue/urgent band.
+    func notifyRestartOverdue(uptimeLabel: String)
 }
 
 @MainActor

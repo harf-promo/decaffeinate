@@ -50,10 +50,16 @@ private final class ThermalBox: @unchecked Sendable {
 
 @MainActor private final class FakeNotifier: BlockerNotifying {
     private(set) var notifications: [(app: String, reason: String)] = []
+    private(set) var forcedSleeps: [String] = []
+    private(set) var agentFinishes: [String] = []
+    private(set) var restartOverdues: [String] = []
     func requestAuthorizationIfNeeded() {}
     func notifyNewBlocker(appName: String, reason: String) {
         notifications.append((appName, reason))
     }
+    func notifyForcedSleep(reason: String) { forcedSleeps.append(reason) }
+    func notifyAgentFinished(label: String) { agentFinishes.append(label) }
+    func notifyRestartOverdue(uptimeLabel: String) { restartOverdues.append(uptimeLabel) }
 }
 
 /// Reports a fixed, idle (zero-CPU) subtree forever — drives AgentWatcher to
@@ -1105,5 +1111,140 @@ final class AppStateTests: XCTestCase {
         h.system.boot = boot
         h.state.readBootTimeAndInferRestart()
         XCTAssertFalse(h.restHistory.events.contains { $0.kind == .restart })
+    }
+
+    // MARK: Notifications — forced sleep
+
+    func testForcedSleepNotificationFiresOnKernelConfirmation() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.settings.settings.notifyOnForcedSleep = true
+        h.idle.seconds = 120
+        h.state.tick()
+        // pmset launched but the kernel hasn't fired willSleep yet — no notification.
+        XCTAssertTrue(
+            h.notifier.forcedSleeps.isEmpty,
+            "notification must not fire until the kernel confirms the sleep")
+        // Kernel confirms → notification fires.
+        h.confirmKernelSleep()
+        XCTAssertEqual(h.notifier.forcedSleeps.count, 1)
+    }
+
+    func testForcedSleepNotificationRespectsOptOut() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        // Default: notifyOnForcedSleep = false.
+        h.idle.seconds = 120
+        h.state.tick()
+        h.confirmKernelSleep()
+        XCTAssertTrue(
+            h.notifier.forcedSleeps.isEmpty,
+            "notifyOnForcedSleep is off by default — must not fire")
+    }
+
+    // MARK: Notifications — agent finished
+
+    func testAgentFinishedNotificationFiresOnceAtSleepTrigger() {
+        let watcher = AgentWatcher(sampler: QuietSampler(pids: [500]))
+        watcher.requiredQuietSeconds = 2
+        let h = makeHarness(watcher: watcher) {
+            $0.idleThresholdMinutes = 10
+            $0.notifyOnAgentFinished = true
+        }
+        defer { h.cleanup() }
+        h.idle.seconds = 0
+        h.state.setWatchTarget(.processName("node"))
+        // Drive the watcher to completed.
+        for _ in 0..<5 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        // Agent finished — fires the notification exactly when the sleep is triggered.
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.notifier.agentFinishes.count, 1)
+        // Watcher is cleared after the one-shot sleep; further ticks must not re-fire.
+        h.clock.advance(120)
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(
+            h.notifier.agentFinishes.count, 1,
+            "agent-finished notification is one-shot — must not re-fire after the watcher clears")
+    }
+
+    func testAgentFinishedNotificationRespectsOptOut() {
+        let watcher = AgentWatcher(sampler: QuietSampler(pids: [500]))
+        watcher.requiredQuietSeconds = 2
+        let h = makeHarness(watcher: watcher) { $0.idleThresholdMinutes = 10 }
+        defer { h.cleanup() }
+        // Explicitly opt out (overrides the true default set in the configure block above).
+        h.settings.settings.notifyOnAgentFinished = false
+        h.idle.seconds = 0
+        h.state.setWatchTarget(.processName("node"))
+        for _ in 0..<5 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertTrue(h.notifier.agentFinishes.isEmpty, "opt-out must suppress the notification")
+    }
+
+    // MARK: Notifications — restart overdue
+
+    func testRestartOverdueNotificationFiresOnFirstCrossing() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.settings.settings.notifyOnRestartOverdue = true
+        // 9 days → .consider (below the 7×2 = 14-day overdue threshold).
+        h.system.boot = h.clock.date.addingTimeInterval(-9 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        h.state.tick()
+        XCTAssertTrue(
+            h.notifier.restartOverdues.isEmpty,
+            ".consider is not overdue — must not fire a notification")
+
+        // 15 days → .overdue (≥ 14-day threshold with default 7-day recommendation).
+        h.system.boot = h.clock.date.addingTimeInterval(-15 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        h.state.tick()
+        XCTAssertEqual(h.notifier.restartOverdues.count, 1, "first crossing must fire exactly once")
+
+        // Subsequent ticks while still overdue must NOT re-fire.
+        h.state.tick()
+        h.state.tick()
+        XCTAssertEqual(
+            h.notifier.restartOverdues.count, 1,
+            "must not spam repeated notifications within the same overdue band")
+    }
+
+    func testRestartOverdueNotificationRespectsOptOut() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // Default: notifyOnRestartOverdue = false.
+        h.system.boot = h.clock.date.addingTimeInterval(-15 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        h.state.tick()
+        XCTAssertTrue(
+            h.notifier.restartOverdues.isEmpty, "notifyOnRestartOverdue is off by default")
+    }
+
+    func testRestartOverdueNotificationReArmsAfterRestartDropsToFresh() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.settings.settings.notifyOnRestartOverdue = true
+        // First run: cross into .overdue → fires once.
+        h.system.boot = h.clock.date.addingTimeInterval(-15 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        h.state.tick()
+        XCTAssertEqual(h.notifier.restartOverdues.count, 1)
+
+        // Simulate a restart: uptime drops to .fresh (1 day).
+        h.system.boot = h.clock.date.addingTimeInterval(-1 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        h.state.tick()  // advice → .fresh → lastNotifiedRestartAdvice resets
+
+        // Second long run: cross into .overdue again → must fire again.
+        h.system.boot = h.clock.date.addingTimeInterval(-15 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        h.state.tick()
+        XCTAssertEqual(
+            h.notifier.restartOverdues.count, 2,
+            "notification must re-arm after a restart that resets advice to .fresh")
     }
 }

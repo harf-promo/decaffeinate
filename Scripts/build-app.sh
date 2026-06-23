@@ -48,6 +48,18 @@ mkdir -p "${APP_BUNDLE}/Contents/Resources"
 cp "${BIN_PATH}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "Resources/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
 
+# Stamp a deterministic CFBundleVersion derived from the marketing version
+# (so locally-built and CI-built apps both report the correct, consistent build
+# number — never the placeholder "1" from the source Info.plist).
+# shellcheck source=Scripts/version.sh
+source "$(dirname "$0")/version.sh"
+_MV="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' \
+    "${APP_BUNDLE}/Contents/Info.plist")"
+_BV="$(bundle_version_from_marketing "$_MV")"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $_BV" \
+    "${APP_BUNDLE}/Contents/Info.plist"
+unset _MV _BV
+
 if [[ -f "assets/AppIcon.icns" ]]; then
     cp "assets/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 else

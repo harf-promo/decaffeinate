@@ -223,6 +223,10 @@ private struct RDActionBar: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .help("Auto-sleep the Mac after you step away")
+                .accessibilityLabel("Auto-sleep when idle")
+                .accessibilityHint(
+                    "Forces the Mac to sleep after you step away, overriding apps that hold it awake"
+                )
         }
     }
 }

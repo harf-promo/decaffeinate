@@ -4,6 +4,67 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] — 2026-06-23
+
+Smarter, more honest, more communicative — and the in-app updater now actually
+works.
+
+### Fixed
+- **In-app updates work again.** `CFBundleVersion` was stamped from
+  `${GITHUB_RUN_NUMBER}` (a CI counter that happened to be `13`), so Sparkle
+  considered every release "up to date" once the user had build 13 installed.
+  The build number is now derived deterministically from the marketing version —
+  `major×10000 + minor×100 + patch` — so `1.10.0 → 11000` which is
+  unambiguously newer than the installed `13`. Future versions can never drift
+  again because the formula is the single source of truth (`Scripts/version.sh`).
+- **In-app update status shows what's happening.** The Settings → About section
+  previously went silent after "Check for Updates…" — there was no feedback on
+  whether the check succeeded, failed, or found something. A status row now shows
+  one of: *Up to date · checked just now* (green pill), *Checking…* (info pill,
+  button disabled), *Update available — Install* (warning pill), or *Couldn't
+  check · Try Again* with the reason in a tooltip (critical pill).
+
+### Added
+- **Three opt-out notifications** — off by default unless you've clearly opted
+  into the relevant feature, honest about what the app actually did:
+  - *Forced-sleep confirmation* — fires when the kernel confirms the transition
+    (not when pmset is launched), guarded by `notifyOnForcedSleep` (default
+    off).
+  - *Agent/build finished* — fires at the moment the sleep happens, one-shot
+    so it can't re-fire after the watcher clears. On by default because you
+    opted into the watch.
+  - *Restart overdue* — fires once per crossing into the overdue/urgent band
+    (never at launch even if the Mac is already overdue), re-arms after a real
+    restart. Off by default.
+  Settings → Notifications & startup has a toggle for each.
+- **Onboarding panel "More than sleep"** — a new step 03 surfaces the
+  keep-awake, agent-watch, and restart-nudge features that new users miss. The
+  panel count, step numerals, and page transitions adapt automatically.
+- **Configurable CPU trigger threshold** — the "While CPU is busy" trigger no
+  longer hard-codes 50%. A slider (10–90%, step 5) lets you add a trigger at any
+  threshold. No model change — the existing `cpuAbove(Int)` condition always
+  stored the value; only the UI was rigid.
+- **Accessibility** — primary menu-bar toggle now has `.accessibilityLabel` +
+  `.accessibilityHint`; the two icon-only trash buttons in Settings carry
+  `.accessibilityLabel` so VoiceOver users can identify them without activating.
+
+### Changed
+- **"Minutes of avoided waking" → "minutes of measured sleep"** — the old
+  `events.count × 15` counterfactual (which claimed to know how long the Mac
+  *would* have stayed awake) is replaced by the actual measured time from each
+  forced sleep to the next observed wake, with a 15-minute fallback only for
+  events where the app was quit before the wake fired. The label is now
+  "≈ X min of measured sleep started by Decaffeinate."
+
+### Internal
+- Resilient per-field decoders on `SleepEvent`, `Rule`, and `RestEvent` so
+  adding a new field in a future version degrades old records gracefully instead
+  of wiping entire persisted arrays. `Rule.policy` absent from old JSON defaults
+  to `.ignore` (never silently grants `.allow`).
+- 18 new tests (245 total): decode-survival, wake-duration pairing, 24 h clamp,
+  measured-minutes computation, notification de-dup, and forced-sleep/
+  agent-finished opt-out coverage.
+
 ## [1.9.0] — 2026-06-22
 
 Rest properly: sleep daily, restart weekly. A new pillar that tracks how long your

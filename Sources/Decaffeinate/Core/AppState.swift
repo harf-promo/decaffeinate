@@ -116,6 +116,12 @@ final class AppState: ObservableObject {
     /// battery backpack guard.
     private var suppressImmediateUntil: Date?
 
+    /// The last restart-advice level we fired a notification for. Seeded in
+    /// `start()` so the app never nags on launch just because the Mac is already
+    /// overdue when Decaffeinate opens. Re-arms after the advice drops back to
+    /// `.fresh` (e.g. after a restart).
+    private var lastNotifiedRestartAdvice: RestartAdvice?
+
     /// A forced sleep we asked for via pmset but haven't confirmed the kernel
     /// performed. Recorded only when a willSleep notification confirms it; left to
     /// lapse (recording nothing) if a PreventSystemSleep hold aborts the transition.
@@ -246,6 +252,11 @@ final class AppState: ObservableObject {
             notifier.requestAuthorizationIfNeeded()
         }
         readBootTimeAndInferRestart()
+        // Seed the restart-notification guard with the current advice so we
+        // never fire a notification at launch just because the Mac is already
+        // overdue when Decaffeinate opens. The guard re-arms after a restart
+        // (advice drops back to .fresh, then a future crossing re-fires once).
+        lastNotifiedRestartAdvice = restartAdvice
         registerRestObservers()
         tick()
         let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -315,8 +326,14 @@ final class AppState: ObservableObject {
                 [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
+                    let wakeDate = self.now()
                     self.restHistory.record(
-                        RestEvent(date: self.now(), kind: kind, onBattery: self.power.onBattery))
+                        RestEvent(date: wakeDate, kind: kind, onBattery: self.power.onBattery))
+                    // Pair a wake with the most recent unmatched forced sleep so we
+                    // can measure how long the Mac actually stayed asleep.
+                    if kind == .wake {
+                        self.history.recordWakeDuration(at: wakeDate)
+                    }
                 }
             }
             restObserverTokens.append(token)
@@ -735,6 +752,12 @@ final class AppState: ObservableObject {
                     // it doesn't turn into a permanent 60s-idle aggressive-sleep
                     // mode after the user wakes the Mac.
                     if agentFinished {
+                        // Notify before clearing the target so we can still read the label.
+                        if settings.notifyOnAgentFinished,
+                            case .completed(let label, _) = watchStatus
+                        {
+                            notifier.notifyAgentFinished(label: label)
+                        }
                         agentWatcher.setTarget(nil)
                         watchStatus = agentWatcher.status
                     }
@@ -747,6 +770,27 @@ final class AppState: ObservableObject {
             systemBlockers: systemBlockers,
             decision: decision,
             remaining: remaining)
+
+        evaluateRestartOverdueNotification()
+    }
+
+    // MARK: Restart-overdue notification
+
+    /// Fire a one-shot notification the first time uptime crosses into the
+    /// overdue/urgent band, then stay silent until a restart resets the advice
+    /// back to `.fresh` and the crossing happens again.
+    private func evaluateRestartOverdueNotification() {
+        guard settings.notifyOnRestartOverdue, let label = uptimeLabel else { return }
+        let advice = restartAdvice
+        let wasOverdue =
+            lastNotifiedRestartAdvice.map {
+                $0 == .overdue || $0 == .urgent
+            } ?? false
+        let isOverdue = advice == .overdue || advice == .urgent
+        if isOverdue, !wasOverdue {
+            notifier.notifyRestartOverdue(uptimeLabel: label)
+        }
+        lastNotifiedRestartAdvice = advice
     }
 
     // MARK: Force sleep
@@ -807,6 +851,9 @@ final class AppState: ObservableObject {
                 SleepEvent(date: when, reason: pending.reason, onBattery: pending.onBattery))
             restHistory.record(
                 RestEvent(date: when, kind: .forcedSleep, onBattery: pending.onBattery))
+            if settings.notifyOnForcedSleep {
+                notifier.notifyForcedSleep(reason: pending.reason)
+            }
         } else {
             restHistory.record(
                 RestEvent(date: when, kind: .systemSleep, onBattery: power.onBattery))

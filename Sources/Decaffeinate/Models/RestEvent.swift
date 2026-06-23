@@ -63,3 +63,20 @@ struct RestEvent: Codable, Identifiable, Hashable, Sendable {
         self.uptimeSeconds = uptimeSeconds
     }
 }
+
+extension RestEvent {
+    /// Resilient decode: every field uses `decodeIfPresent` with a safe default,
+    /// so adding a new field in a later version degrades one old record gracefully
+    /// instead of wiping the entire rest history. Encode stays synthesized.
+    /// Note: `Kind` already has its own resilient decode (unknown → `.systemSleep`).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        let date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
+        let kind = try c.decodeIfPresent(Kind.self, forKey: .kind) ?? .systemSleep
+        let onBattery = try c.decodeIfPresent(Bool.self, forKey: .onBattery) ?? false
+        let uptimeSeconds = try c.decodeIfPresent(TimeInterval.self, forKey: .uptimeSeconds)
+        self.init(
+            id: id, date: date, kind: kind, onBattery: onBattery, uptimeSeconds: uptimeSeconds)
+    }
+}

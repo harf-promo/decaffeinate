@@ -1,10 +1,13 @@
 import Foundation
 import UserNotifications
 
-/// Best-effort user notifications for firewall alerts ("a new app is keeping
-/// your Mac awake"). Entirely guarded: notifications only work from a real app
-/// bundle, so when Decaffeinate is run as a bare binary (e.g. in CI or a smoke
-/// test) every call is a safe no-op instead of a crash.
+/// Best-effort user notifications for Decaffeinate events. Entirely guarded:
+/// notifications only work from a real app bundle, so when Decaffeinate is run
+/// as a bare binary (e.g. in CI or a smoke test) every call is a safe no-op.
+///
+/// All notification copy uses fixed, classified labels — never raw app-supplied
+/// assertion text, which can carry a media title / file name and would leak to
+/// the lock screen.
 @MainActor
 final class Notifier {
     private var authorized = false
@@ -21,23 +24,44 @@ final class Notifier {
         }
     }
 
+    // MARK: Typed notification methods
+
     func notifyNewBlocker(appName: String, reason: String) {
+        post(
+            title: "\(appName) is keeping your Mac awake",
+            body: "\(reason) — open Decaffeinate to Allow or Block it.")
+    }
+
+    func notifyForcedSleep(reason: String) {
+        post(
+            title: "Putting your Mac to sleep",
+            body: "Decaffeinate stepped in — \(reason).")
+    }
+
+    func notifyAgentFinished(label: String) {
+        post(
+            title: "\(label) finished",
+            body: "Decaffeinate is letting your Mac sleep now.")
+    }
+
+    func notifyRestartOverdue(uptimeLabel: String) {
+        post(
+            title: "A restart is overdue",
+            body:
+                "Your Mac has been up \(uptimeLabel). A weekly restart clears what sleep can't.")
+    }
+
+    // MARK: Private
+
+    private func post(title: String, body: String) {
         guard isBundled else { return }
         requestAuthorizationIfNeeded()
-
         let content = UNMutableNotificationContent()
-        // `appName` is the resolved display name and `reason` is a fixed,
-        // classified label — never the raw, app-controlled assertion text, which
-        // can carry a media title / file name and would leak to the lock screen.
-        content.title = "\(appName) is keeping your Mac awake"
-        content.body = "\(reason) — open Decaffeinate to Allow or Block it."
-        content.sound = nil
-
+        content.title = title
+        content.body = body
+        content.sound = .default
         let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
+            identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 }

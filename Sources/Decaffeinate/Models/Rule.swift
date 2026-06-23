@@ -119,3 +119,23 @@ struct Rule: Identifiable, Codable, Hashable, Sendable {
         return processName.caseInsensitiveCompare(process) == .orderedSame
     }
 }
+
+extension Rule {
+    /// Resilient decode: every field uses `decodeIfPresent` with a safe default,
+    /// so adding a new field in a later version degrades one old record gracefully
+    /// instead of wiping the entire rules list. Encode stays synthesized.
+    ///
+    /// An absent `policy` defaults to `.ignore` — the safe choice (let the Mac
+    /// sleep) — never silently granting `.allow` to an unrecognised record.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        let bundleIdentifier = try c.decodeIfPresent(String.self, forKey: .bundleIdentifier)
+        let processName = try c.decodeIfPresent(String.self, forKey: .processName) ?? ""
+        let displayName = try c.decodeIfPresent(String.self, forKey: .displayName) ?? ""
+        let policy = try c.decodeIfPresent(RulePolicy.self, forKey: .policy) ?? .ignore
+        self.init(
+            id: id, bundleIdentifier: bundleIdentifier, processName: processName,
+            displayName: displayName, policy: policy)
+    }
+}

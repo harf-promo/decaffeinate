@@ -177,8 +177,13 @@ private struct GeneralSettings: View {
                     .disabled(!store.settings.caffeinateEnabled)
             }
 
-            Section("Startup & alerts") {
+            Section("Notifications & startup") {
                 Toggle("Notify me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
+                Toggle("Notify me when I force the Mac to sleep", isOn: s.notifyOnForcedSleep)
+                Toggle(
+                    "Notify me when a watched agent or build finishes",
+                    isOn: s.notifyOnAgentFinished)
+                Toggle("Remind me when a restart is overdue", isOn: s.notifyOnRestartOverdue)
                 Toggle("Show the countdown in the menu bar", isOn: s.showMenuBarCountdown)
                 if LoginItem.isAvailable {
                     Toggle("Launch at login", isOn: s.launchAtLogin)
@@ -285,6 +290,7 @@ private struct AutomationSettings: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var rules: RulesEngine
     @State private var newAppName = ""
+    @State private var cpuThreshold: Double = 50
 
     var body: some View {
         Form {
@@ -311,6 +317,7 @@ private struct AutomationSettings: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("Remove trigger: \(rule.condition.label)")
                     }
                 }
             }
@@ -323,7 +330,15 @@ private struct AutomationSettings: View {
                         .disabled(newAppName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 Button("While on AC power") { add(.onACPower) }
-                Button("While CPU is busy (above 50%)") { add(.cpuAbove(50)) }
+                HStack {
+                    LabeledSlider(
+                        "Keep awake when CPU above",
+                        value: $cpuThreshold,
+                        range: 10...90, step: 5, unit: "%", width: 44)
+                    Button("Add") { add(.cpuAbove(Int(cpuThreshold))) }
+                        .buttonStyle(HarfButtonStyle(variant: .ghost, size: .small))
+                        .fixedSize()
+                }
             }
 
             Section("Allowed / blocked apps") {
@@ -348,6 +363,7 @@ private struct AutomationSettings: View {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove rule: \(rule.displayName)")
                         }
                     }
                     Button("Clear all rules", role: .destructive) { rules.removeAll() }
@@ -551,7 +567,7 @@ private struct HistorySettings: View {
                     )
                     .font(HarfFont.title).foregroundStyle(Color.ink1)
                     Text(
-                        "≈ \(history.estimatedMinutesAvoided) min of needless wake avoided (rough estimate)."
+                        "≈ \(history.measuredMinutesAsleep) min of measured sleep started by Decaffeinate."
                     )
                     .font(.caption).foregroundStyle(Color.ink3)
                 }
@@ -615,19 +631,53 @@ private struct AboutView: View {
         VStack(spacing: Space.s2) {
             Text("Version \(AppInfo.version)").eyebrow(.ink4)
             if updater.isAvailable {
-                if updater.updateAvailable {
-                    Label("An update is available", systemImage: "arrow.down.circle.fill")
-                        .font(HarfFont.caption).foregroundStyle(Color.positive)
-                }
-                Text("Last checked: \(lastChecked)")
-                    .font(HarfFont.caption).foregroundStyle(Color.ink3)
-                Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
-                    .padding(.top, 2)
+                updateStatusRow
                 Toggle("Automatically check for updates", isOn: $updater.automaticChecksEnabled)
                     .font(HarfFont.caption).fixedSize()
             }
         }
         .padding(.vertical, Space.s2)
+    }
+
+    @ViewBuilder private var updateStatusRow: some View {
+        switch updater.state {
+        case .idle:
+            VStack(spacing: Space.s1) {
+                Text("Last checked: \(lastChecked)")
+                    .font(HarfFont.caption).foregroundStyle(Color.ink3)
+                Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
+                    .padding(.top, 2)
+            }
+        case .checking:
+            HStack(spacing: Space.s2) {
+                ProgressView().scaleEffect(0.7)
+                HarfPill(label: "Checking", variant: .info)
+            }
+            .frame(minHeight: 32)
+        case .upToDate:
+            VStack(spacing: Space.s1) {
+                HStack(spacing: Space.s2) {
+                    HarfPill(label: "Up to date", variant: .positive, dot: true)
+                    Text("· \(lastChecked)")
+                        .font(HarfFont.caption).foregroundStyle(Color.ink3)
+                }
+                Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
+                    .padding(.top, 2)
+            }
+        case .updateAvailable:
+            VStack(spacing: Space.s1) {
+                HarfPill(label: "Update available", variant: .warning, dot: true)
+                Button("Install Update…") { updater.checkForUpdatesUserInitiated() }
+                    .padding(.top, 2)
+            }
+        case .failed(let reason):
+            VStack(spacing: Space.s1) {
+                HarfPill(label: "Couldn't check", variant: .critical, dot: true)
+                    .help(reason)
+                Button("Try Again") { updater.checkForUpdatesUserInitiated() }
+                    .padding(.top, 2)
+            }
+        }
     }
 
     private var lastChecked: String {

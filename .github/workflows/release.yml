@@ -78,8 +78,11 @@ jobs:
             echo "::error::Tag '${GITHUB_REF_NAME}' is not a valid version (expected vMAJOR.MINOR.PATCH)."
             exit 1
           fi
+          source Scripts/version.sh
+          BUILD="$(bundle_version_from_marketing "$VERSION")"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Resources/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" Resources/Info.plist
+          echo "▸ CFBundleVersion → $BUILD (derived from $VERSION, replaces GITHUB_RUN_NUMBER)"
 
       - name: Import signing certificate
         env:
