@@ -157,56 +157,22 @@ struct Hairline: View {
     var body: some View { Rectangle().fill(color).frame(height: 1) }
 }
 
-/// The Decaffeinate brand mark — the "nightcap": a coffee cup with one harf-green
-/// crescent moon rising like steam (matches the app icon, tonally adapted so the
-/// cup stays legible on a paper surface). The same mark used everywhere.
+/// The Decaffeinate brand mark — the "Moon + Zzz" sleep identity: a harf-green
+/// crescent moon with three rising z's (small → medium → large). Drawn from
+/// `BrandMark` geometry so it matches the app icon and menu-bar glyph exactly.
 struct DecaffeinateMark: View {
     var size: CGFloat = 22
 
     var body: some View {
         Canvas { ctx, sz in
             let s = min(sz.width, sz.height)
-
-            // Saucer.
-            ctx.fill(
-                Path(
-                    ellipseIn: CGRect(
-                        x: s * 0.235, y: s * 0.690, width: s * 0.45, height: s * 0.075)),
-                with: .color(.ink1))
-
-            // Handle (stroked C on the right).
-            var handle = Path()
-            handle.move(to: CGPoint(x: s * 0.61, y: s * 0.44))
-            handle.addCurve(
-                to: CGPoint(x: s * 0.60, y: s * 0.61),
-                control1: CGPoint(x: s * 0.76, y: s * 0.44),
-                control2: CGPoint(x: s * 0.76, y: s * 0.61))
-            ctx.stroke(
-                handle, with: .color(.ink1),
-                style: StrokeStyle(lineWidth: s * 0.055, lineCap: .round))
-
-            // Cup body (filled), tapered with a rounded bottom.
-            var cup = Path()
-            cup.move(to: CGPoint(x: s * 0.295, y: s * 0.38))
-            cup.addLine(to: CGPoint(x: s * 0.625, y: s * 0.38))
-            cup.addLine(to: CGPoint(x: s * 0.597, y: s * 0.61))
-            cup.addQuadCurve(
-                to: CGPoint(x: s * 0.542, y: s * 0.66), control: CGPoint(x: s * 0.592, y: s * 0.66))
-            cup.addLine(to: CGPoint(x: s * 0.378, y: s * 0.66))
-            cup.addQuadCurve(
-                to: CGPoint(x: s * 0.323, y: s * 0.61), control: CGPoint(x: s * 0.328, y: s * 0.66))
-            cup.closeSubpath()
-            ctx.fill(cup, with: .color(.ink1))
-
-            // Crescent moon (green) rising at the upper-right.
-            let r1 = s * 0.085
-            let r2 = s * 0.068
-            var moon = Path()
-            moon.addEllipse(
-                in: CGRect(x: s * 0.62 - r1, y: s * 0.26 - r1, width: r1 * 2, height: r1 * 2))
-            moon.addEllipse(
-                in: CGRect(x: s * 0.65 - r2, y: s * 0.235 - r2, width: r2 * 2, height: r2 * 2))
-            ctx.fill(moon, with: .color(.harfGreen), style: FillStyle(eoFill: true))
+            let rect = CGRect(
+                x: (sz.width - s) / 2, y: (sz.height - s) / 2, width: s, height: s)
+            for el in BrandMark.logo(in: rect) {
+                let fill: GraphicsContext.Shading =
+                    el.ink == .moon ? .color(.harfGreen) : .color(.ink1)
+                ctx.fill(Path(el.path), with: fill, style: FillStyle(eoFill: el.evenOdd))
+            }
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)

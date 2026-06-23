@@ -80,13 +80,13 @@ Now**, auto-sleep, and keep-awake.
 <img src="assets/onboarding.png" width="360" alt="Decaffeinate first-run welcome — safe by default" />
 </div>
 
-**Menu-bar at a glance** — a coffee cup tells you the state without opening the menu:
+**Menu-bar at a glance** — a crescent moon tells you the state without opening the menu:
 
 <div align="center">
 <img src="assets/menubar-icons.png" width="280" alt="Menu-bar states" />
 </div>
 
-> empty cup + crescent *(decaffeinated; free to sleep)* · a downward chevron *(winding down)* · full & steaming *(something's keeping it awake)* · with a bolt *(intentionally awake)*
+> moon + z *(decaffeinated; free to sleep)* · moon + chevron *(winding down)* · moon + ! *(something's keeping it awake)* · moon + bolt *(intentionally awake)*
 
 ---
 
@@ -230,7 +230,7 @@ Open areas where you can make a dent today:
 
 ## Roadmap
 
-**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · **the Rest & Restart pillar (uptime tracking + a weekly-restart recommendation)** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the coffee "nightcap" mark · universal (Intel + Apple Silicon) build.
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · **the Rest & Restart pillar (uptime tracking + a weekly-restart recommendation)** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the crescent-moon "Zzz" mark unified across all renderers · universal (Intel + Apple Silicon) build.
 
 **Next:** localization · homebrew/cask-core submission · SMC temperature sensors. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

@@ -586,7 +586,7 @@ private struct AboutView: View {
 
     var body: some View {
         VStack(spacing: Space.s3) {
-            DecaffeinateMark(size: 56)
+            DecaffeinateMark(size: 64)
             Text("Decaffeinate").font(HarfFont.h2).foregroundStyle(Color.ink1)
             Text("The truth about what's keeping your Mac awake — and the power to make it sleep.")
                 .font(HarfFont.lede)
