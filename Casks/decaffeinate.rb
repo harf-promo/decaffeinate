@@ -4,7 +4,7 @@
 # Scripts/make-dmg.sh and published as SHA256SUMS.txt on the GitHub release).
 cask "decaffeinate" do
   version "1.10.1"
-  sha256 "placeholder-updated-after-release-build"
+  sha256 "52c415478717bdefc8d5398e2df2e2d96e0fcc05af7aeeb49ff72af116a3957e"
 
   url "https://github.com/harf-promo/decaffeinate/releases/download/v#{version}/Decaffeinate-#{version}.dmg"
   name "Decaffeinate"
