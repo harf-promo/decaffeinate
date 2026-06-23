@@ -4,7 +4,7 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — UX simplification: answer-first menu
+## [1.11.0] — 2026-06-23
 
 Radically simplifies the menu so it answers one question per hold: "Will my Mac
 sleep on its own, or is something holding it awake indefinitely?" Removes firewall
