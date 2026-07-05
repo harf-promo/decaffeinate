@@ -66,6 +66,25 @@ else
     echo "  (no assets/AppIcon.icns — run: swift Scripts/generate-icon.swift)"
 fi
 
+# Copy SwiftPM resource bundles (e.g. KeyboardShortcuts' localized .strings) so
+# each package's Bundle.module accessor resolves at runtime. Without this,
+# KeyboardShortcuts.RecorderCocoa.init fatalErrors ("unable to find bundle named
+# KeyboardShortcuts_KeyboardShortcuts") the moment the Settings window renders the
+# hotkey recorder. The accessor searches Bundle.main.resourceURL first — i.e.
+# Contents/Resources/ — so that's where the bundle must land.
+for _bundle in "${BIN_DIR}"/*.bundle; do
+    [[ -e "${_bundle}" ]] || continue
+    echo "▸ Bundling resource: $(basename "${_bundle}")"
+    cp -R "${_bundle}" "${APP_BUNDLE}/Contents/Resources/"
+done
+# Guard: KeyboardShortcuts is a required dep whose recorder needs its bundle —
+# fail loudly if it didn't make it in, rather than shipping a Settings crash.
+if grep -q "KeyboardShortcuts" Package.swift \
+    && [[ ! -d "${APP_BUNDLE}/Contents/Resources/KeyboardShortcuts_KeyboardShortcuts.bundle" ]]; then
+    echo "✗ KeyboardShortcuts resource bundle missing — Settings would crash (Bundle.module)" >&2
+    exit 1
+fi
+
 # Embed Sparkle.framework (the executable links @rpath/Sparkle.framework and has
 # an @executable_path/../Frameworks rpath). BIN_DIR was resolved above.
 FRAMEWORK="${BIN_DIR}/Sparkle.framework"

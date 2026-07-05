@@ -4,6 +4,21 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] — 2026-07-05
+
+Fixes a crash introduced in 1.12.0.
+
+### Fixed
+- **Opening Settings no longer crashes the app.** 1.12.0 added a global
+  Sleep-Now hotkey recorder to Settings → General, but the packaging script
+  (`build-app.sh`) never copied the KeyboardShortcuts SwiftPM **resource bundle**
+  into the app. The moment the Settings window rendered the recorder, the
+  package's `Bundle.module` lookup for its localized strings trapped
+  (`EXC_BREAKPOINT` — "unable to find bundle named KeyboardShortcuts_KeyboardShortcuts"),
+  terminating the app. `build-app.sh` now copies SwiftPM resource bundles into
+  `Contents/Resources/` (with a hard-fail guard so a missing bundle can never
+  ship silently again). Menu-bar behavior and the CLI were unaffected.
+
 ## [1.12.0] — 2026-07-05
 
 Modern automation and forward-compatibility: Decaffeinate is now scriptable from
