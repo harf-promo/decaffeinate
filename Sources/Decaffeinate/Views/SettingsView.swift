@@ -115,6 +115,17 @@ private struct GeneralSettings: View {
 
     var body: some View {
         Form {
+            Section {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Decaffeinate makes your idle Mac sleep.")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(
+                        "You're in control: it forces sleep when you step away, and shows you exactly what's holding it awake."
+                    )
+                    .settingsCaption()
+                }
+            }
+
             Section("Put the Mac to sleep") {
                 Toggle("Auto-sleep when left idle", isOn: s.decaffeinateEnabled)
                 LabeledSlider(
@@ -150,15 +161,21 @@ private struct GeneralSettings: View {
             }
 
             Section("Never sleep at a bad moment") {
-                Toggle("Pause while the microphone is in use (calls)", isOn: s.pauseForActiveCall)
-                Toggle("Pause for active media", isOn: s.pauseForActiveMedia)
-                Toggle("Pause during Time Machine backups", isOn: s.pauseForTimeMachine)
-                Toggle("Pause during macOS updates", isOn: s.pauseForSystemUpdate)
-                Toggle("Respect apps set to \u{201C}Always allow\u{201D}", isOn: s.respectWhitelist)
-                Text(
-                    "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
-                )
-                .settingsCaption()
+                Text("Won't interrupt calls, media, backups, updates, or apps you allowed.")
+                    .settingsCaption()
+                DisclosureGroup("Advanced \u{2014} choose which") {
+                    Toggle("Pause during calls (microphone)", isOn: s.pauseForActiveCall)
+                    Toggle("Pause for active media", isOn: s.pauseForActiveMedia)
+                    Toggle("Pause during Time Machine backups", isOn: s.pauseForTimeMachine)
+                    Toggle("Pause during macOS updates", isOn: s.pauseForSystemUpdate)
+                    Toggle(
+                        "Respect apps set to \u{201C}Always allow\u{201D}", isOn: s.respectWhitelist
+                    )
+                    Text(
+                        "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
+                    )
+                    .settingsCaption()
+                }
             }
 
             Section("Battery & heat") {
@@ -170,7 +187,8 @@ private struct GeneralSettings: View {
                     range: 0...50, step: 5, unit: "%", width: 44)
                 Text("On battery, keep-awake holds are dropped below this charge.")
                     .settingsCaption()
-                Toggle("Backpack guard (sleep if overheating)", isOn: s.thermalGuardEnabled)
+                Toggle(
+                    "Sleep if it overheats in a bag (backpack guard)", isOn: s.thermalGuardEnabled)
                 Text(
                     "If the Mac gets thermally stressed — e.g. lid closed in a bag — all keep-awake holds are released and it sleeps immediately."
                 )
@@ -183,16 +201,7 @@ private struct GeneralSettings: View {
                     .disabled(!store.settings.caffeinateEnabled)
             }
 
-            Section("Notifications & startup") {
-                Toggle("Notify me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
-                Toggle(
-                    "Notify me when Decaffeinate puts the Mac to sleep",
-                    isOn: s.notifyOnForcedSleep)
-                Toggle(
-                    "Notify me when a watched agent or build finishes",
-                    isOn: s.notifyOnAgentFinished)
-                Toggle("Remind me when a restart is overdue", isOn: s.notifyOnRestartOverdue)
-                Toggle("Show the countdown in the menu bar", isOn: s.showMenuBarCountdown)
+            Section("Startup & menu bar") {
                 if LoginItem.isAvailable {
                     Toggle("Launch at login", isOn: s.launchAtLogin)
                         .onChange(of: store.settings.launchAtLogin) { _, newValue in
@@ -203,6 +212,16 @@ private struct GeneralSettings: View {
                             }
                         }
                 }
+                Toggle("Show the sleep countdown in the menu bar", isOn: s.showMenuBarCountdown)
+            }
+
+            Section("Notifications") {
+                Toggle("Tell me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
+                Toggle(
+                    "Tell me when Decaffeinate puts the Mac to sleep", isOn: s.notifyOnForcedSleep)
+                Toggle(
+                    "Tell me when a watched agent or build finishes", isOn: s.notifyOnAgentFinished)
+                Toggle("Remind me when a restart is overdue", isOn: s.notifyOnRestartOverdue)
             }
         }
         .formStyle(.grouped)
@@ -406,11 +425,11 @@ private struct AutomationSettings: View {
                 .settingsCaption()
             }
 
-            Section("Strict takeover") {
+            Section("Take full control of sleep") {
                 Toggle(
-                    "Let Decaffeinate own the idle timer", isOn: $store.settings.strictTakeoverMode)
+                    "Let Decaffeinate decide every sleep", isOn: $store.settings.strictTakeoverMode)
                 Text(
-                    "Holds a system-sleep assertion so macOS never idle-sleeps on its own — Decaffeinate becomes the only thing that decides when to sleep. If it ever quits, normal macOS sleep resumes automatically."
+                    "Decaffeinate becomes the only thing that decides when your Mac sleeps — macOS won't idle-sleep on its own. If Decaffeinate ever quits, normal sleep resumes automatically."
                 )
                 .settingsCaption()
             }

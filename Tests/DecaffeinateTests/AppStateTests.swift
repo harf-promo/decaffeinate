@@ -189,14 +189,25 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(h.state.headline.hasPrefix("Sleeping in"))
     }
 
-    func testBlockedWhenAppHoldsAwakeAndUserActive() {
+    func testWillSleepAfterIdleWhenAppHoldsAwakeAndUserActive() {
         let h = makeHarness { $0.idleThresholdMinutes = 10 }; defer { h.cleanup() }
         h.scanner.assertions = [systemBlocker("Chrome")]
-        h.idle.seconds = 2  // user active → not counting
+        h.idle.seconds = 2  // user active → not counting yet
         h.state.tick()
-        XCTAssertEqual(h.state.mug, .blocked)
+        // The confident reframe: the engine WILL override this hold after idle, so
+        // the app speaks from control — not the old passive "blocked" framing.
+        XCTAssertEqual(h.state.mug, .free)
         XCTAssertEqual(h.state.secondsUntilForcedSleep, nil)
-        XCTAssertTrue(h.state.headline.contains("keeping your Mac awake"))
+        XCTAssertTrue(
+            h.state.headline.hasPrefix("Your Mac will sleep"),
+            "confident framing; got: \(h.state.headline)")
+        XCTAssertFalse(
+            h.state.headline.lowercased().contains("keeping your mac awake"),
+            "must not frame the app as passive; got: \(h.state.headline)")
+        if case .willSleepAfterIdle = h.state.outlook {
+        } else {
+            XCTFail("expected .willSleepAfterIdle; got \(h.state.outlook)")
+        }
     }
 
     func testCaffeinatedState() {
@@ -983,17 +994,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(h.state.holdLifetime(for: plain), .indefinite)
     }
 
-    func testAwakeSummary() {
-        let h = makeHarness(); defer { h.cleanup() }
-        XCTAssertNil(h.state.awakeSummary, "nil when nothing holds")
-        h.scanner.assertions = [
-            agentCaff(h, pid: 800, cwd: "/x/repo", tty: "ttys003", created: h.clock.date)
-        ]
-        h.state.tick()
-        XCTAssertEqual(
-            h.state.awakeSummary,
-            "Won't sleep while \(h.state.rowTitle(for: h.scanner.assertions[0])) is working")
-    }
+    // (Former `testAwakeSummary` removed — `awakeSummary` folded into SleepOutlook;
+    //  its behavior is covered by SleepOutlookTests + the sleepBanner tests below.)
 
     // MARK: Rest & restart (v1.9.0)
 
@@ -1265,60 +1267,97 @@ final class AppStateTests: XCTestCase {
             "notification must re-arm after a restart that resets advice to .fresh")
     }
 
-    // MARK: sleepVerdict (v1.11.0)
+    // MARK: sleepBanner (v1.13.0 — outlook-aware, never contradicts the header)
 
-    func testSleepVerdictNilWhenNoBlockers() {
+    func testSleepBannerNilWhenNoBlockers() {
         let h = makeHarness(); defer { h.cleanup() }
         h.scanner.assertions = []
         h.state.tick()
         XCTAssertNil(
-            h.state.sleepVerdict,
+            h.state.sleepBanner,
             "No blockers → nil (empty state handles 'free to sleep')"
         )
     }
 
-    func testSleepVerdictAllBounded() {
+    func testSleepBannerCalmWhenEngineWillOverride() {
         let h = makeHarness(); defer { h.cleanup() }
-        // A caffeinate -t hold has a timeout → timed → bounded.
+        // A caffeinate -t agent hold (timed) — the engine overrides after idle.
         h.scanner.assertions = [
             agentCaff(h, pid: 800, cwd: "/x/repo", tty: "ttys003", created: h.clock.date)
         ]
         h.state.tick()
-        let verdict = h.state.sleepVerdict
-        XCTAssertNotNil(verdict, "Agent hold (timed) → non-nil verdict")
-        XCTAssertTrue(verdict?.bounded == true, "timed hold → bounded verdict")
-        XCTAssertEqual(verdict?.glyph, "checkmark")
+        let banner = h.state.sleepBanner
+        XCTAssertNotNil(banner, "Hold present → non-nil banner")
+        XCTAssertEqual(banner?.tone, .calm)
+        XCTAssertEqual(banner?.glyph, "checkmark")
     }
 
-    func testSleepVerdictAnyIndefiniteWins() {
+    func testSleepBannerCalmForIndefiniteHoldWhenAutoSleepOn() {
         let h = makeHarness(); defer { h.cleanup() }
-        // An indefinite system-sleep assertion (no timeout, no -w target).
+        // The core bug fix: an INDEFINITE hold used to force an amber "held
+        // indefinitely" banner. With auto-sleep on and nothing holding off the
+        // engine, the app WILL override it — so the banner is calm, not amber.
         h.scanner.assertions = [
             Fixtures.assertion(
                 pid: 100, process: "Zoom", bundle: "us.zoom.xos",
                 type: AssertionType.preventUserIdleSystemSleep)
         ]
         h.state.tick()
-        let verdict = h.state.sleepVerdict
-        XCTAssertNotNil(verdict, "Indefinite hold → non-nil verdict")
-        XCTAssertFalse(verdict?.bounded == true, "Indefinite hold → bounded=false")
-        XCTAssertEqual(verdict?.glyph, "exclamationmark.triangle")
+        let banner = h.state.sleepBanner
+        XCTAssertNotNil(banner)
+        XCTAssertEqual(
+            banner?.tone, .calm,
+            "auto-sleep will override the indefinite hold → calm, not amber")
+        XCTAssertNotEqual(banner?.glyph, "exclamationmark.triangle")
     }
 
-    func testSleepVerdictMixedIndefiniteWinsOverBounded() {
-        let h = makeHarness(); defer { h.cleanup() }
-        // One agent (bounded) + one bare Zoom-style indefinite hold.
-        let zoomAssertion = Fixtures.assertion(
+    func testSleepBannerAmberOnlyWhenGenuinelyHeldOff() {
+        // A whitelisted app genuinely holds off force-sleep (canForceSleep=false)
+        // → the amber warning is now correct and scoped to the real reason.
+        let h = makeHarness { $0.respectWhitelist = true }; defer { h.cleanup() }
+        let zoom = Fixtures.assertion(
             pid: 100, process: "Zoom", bundle: "us.zoom.xos",
             type: AssertionType.preventUserIdleSystemSleep)
-        h.scanner.assertions = [
-            agentCaff(h, pid: 800, cwd: "/x/repo", tty: "ttys003", created: h.clock.date),
-            zoomAssertion,
-        ]
+        h.scanner.assertions = [zoom]
+        h.rules.setPolicy(.allow, for: zoom)
         h.state.tick()
-        let verdict = h.state.sleepVerdict
-        XCTAssertFalse(
-            verdict?.bounded == true,
-            "Any indefinite hold makes the aggregate verdict 'indefinite'")
+        guard case .heldByBlocker = h.state.outlook else {
+            return XCTFail("expected .heldByBlocker; got \(h.state.outlook)")
+        }
+        XCTAssertEqual(h.state.sleepBanner?.tone, .warning)
+    }
+
+    // MARK: Sleep Now feedback (v1.13.0)
+
+    func testSleepNowThatNeverSleepsSurfacesFeedback() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.state.sleepNow()  // pmset "launches" but no willSleep confirmation arrives
+        XCTAssertNil(h.state.lastError, "no error immediately after launch")
+        h.clock.advance(11)  // past userSleepFeedbackSeconds
+        h.state.tick()
+        XCTAssertNotNil(
+            h.state.lastError,
+            "a Sleep Now that never actually slept must be surfaced, not silent")
+    }
+
+    func testConfirmedSleepNowShowsNoError() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.state.sleepNow()
+        h.confirmKernelSleep()  // willSleep fired → confirmed, pending cleared
+        h.clock.advance(11)
+        h.state.tick()
+        XCTAssertNil(h.state.lastError)
+        XCTAssertNotNil(h.state.lastSleepAt, "a confirmed sleep is recorded")
+    }
+
+    func testTransientErrorClearsAfterVisibilityWindow() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.sleeper.result = .failure(.launchFailed("boom"))
+        h.state.sleepNow()
+        XCTAssertNotNil(h.state.lastError)
+        h.sleeper.result = .success(())  // stop failing
+        h.clock.advance(31)  // past errorVisibilitySeconds
+        h.state.tick()
+        XCTAssertNil(h.state.lastError, "a one-off error clears itself")
     }
 }

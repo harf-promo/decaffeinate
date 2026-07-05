@@ -61,6 +61,10 @@ final class AppState: ObservableObject {
     @Published private(set) var decision = SafetyDecision()
 
     // Derived UI state
+    /// The single source of truth for "will my Mac sleep?" — the header, banner,
+    /// every row verdict, and the mug all project from this so they never disagree.
+    @Published private(set) var outlook: SleepOutlook = .freeToSleep(
+        idleMinutes: 10, batteryNote: false)
     @Published private(set) var mug: MugState = .free
     @Published private(set) var headline: String = "Monitoring sleep"
     @Published private(set) var detail: String = ""
@@ -134,12 +138,24 @@ final class AppState: ObservableObject {
     /// A forced sleep we asked for via pmset but haven't confirmed the kernel
     /// performed. Recorded only when a willSleep notification confirms it; left to
     /// lapse (recording nothing) if a PreventSystemSleep hold aborts the transition.
-    private var pendingForcedSleep: (reason: String, requestedAt: Date, onBattery: Bool)?
+    private var pendingForcedSleep:
+        (reason: String, requestedAt: Date, onBattery: Bool, userInitiated: Bool)?
     /// How long after launching `pmset sleepnow` a willSleep still counts as
     /// confirmation of *that* forced sleep. Generous enough to cover a slow sleep
     /// transition, bounded so an unrelated natural sleep minutes later isn't
     /// misattributed.
     private let forcedSleepConfirmationWindow: TimeInterval = 30
+    /// When a user's **Sleep Now** launches `pmset` but the Mac never actually
+    /// sleeps within this window (an app holds a `PreventSystemSleep` assertion),
+    /// tell the user instead of failing silently.
+    private let userSleepFeedbackSeconds: TimeInterval = 10
+    /// Named force-sleep cooldowns (avoid a per-second `pmset` spawn storm).
+    private let idleCooldownSeconds: TimeInterval = 60
+    private let immediateCooldownSeconds: TimeInterval = 15
+    private let failureCooldownSeconds: TimeInterval = 10
+    /// A transient error auto-clears after this long so a one-off can't linger.
+    private var lastErrorAt: Date?
+    private let errorVisibilitySeconds: TimeInterval = 30
 
     /// Clock seam for tests.
     private let now: () -> Date
@@ -362,7 +378,7 @@ final class AppState: ObservableObject {
     /// Sleep the Mac right now, from the menu's primary button. Always fires,
     /// bypassing the post-sleep cooldown.
     func sleepNow() {
-        forceSleep(reason: "Sleep Now pressed", bypassCooldown: true)
+        forceSleep(reason: "Sleep Now pressed", bypassCooldown: true, userInitiated: true)
     }
 
     /// Clear a firewall rule and allow this app to be re-surfaced as a new
@@ -563,50 +579,20 @@ final class AppState: ObservableObject {
         return RestartAdvisor.message(restartAdvice, uptimeLabel: label)
     }
 
-    /// A one-glance "what will end this?" line for the header — the single most
-    /// useful lifetime statement across the current holds, or nil when free.
-    var awakeSummary: String? {
-        let groups = groupedSystemBlockers
-        guard !groups.isEmpty else { return nil }
-        // The most concrete answer: a watched task or an explicit `-w` wait.
-        for group in groups {
-            switch holdLifetime(for: group.representative) {
-            case .untilWatchedFinishes: return "Won't sleep until the watched task finishes"
-            case .untilProcess(let name): return "Won't sleep until \(name) finishes"
-            default: continue
-            }
-        }
-        // An active agent session re-arms while it works.
-        if let agent = groups.first(where: \.isAgentSession) {
-            return "Won't sleep while \(groupTitle(for: agent)) is working"
-        }
-        // Otherwise name an indefinite hold, else note the timers.
-        if let indefinite = groups.first(where: {
-            holdLifetime(for: $0.representative) == .indefinite
-        }) {
-            return "Held indefinitely by \(groupTitle(for: indefinite))"
-        }
-        return "Holding on a timer — auto-releases"
+    /// The list banner — a projection of `outlook`, so it can never contradict the
+    /// header. Nil when there are no system-sleep blockers (use the empty state).
+    var sleepBanner: SleepVerdict? {
+        outlook.banner(hasHolds: !groupedSystemBlockers.isEmpty, anyIndefinite: anyIndefiniteHold)
     }
 
-    /// Aggregate "will the Mac sleep on its own?" verdict for the list banner.
-    /// Distinct from `awakeSummary` (which drives the header) — this answers the
-    /// owner's core question across all system-sleep blockers at once.
-    /// Returns nil when there are no system-sleep blockers (use the empty state instead).
-    var sleepVerdict: (glyph: String, text: String, bounded: Bool)? {
-        let groups = groupedSystemBlockers
-        guard !groups.isEmpty else { return nil }
-        let anyIndefinite = groups.contains {
-            holdLifetime(for: $0.representative) == .indefinite
-        }
-        if anyIndefinite {
-            return (
-                "exclamationmark.triangle",
-                "Something is holding your Mac awake indefinitely",
-                false
-            )
-        }
-        return ("checkmark", "Your Mac will sleep on its own when these finish", true)
+    /// A per-row verdict, projected from `outlook` + the hold's lifetime.
+    func rowVerdict(for assertion: PowerAssertion) -> SleepVerdict {
+        outlook.rowVerdict(for: holdLifetime(for: assertion))
+    }
+
+    /// True when any grouped hold is indefinite — decides banner tone.
+    private var anyIndefiniteHold: Bool {
+        groupedSystemBlockers.contains { holdLifetime(for: $0.representative) == .indefinite }
     }
 
     /// Whether a hold's provenance traces back to a known AI agent (Claude Code…).
@@ -748,6 +734,9 @@ final class AppState: ObservableObject {
         updateSessionTracking(systemBlockers)
         groupedSystemBlockers = computeGroupedSystemBlockers()
 
+        // Close the Sleep-Now feedback loop and expire stale errors.
+        reconcilePendingSleepFeedback()
+
         // 2.5) Agent watcher: optionally auto-arm on a recognized agent task, then
         // detect when a watched build/agent has finished.
         autoArmAgentWatchIfNeeded()
@@ -804,9 +793,9 @@ final class AppState: ObservableObject {
         }
 
         updateDerivedState(
-            systemBlockers: systemBlockers,
             decision: decision,
-            remaining: remaining)
+            remaining: remaining,
+            agentFinished: agentFinished)
 
         evaluateRestartOverdueNotification()
     }
@@ -884,25 +873,57 @@ final class AppState: ObservableObject {
     ///   pmset spawn storm) but do *not* claim a sleep occurred.
     /// - cooldown active (and not bypassed) → no-op.
     @discardableResult
-    private func forceSleep(reason: String, bypassCooldown: Bool, immediate: Bool = false) -> Bool {
+    private func forceSleep(
+        reason: String, bypassCooldown: Bool, immediate: Bool = false, userInitiated: Bool = false
+    ) -> Bool {
         let suppressed = immediate ? isImmediateSuppressed : isForceSleepSuppressed
         if !bypassCooldown, suppressed { return false }
 
         switch sleepController.sleepNow() {
         case .success:
-            lastError = nil
+            clearError()
             // Arm the idle cooldown so we don't re-sleep right after wake.
-            suppressForceSleepUntil = now().addingTimeInterval(60)
-            if immediate { suppressImmediateUntil = now().addingTimeInterval(15) }
+            suppressForceSleepUntil = now().addingTimeInterval(idleCooldownSeconds)
+            if immediate {
+                suppressImmediateUntil = now().addingTimeInterval(immediateCooldownSeconds)
+            }
             // Don't claim we slept yet — "pmset launched" isn't "the kernel slept."
-            // systemWillSleep() records it only if the transition actually happens.
-            pendingForcedSleep = (reason, now(), power.onBattery)
+            // systemWillSleep() records it only if the transition actually happens;
+            // reconcilePendingSleepFeedback() surfaces a user sleep that never took.
+            pendingForcedSleep = (reason, now(), power.onBattery, userInitiated)
             return true
         case .failure(let error):
-            lastError = error.description
-            suppressForceSleepUntil = now().addingTimeInterval(10)
-            if immediate { suppressImmediateUntil = now().addingTimeInterval(10) }
+            setError(error.description)
+            suppressForceSleepUntil = now().addingTimeInterval(failureCooldownSeconds)
+            if immediate {
+                suppressImmediateUntil = now().addingTimeInterval(failureCooldownSeconds)
+            }
             return false
+        }
+    }
+
+    private func setError(_ message: String) {
+        lastError = message
+        lastErrorAt = now()
+    }
+
+    private func clearError() {
+        lastError = nil
+        lastErrorAt = nil
+    }
+
+    /// Close the two feedback loops the app used to leave silent: a user's
+    /// **Sleep Now** that never actually slept (an app is holding system sleep
+    /// open), and a transient error that would otherwise linger forever.
+    private func reconcilePendingSleepFeedback() {
+        if let pending = pendingForcedSleep, pending.userInitiated,
+            now().timeIntervalSince(pending.requestedAt) > userSleepFeedbackSeconds
+        {
+            setError("The Mac didn\u{2019}t sleep \u{2014} an app is holding system sleep open.")
+            pendingForcedSleep = nil
+        }
+        if let at = lastErrorAt, now().timeIntervalSince(at) > errorVisibilitySeconds {
+            clearError()
         }
     }
 
@@ -1124,128 +1145,38 @@ final class AppState: ObservableObject {
 
     // MARK: Derived UI state
 
+    /// Project every derived UI string from the single `SleepOutlook` — the header,
+    /// the mug, and the countdown. The banner (`sleepBanner`) and row verdicts
+    /// (`rowVerdict(for:)`) project from the same value, so they can never disagree.
     private func updateDerivedState(
-        systemBlockers: [PowerAssertion],
         decision: SafetyDecision,
-        remaining: TimeInterval?
+        remaining: TimeInterval?,
+        agentFinished: Bool
     ) {
         let s = settings
-        let nonWhitelistedBlockers = systemBlockers.filter {
-            !rulesEngine.isActivelyAllowed($0, now: now())
-        }
-
-        if s.caffeinateEnabled, caffeine.isActive {
-            mug = .caffeinated
-            headline = "Keeping your Mac awake"
-            detail =
-                s.caffeinateKeepsDisplayAwake ? "Display stays on too" : "Display can still sleep"
-            secondsUntilForcedSleep = nil
-            return
-        }
-
-        // Temporary "stay awake until …" quiet window. Key on the real holding
-        // state (not the caffeine proxy): when a safety rail (battery / thermal)
-        // has paused the hold, say so plainly rather than falling through to a
-        // misleading "Sleeping in …" countdown.
-        if let until = quietUntil, until > now() {
-            if !decision.shouldDropKeepAwake {
-                mug = .caffeinated
-                headline = "Awake until \(ScheduleEngine.timeLabel(until))"
-                detail = "Quiet window — auto-sleep paused"
-            } else {
-                mug = .free
-                headline = "Quiet window paused"
-                detail = decision.dropKeepAwakeReasons.first ?? "Paused by a safety rail"
-            }
-            secondsUntilForcedSleep = nil
-            return
-        }
-
-        // A keep-awake trigger is holding the Mac awake.
-        if let reason = activeTriggerReason, caffeine.isActive {
-            mug = .caffeinated
-            headline = "Keeping your Mac awake"
-            detail = "Trigger — \(reason)"
-            secondsUntilForcedSleep = nil
-            return
-        }
-
-        // Counting down to a forced sleep — only surfaced once the user has
-        // actually stepped away (so we don't show "Sleeping in 9:59" mid-type),
-        // except a finished watched task uses a short grace, so show it at once.
-        let agentFinished: Bool = {
-            if case .completed = watchStatus { return true }
-            return false
-        }()
-        if s.decaffeinateEnabled, !s.caffeinateEnabled, decision.canForceSleep,
-            let remaining, idleSeconds >= 30 || agentFinished
-        {
-            secondsUntilForcedSleep = max(0, remaining)
-            mug = .counting
-            headline = "Sleeping in \(Format.countdown(remaining))"
-            detail =
-                nonWhitelistedBlockers.isEmpty
-                ? "You stepped away — winding down"
-                : "Overriding \(nonWhitelistedBlockers.count) sleep block\(nonWhitelistedBlockers.count == 1 ? "" : "s")"
-            return
-        }
-        secondsUntilForcedSleep = nil
-
-        // Something is keeping the Mac awake and we are not forcing sleep.
-        if !nonWhitelistedBlockers.isEmpty {
-            mug = .blocked
-            let names = nonWhitelistedBlockers.map(\.displayName).removingDuplicates()
-            headline = smartHeadline(for: nonWhitelistedBlockers, names: names)
-            if !decision.canForceSleep, let reason = decision.holdForceSleepReasons.first {
-                detail = reason
-            } else if !s.decaffeinateEnabled {
-                detail = "Decaffeinate engine is off"
-            } else if names.count == 1 {
-                detail = "Keeping your Mac awake"
-            } else {
-                detail = names.prefix(3).joined(separator: ", ")
-            }
-            return
-        }
-
-        // Nothing is actively holding the Mac awake.
-        mug = .free
-        if !s.decaffeinateEnabled {
-            headline = "Monitoring only"
-            detail = "Auto-sleep is off — overheating & critical-battery guards still apply"
-        } else if !decision.canForceSleep, let reason = decision.holdForceSleepReasons.first {
-            // Force-sleep is being held off (e.g. active-hours schedule) even
-            // though nothing is keeping the Mac awake — say so instead of
-            // promising "Sleeps ~N min after you step away", which we won't honor.
-            headline = "Auto-sleep paused"
-            detail = reason
-        } else {
-            headline = "Free to sleep"
-            detail = idleSleepHint
-        }
-        secondsUntilForcedSleep = nil
-    }
-
-    /// Fold the *reason* into the headline when one app dominates, e.g.
-    /// "Safari is playing media" / "Your microphone is in use".
-    private func smartHeadline(for blockers: [PowerAssertion], names: [String]) -> String {
-        if names.count == 1, let blocker = blockers.first {
-            let reason = blocker.reason
-            switch reason.category {
-            case .microphone:
-                return "Your microphone is in use"
-            case .unknown:
-                return "\(names[0]) is keeping your Mac awake"
-            default:
-                return "\(names[0]) is \(lowercasedFirst(reason.explanation))"
-            }
-        }
-        return "\(names.count) apps are keeping your Mac awake"
-    }
-
-    private func lowercasedFirst(_ string: String) -> String {
-        guard let first = string.first else { return string }
-        return first.lowercased() + string.dropFirst()
+        let inputs = SleepOutlookInputs(
+            decaffeinateEnabled: s.decaffeinateEnabled,
+            caffeinateActive: s.caffeinateEnabled && caffeine.isActive,
+            caffeinateKeepsDisplayAwake: s.caffeinateKeepsDisplayAwake,
+            decision: decision,
+            isQuietWindowActive: isQuietWindowActive,
+            quietWindowHoldingAwake: quietWindowHoldingAwake,
+            quietUntil: quietUntil,
+            triggerReason: (caffeine.isActive && activeTriggerReason != nil)
+                ? activeTriggerReason : nil,
+            idleMinutes: idleSleepMinutes,
+            batteryNote: idleBatteryNote,
+            idleSeconds: idleSeconds,
+            agentFinished: agentFinished,
+            remainingSeconds: remaining,
+            activeHoldingCount: activeHoldingCount
+        )
+        let o = SleepOutlook.classify(inputs)
+        outlook = o
+        headline = o.headline
+        detail = o.subline
+        mug = o.mug
+        secondsUntilForcedSleep = o.countdownSeconds
     }
 
     // MARK: Convenience for the UI
@@ -1278,15 +1209,16 @@ final class AppState: ObservableObject {
         return decision.dropKeepAwakeReasons.first ?? "Paused by a safety rail"
     }
 
-    /// A glanceable, always-true promise (shown when no live countdown is up):
-    /// how long after you step away the Mac will sleep.
-    var idleSleepHint: String {
-        let minutes = Int(settings.effectiveIdleSeconds(onBattery: power.onBattery) / 60)
-        let onBatteryNote =
-            (power.onBattery && settings.sleepSoonerOnBattery
-                && settings.batteryIdleThresholdMinutes < settings.idleThresholdMinutes)
-            ? " (on battery)" : ""
-        return "Sleeps ~\(minutes) min after you step away\(onBatteryNote)"
+    /// Minutes after stepping away that the Mac will sleep (battery-aware) — feeds
+    /// the "step away" copy in `SleepOutlook`.
+    var idleSleepMinutes: Int {
+        Int(settings.effectiveIdleSeconds(onBattery: power.onBattery) / 60)
+    }
+
+    /// Whether the "(on battery)" note applies to the idle-sleep phrase.
+    var idleBatteryNote: Bool {
+        power.onBattery && settings.sleepSoonerOnBattery
+            && settings.batteryIdleThresholdMinutes < settings.idleThresholdMinutes
     }
 
     /// "for 12m" since the assertion was created, if known.

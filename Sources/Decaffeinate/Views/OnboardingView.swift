@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// First-run welcome: three short panels — what Decaffeinate does, the safety
-/// promise, and the one notification permission — ending in "Get started".
+/// First-run welcome: four short panels — what Decaffeinate does, the safety
+/// promise, the keep-awake extras, and staying informed — ending in "Get started".
 struct OnboardingView: View {
     /// Called when the user finishes (or skips) onboarding.
     let onFinish: () -> Void

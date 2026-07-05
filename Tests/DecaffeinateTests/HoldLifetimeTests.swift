@@ -30,51 +30,6 @@ final class HoldLifetimeTests: XCTestCase {
         XCTAssertFalse(HoldLifetime.indefinite.isBounded)
     }
 
-    // MARK: rowVerdict
-
-    func testRowVerdictUntilProcess() {
-        let v = HoldLifetime.untilProcess("npm run build").rowVerdict
-        XCTAssertEqual(v.glyph, "checkmark")
-        XCTAssertEqual(v.text, "Will sleep when npm run build finishes")
-        XCTAssertTrue(v.bounded)
-    }
-
-    func testRowVerdictUntilWatchedFinishes() {
-        let v = HoldLifetime.untilWatchedFinishes.rowVerdict
-        XCTAssertEqual(v.glyph, "checkmark")
-        XCTAssertEqual(v.text, "Will sleep when the watched task finishes")
-        XCTAssertTrue(v.bounded)
-    }
-
-    func testRowVerdictTimedReArmsTrue_agentCase() {
-        let v = HoldLifetime.timed(reArms: true).rowVerdict
-        XCTAssertEqual(v.glyph, "checkmark")
-        // The owner's explicit acceptance: AI agent row must answer "will sleep".
-        XCTAssertTrue(
-            v.text.contains("agent"),
-            "Expected agent-specific copy; got: \(v.text)"
-        )
-        XCTAssertTrue(v.bounded)
-    }
-
-    func testRowVerdictTimedReArmsFalse() {
-        let v = HoldLifetime.timed(reArms: false).rowVerdict
-        XCTAssertEqual(v.glyph, "checkmark")
-        XCTAssertTrue(v.bounded)
-        XCTAssertFalse(
-            v.text.contains("agent"),
-            "Non-agent timed verdict should not mention agent; got: \(v.text)"
-        )
-    }
-
-    func testRowVerdictIndefinite() {
-        let v = HoldLifetime.indefinite.rowVerdict
-        XCTAssertEqual(v.glyph, "exclamationmark.triangle")
-        XCTAssertFalse(v.bounded)
-        let textLower = v.text.lowercased()
-        XCTAssertTrue(
-            textLower.contains("won\u{2019}t sleep") || textLower.contains("won't sleep"),
-            "Indefinite verdict should indicate no automatic sleep; got: \(v.text)"
-        )
-    }
+    // Row verdicts moved to SleepOutlookTests (they now depend on the outlook, so a
+    // hold reads differently when the engine will vs won't override it).
 }

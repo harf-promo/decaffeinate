@@ -4,6 +4,54 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] — 2026-07-05
+
+A UX-clarity round: the menu now gives ONE confident answer to "will my Mac
+sleep?", the settings are simpler, and the underlying decision-to-copy logic
+collapsed into a single source of truth.
+
+### Changed
+- **One clear, confident verdict.** The menu used to stack contradictory signals —
+  "2 apps are keeping your Mac awake", "Won't sleep while X is working", an amber
+  "Something is holding your Mac awake indefinitely", and a green "✓ Will sleep
+  shortly" — all at once, framing the app as passive. A new **`SleepOutlook`** is
+  the single source of truth the header, the banner, every row, and the menu-bar
+  icon now project from, so they can never disagree. The common case flips from
+  the passive *"N apps are keeping your Mac awake"* to the confident **"Your Mac
+  will sleep ~10 min after you step away"** — the holds are context the engine
+  overrides. Only genuinely-stuck states (a call, media, an app you allowed, or
+  auto-sleep off) are amber, and each names its specific reason.
+- **Simpler Settings.** General opens with a plain-language hero ("Decaffeinate
+  makes your idle Mac sleep — you're in control"). The five always-on guards
+  collapse behind an **Advanced** disclosure with a one-line summary. "Strict
+  takeover / own the idle timer / system-sleep assertion" is reworded to plain
+  **"Take full control of sleep"**; the backpack guard leads with "Sleep if it
+  overheats in a bag". Startup (launch-at-login, menu-bar countdown) split out
+  from Notifications.
+- **A calmer hold detail.** The per-hold detail shows the human answer (why,
+  who, where, how long, when it ends) by default; the raw plumbing (type,
+  assertion name, PID, command) is tucked behind **"Technical details"**.
+
+### Added
+- **Sleep Now tells you if it didn't work.** A "Sleep Now" that launches but
+  never actually sleeps (an app holds a `PreventSystemSleep` assertion) now
+  surfaces "The Mac didn't sleep — an app is holding system sleep open" instead
+  of failing silently.
+
+### Fixed
+- A transient sleep error no longer lingers in the menu forever — it auto-clears.
+
+### Internal
+- `SleepOutlook` (pure, value-typed) replaces three independent verdict producers
+  (`awakeSummary`, `sleepVerdict`, `HoldLifetime.rowVerdict`) and a ~100-line
+  `updateDerivedState` ladder; it folds in `decaffeinateEnabled` + the
+  `SafetyDecision` so the copy always matches what the engine will do. Named the
+  force-sleep cooldown constants; `agentFinished` computed once per tick.
+- +13 tests (286 total): `SleepOutlookTests` proves each state's copy, the
+  blocker classification, and the **invariant that the banner is amber iff a row
+  is amber** — so a contradiction like the old one can't return.
+  `swift format lint --strict` clean.
+
 ## [1.12.1] — 2026-07-05
 
 Fixes a crash introduced in 1.12.0.

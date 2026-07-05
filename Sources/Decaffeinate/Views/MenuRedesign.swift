@@ -84,16 +84,6 @@ private struct RDHeader: View {
                 .foregroundStyle(theme.ink4)
                 .padding(.top, Space.s2)
 
-            // The one at-a-glance "what will end this?" answer.
-            if let summary = appState.awakeSummary {
-                Text(summary)
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.ink2)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, Space.s2)
-            }
-
             // A calm uptime/restart nudge when the Mac has been up a while.
             if let hint = appState.restartHint {
                 HStack(spacing: Space.s1) {
@@ -295,7 +285,7 @@ private struct RDList: View {
             } else {
                 sectionHeader
                 if showExplainer { explainerCard }
-                if let verdict = appState.sleepVerdict { verdictBanner(verdict) }
+                if let verdict = appState.sleepBanner { verdictBanner(verdict) }
                 groupRows(appState.groupedSystemBlockers)
                 if !others.isEmpty {
                     RDSectionLabel(text: "Screen-only / background", trailing: nil)
@@ -353,18 +343,17 @@ private struct RDList: View {
         .padding(.bottom, Space.s2)
     }
 
-    /// One-line verdict banner across all system-sleep holds.
-    private func verdictBanner(
-        _ verdict: (glyph: String, text: String, bounded: Bool)
-    ) -> some View {
+    /// One-line verdict banner across all system-sleep holds — a projection of the
+    /// app's single `SleepOutlook`, so it can never contradict the header.
+    private func verdictBanner(_ verdict: SleepVerdict) -> some View {
         HStack(spacing: Space.s2) {
             Image(systemName: verdict.glyph)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(verdict.bounded ? theme.teal : Color.warning)
+                .foregroundStyle(verdict.tone.color(theme))
                 .accessibilityHidden(true)
             Text(verdict.text)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(verdict.bounded ? theme.teal : Color.warning)
+                .foregroundStyle(verdict.tone.color(theme))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -499,15 +488,15 @@ private struct RDRow: View {
                 // sleep on its own — held until you act". Only for system-sleep holds
                 // so a screen-only row never shows a spurious "won't sleep" warning.
                 if !pending, assertion.blocksSystemSleep {
-                    let v = appState.holdLifetime(for: assertion).rowVerdict
+                    let v = appState.rowVerdict(for: assertion)
                     HStack(spacing: 4) {
                         Image(systemName: v.glyph)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(v.bounded ? theme.teal : Color.warning)
+                            .foregroundStyle(v.tone.color(theme))
                             .accessibilityHidden(true)
                         Text(v.text)
                             .font(.system(size: 12))
-                            .foregroundStyle(v.bounded ? theme.teal : Color.warning)
+                            .foregroundStyle(v.tone.color(theme))
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(v.text)
@@ -763,6 +752,18 @@ enum SettingsWindowOpener {
         let selector = NSSelectorFromString("showSettingsWindow:")
         if NSApp.responds(to: selector) {  // fallback for 26 where openSettings no-ops
             NSApp.sendAction(selector, to: nil, from: nil)
+        }
+    }
+}
+
+extension SleepTone {
+    /// Map the outlook tone to the menu's design-system colours: teal for the
+    /// "will sleep" states (green is reserved as one-mark punctuation for Sleep
+    /// Now), amber only for the genuinely-won't-sleep states.
+    func color(_ theme: Theme) -> Color {
+        switch self {
+        case .positive, .calm: return theme.teal
+        case .warning: return Color.warning
         }
     }
 }
