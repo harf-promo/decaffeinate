@@ -1215,6 +1215,23 @@ final class AppStateTests: XCTestCase {
             "must not spam repeated notifications within the same overdue band")
     }
 
+    func testRestartAdviceDeDupPersistsToInjectedDefaults() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.settings.settings.notifyOnRestartOverdue = true
+        // Cross into .overdue so the de-dup band is recorded.
+        h.system.boot = h.clock.date.addingTimeInterval(-15 * 86_400)
+        h.state.readBootTimeAndInferRestart()
+        h.state.tick()
+        XCTAssertEqual(h.notifier.restartOverdues.count, 1)
+
+        // The de-dup blob must land in the *injected* suite (test isolation) — pre-fix
+        // it went to UserDefaults.standard, so this suite would read nil.
+        let persisted = h.settings.defaults.dictionary(
+            forKey: "Decaffeinate.lastNotifiedAdvice.v1")
+        XCTAssertNotNil(persisted, "advice de-dup state must persist to the injected defaults")
+        XCTAssertEqual(persisted?["advice"] as? String, "overdue")
+    }
+
     func testRestartOverdueNotificationRespectsOptOut() {
         let h = makeHarness(); defer { h.cleanup() }
         // Default: notifyOnRestartOverdue = false.

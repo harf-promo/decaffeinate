@@ -28,10 +28,44 @@ privacy and accessibility hardening.
 layer, redesigned onboarding/menu/settings); **triggers / automation**
 (keep-awake while an app runs / on AC / CPU busy).
 
+**1.6.0** — a ground-up **Nightcap** redesign driven by real rendered screenshots:
+the menu and a native five-pane Settings sidebar rebuilt, shape-distinct menu-bar
+icon states, and a live-SwiftUI screenshot harness; retired the old `ImageRenderer`
+preview path and dead helpers.
+
+**1.7.0 / 1.7.1** — **process provenance** (trace each hold back to the window /
+terminal / agent / project via public `libproc`/`sysctl`) and **agentic awareness**
+(parse the `caffeinate` command line, recognise AI-agent sessions, offer "Sleep when
+it finishes", auto-sleep toggle, `--provenance` CLI); churning agent-`caffeinate`
+respawns coalesce into one stable per-session row; upgrades no longer reset settings.
+
+**1.8.0** — clearer holds: per-hold **lifetime** (until done / timed / indefinite),
+a header "won't sleep until…" line, **audio-source device naming** (CoreAudio), a
+stably alphabetical list, and row actions (bring to front / Activity Monitor / copy).
+
+**1.9.0** — the **Rest & Restart** pillar: an uptime hero and a calm restart
+recommendation escalating toward the ~49.7-day networking cliff, a display-off / sleep
+/ restart explainer, a rest timeline, and a "recommend after N days" setting.
+
+**1.10.0 / 1.10.1** — **in-app updates fixed** (deterministic `CFBundleVersion`) with
+visible update-status UI; three opt-out notifications; a configurable CPU-trigger
+threshold; accessibility labels — then a council-verified honesty/correctness pass:
+truly-measured sleep metric, persisted restart-overdue de-dup, urgency escalation,
+notification-auth gating, an updater no longer stuck on "Checking…", a widened
+`version.sh` formula, and a `release.yml` appcast-upload guard.
+
+**1.11.0** — **radically simplified menu**: every hold leads with a plain ✓/⚠ verdict,
+an aggregate verdict banner, a consolidated action area, and plain-language "Always
+allow" / "Sleep anyway" / "Allow for…" with a single source of truth for policy verbs.
+
 ## Near term
 
 - [ ] **Submit to homebrew/cask core** (removes the one-time tap step) — the cask
   is style-ready; gated only on notability. See [`HOMEBREW-CORE.md`](HOMEBREW-CORE.md).
+- [ ] **App Intents / Shortcuts & URL-scheme automation** — Sleep Now, "What's
+  keeping my Mac awake", Keep Awake for…, and Stop as Shortcuts / Siri / Spotlight
+  actions, plus a `decaffeinate://` URL scheme, `--sleep-now` / `--keep-awake` CLI,
+  and a global Sleep-Now hotkey. *(In progress.)*
 
 ## Deeper system insight
 

@@ -46,7 +46,7 @@ struct TelemetryEngine {
             let name = processName(forPID: pid)
             let bundle = bundleIdentifier(forPID: pid)
 
-            for detail in assertions {
+            for (indexWithinPID, detail) in assertions.enumerated() {
                 let type = detail[kIOPMAssertionTypeKey as String] as? String ?? "Unknown"
                 let assertionName = detail[kIOPMAssertionNameKey as String] as? String ?? "Unnamed"
                 let created = detail[AssertionDetailKey.startWhen] as? Date
@@ -70,7 +70,9 @@ struct TelemetryEngine {
 
                 result.append(
                     PowerAssertion(
-                        id: "\(pid)-\(assertionID ?? result.count)-\(type)",
+                        id: Self.stableID(
+                            pid: pid, assertionID: assertionID, type: type,
+                            createdAt: created, indexWithinPID: indexWithinPID),
                         pid: pid,
                         processName: name,
                         bundleIdentifier: bundle,
@@ -105,6 +107,22 @@ struct TelemetryEngine {
             return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
                 == .orderedAscending
         }
+    }
+
+    /// A per-assertion identity that stays stable across scans. Prefer IOKit's own
+    /// `AssertionId`/`GlobalUniqueID` when present. When absent, derive one from
+    /// fields that do NOT depend on global scan order — the owning `pid`, the
+    /// creation time, and the index *within this pid's* assertion list (IOKit
+    /// returns each pid's assertions in a stable order) — so the same live hold
+    /// keeps the same id tick-to-tick instead of churning with `result.count`
+    /// (which caused SwiftUI row flicker). Globally unique by construction: a
+    /// process's pid plus its per-pid index can never collide.
+    static func stableID(
+        pid: pid_t, assertionID: Int?, type: String, createdAt: Date?, indexWithinPID: Int
+    ) -> String {
+        if let assertionID { return "\(pid)-\(assertionID)-\(type)" }
+        let createdKey = createdAt.map { String(Int($0.timeIntervalSince1970.rounded())) } ?? "n"
+        return "\(pid)-x\(createdKey)-\(indexWithinPID)-\(type)"
     }
 
     /// Resolve the real app behind a hold routed through a shared daemon. Only

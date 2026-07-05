@@ -1,7 +1,7 @@
 import Foundation
 
 /// Deterministic sample data for rendering README screenshots (via the hidden
-/// `--render-previews` CLI mode) without touching real system state or user prefs.
+/// `--screenshots` CLI mode) without touching real system state or user prefs.
 
 @MainActor
 final class PreviewSampler: PowerAssertionScanning {

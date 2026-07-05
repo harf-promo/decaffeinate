@@ -19,6 +19,15 @@ enum CLI {
             runScan()
             return true
         }
+        if arguments.contains("--sleep-now") {
+            runSleepNow()
+            return true
+        }
+        if let index = arguments.firstIndex(of: "--keep-awake") {
+            let minutes = arguments.indices.contains(index + 1) ? Int(arguments[index + 1]) : nil
+            runKeepAwake(minutes: minutes ?? 30)
+            return true
+        }
         if arguments.contains("--help") || arguments.contains("-h") {
             printHelp()
             return true
@@ -75,6 +84,34 @@ enum CLI {
         for holder in holders { dump(holder.pid, label: holder.displayName) }
     }
 
+    /// Put the Mac to sleep now — the same headless `pmset sleepnow` path the app
+    /// uses. Exits non-zero if the launch fails, so scripts can react.
+    @MainActor
+    private static func runSleepNow() {
+        switch SleepController().sleepNow() {
+        case .success:
+            print("😴  Putting this Mac to sleep now…")
+        case .failure(let error):
+            FileHandle.standardError.write(Data("decaffeinate: \(error.description)\n".utf8))
+            exit(EXIT_FAILURE)
+        }
+    }
+
+    /// Hold this Mac awake for `minutes`, then release — a foreground, blocking
+    /// hold (like `caffeinate -t`). Ctrl-C exits early; the kernel releases the
+    /// assertion automatically on process exit.
+    @MainActor
+    private static func runKeepAwake(minutes: Int) {
+        let clamped = min(max(minutes, 1), 24 * 60)
+        let engine = CaffeineEngine()
+        engine.update(
+            keepSystemAwake: true, keepDisplayAwake: false, reason: "Decaffeinate --keep-awake")
+        print("☕️  Keeping this Mac awake for \(clamped) min. Press Ctrl-C to stop early.")
+        Thread.sleep(forTimeInterval: TimeInterval(clamped) * 60)
+        engine.releaseAll()
+        print("✓  Done — this Mac can sleep again.")
+    }
+
     @MainActor
     private static func runScan() {
         let assertions = TelemetryEngine().scan()
@@ -127,12 +164,14 @@ enum CLI {
             Decaffeinate — the truth about what keeps your Mac awake.
 
             USAGE:
-              Decaffeinate                Run the menu-bar app
+              Decaffeinate                  Run the menu-bar app
               Decaffeinate --scan           Print active sleep assertions and exit
-              Decaffeinate --provenance   Trace each holder to its window / agent / project
-              Decaffeinate --icon [dir]   Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)
-              Decaffeinate --version      Print the version and exit
-              Decaffeinate --help         Show this help
+              Decaffeinate --sleep-now      Put this Mac to sleep now and exit
+              Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit
+              Decaffeinate --provenance     Trace each holder to its window / agent / project
+              Decaffeinate --icon [dir]     Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)
+              Decaffeinate --version        Print the version and exit
+              Decaffeinate --help           Show this help
 
             Project: https://github.com/harf-promo/decaffeinate
             """

@@ -11,6 +11,10 @@ struct SleepController {
 
     enum SleepError: Error, CustomStringConvertible {
         case launchFailed(String)
+        /// Never produced at runtime — `run(arguments:)` deliberately does not
+        /// `waitUntilExit()`, so only `.launchFailed` can occur. Retained as a
+        /// distinct failure the test suite injects to exercise the failed-sleep
+        /// path (see `AppStateTests.testFailedSleepDoesNotClaimSlept…`).
         case nonZeroExit(Int32)
 
         var description: String {

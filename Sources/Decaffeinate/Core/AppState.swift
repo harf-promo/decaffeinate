@@ -84,8 +84,11 @@ final class AppState: ObservableObject {
 
     /// One-shot "stay awake until …" quiet window from the menu. While set and in
     /// the future, Decaffeinate actively holds the Mac awake and never forces
-    /// sleep. Cleared automatically once it elapses.
-    @Published private(set) var quietUntil: Date?
+    /// sleep. Cleared automatically once it elapses. Persisted so a window set via
+    /// a Shortcut / App Intent / URL scheme survives a background relaunch.
+    @Published private(set) var quietUntil: Date? {
+        didSet { persistQuietUntil() }
+    }
 
     /// Why a keep-awake trigger is currently holding the Mac awake (an app is
     /// running, on AC, CPU busy), or `nil`.
@@ -100,6 +103,9 @@ final class AppState: ObservableObject {
     /// Persisted restart-advice state — keyed by boot time so it auto-resets after
     /// a real restart. Stores { "bootSecs": Double, "advice": String }.
     private static let lastNotifiedAdviceKey = "Decaffeinate.lastNotifiedAdvice.v1"
+    /// Persisted keep-awake window end, so an intent/URL-scheme "keep awake" hold
+    /// survives a background relaunch (see `start()` restore, `persistQuietUntil`).
+    private static let quietUntilKey = "Decaffeinate.quietUntil.v1"
     private var notifiedBlockers: Set<String> = []
 
     /// First time each live session key was observed — the anchor for a stable
@@ -260,6 +266,14 @@ final class AppState: ObservableObject {
         // Falls back to the current advice when no persisted state exists for this
         // boot (first run, or a different boot), which prevents a launch-time nag.
         lastNotifiedRestartAdvice = loadPersistedRestartNotificationState() ?? restartAdvice
+        // Restore a keep-awake window set via a Shortcut / App Intent / URL scheme
+        // before this (possibly background) launch, so it isn't silently dropped.
+        // An expired window is cleared by the tick() below.
+        if let saved = settingsStore.defaults.object(forKey: Self.quietUntilKey) as? Date,
+            saved > now()
+        {
+            quietUntil = saved
+        }
         registerRestObservers()
         tick()
         let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -821,7 +835,7 @@ final class AppState: ObservableObject {
 
     private func loadPersistedRestartNotificationState() -> RestartAdvice? {
         guard
-            let dict = UserDefaults.standard.dictionary(forKey: Self.lastNotifiedAdviceKey),
+            let dict = settingsStore.defaults.dictionary(forKey: Self.lastNotifiedAdviceKey),
             let storedBootSecs = dict["bootSecs"] as? Double,
             let rawAdvice = dict["advice"] as? String,
             let storedAdvice = RestartAdvice(rawValue: rawAdvice),
@@ -835,9 +849,19 @@ final class AppState: ObservableObject {
         guard newAdvice != lastNotifiedRestartAdvice else { return }
         lastNotifiedRestartAdvice = newAdvice
         guard let currentBoot = bootTime else { return }
-        UserDefaults.standard.set(
+        settingsStore.defaults.set(
             ["bootSecs": currentBoot.timeIntervalSince1970, "advice": newAdvice.rawValue],
             forKey: Self.lastNotifiedAdviceKey)
+    }
+
+    /// Mirror the keep-awake window to the injected defaults (called from
+    /// `quietUntil.didSet`) so an intent/URL-scheme hold survives a relaunch.
+    private func persistQuietUntil() {
+        if let quietUntil {
+            settingsStore.defaults.set(quietUntil, forKey: Self.quietUntilKey)
+        } else {
+            settingsStore.defaults.removeObject(forKey: Self.quietUntilKey)
+        }
     }
 
     // MARK: Force sleep

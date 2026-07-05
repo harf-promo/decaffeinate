@@ -699,6 +699,7 @@ private struct RDRow: View {
 // ── Footer: slept-ago / update · Settings · quit ──
 private struct RDFooter: View {
     @Environment(\.theme) private var theme
+    @Environment(\.openSettings) private var openSettings
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var updater: UpdaterController
 
@@ -722,7 +723,9 @@ private struct RDFooter: View {
             Spacer()
             // Routine "Check for Updates…" lives in Settings → About now; the menu
             // only surfaces the green button above when there's genuinely an update.
-            SettingsLink {
+            Button {
+                SettingsWindowOpener.open(openSettings)
+            } label: {
                 Label("Settings", systemImage: "gearshape").font(.system(size: 12, weight: .medium))
             }
             .buttonStyle(.plain).foregroundStyle(theme.ink2)
@@ -739,6 +742,28 @@ private struct RDFooter: View {
         Button(action: action) { Image(systemName: icon) }
             .buttonStyle(.plain).foregroundStyle(theme.ink2)
             .help(label).accessibilityLabel(label)
+    }
+}
+
+/// Opens the `Settings` scene reliably from the menu-bar popover across macOS
+/// 14–26. SwiftUI's `openSettings()` / `SettingsLink` silently no-op from a
+/// `MenuBarExtra` on macOS 26 Tahoe — an `.accessory` app has no active render
+/// tree behind the popover (verified: mjtsai.com 2025/06/18, Apple Forums 731628).
+/// So: (1) bring the app forward, (2) ask SwiftUI to open Settings, and
+/// (3) fall back to the AppKit responder-chain selector the `Settings` scene
+/// installs. Both routes target the one Settings window, so whichever the running
+/// OS honours wins and the other is a harmless re-focus. `showSettingsWindow:` is
+/// the Ventura+ selector; the app's floor is macOS 14, so the pre-Ventura
+/// `showPreferencesWindow:` isn't needed.
+@MainActor
+enum SettingsWindowOpener {
+    static func open(_ openSettings: OpenSettingsAction) {
+        NSApp.activate(ignoringOtherApps: true)  // .accessory app must front itself first
+        openSettings()  // works on macOS 14/15
+        let selector = NSSelectorFromString("showSettingsWindow:")
+        if NSApp.responds(to: selector) {  // fallback for 26 where openSettings no-ops
+            NSApp.sendAction(selector, to: nil, from: nil)
+        }
     }
 }
 

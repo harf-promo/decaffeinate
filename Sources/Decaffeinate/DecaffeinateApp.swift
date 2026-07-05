@@ -1,5 +1,12 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
+
+extension KeyboardShortcuts.Name {
+    /// User-configurable global hotkey that forces the Mac to sleep from anywhere.
+    /// No default combo — the user opts in via Settings → General.
+    static let sleepNow = Self("sleepNow")
+}
 
 /// Real entry point: dispatch headless CLI commands first, otherwise run the
 /// SwiftUI menu-bar app.
@@ -66,6 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             NSApp.setActivationPolicy(.accessory)
             AppState.shared.start()
+            // Global "Sleep Now" hotkey (opt-in; recorded in Settings → General).
+            // KeyboardShortcuts invokes the handler on the main thread.
+            KeyboardShortcuts.onKeyUp(for: .sleepNow) {
+                MainActor.assumeIsolated { AppState.shared.sleepNow() }
+            }
             // First run: welcome the user (and own the notification prompt).
             OnboardingPresenter.shared.showIfNeeded(
                 settingsStore: AppState.shared.settingsStore)
@@ -75,6 +87,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
             AppState.shared.shutDown()
+        }
+    }
+
+    /// Handle the `decaffeinate://…` URL scheme (Shortcuts "Open URLs", scripts).
+    /// Delivered on the main thread for schemes registered in Info.plist.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated {
+            for url in urls {
+                switch AutomationURL.parse(url) {
+                case .sleepNow: AppState.shared.sleepNow()
+                case .keepAwake(let minutes): AppState.shared.stayAwake(forMinutes: minutes)
+                case .stopAwake: AppState.shared.clearQuietWindow()
+                case .none: break
+                }
+            }
         }
     }
 }

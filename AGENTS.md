@@ -1,6 +1,6 @@
 # Decaffeinate — agent contract
 
-macOS menu-bar app (SwiftPM executable, macOS 14+) that keeps the Mac awake — a caffeinate wrapper with UI. Public repo `harf-promo/decaffeinate`: unlimited Actions minutes, direct push to `main` is allowed (PR optional).
+macOS menu-bar app (SwiftPM executable, macOS 14+) — a *sleep firewall*: it shows exactly what's holding the Mac awake (IOKit power assertions via `IOPMCopyAssertionsByProcess`) and forces an idle Mac to sleep with `pmset sleepnow`. Keep-awake is a secondary, opt-in mode — it does **not** wrap `caffeinate`. Public repo `harf-promo/decaffeinate`: unlimited Actions minutes, direct push to `main` is allowed (PR optional).
 
 ## Layout
 
@@ -13,7 +13,7 @@ macOS menu-bar app (SwiftPM executable, macOS 14+) that keeps the Mac awake — 
 
 ```bash
 swift build            # debug build (~10 s warm)
-swift test             # Swift Testing runner (suite currently empty — passes)
+swift test             # XCTest suite — 256 tests across 20 files in Tests/DecaffeinateTests
 swift build -c release
 ```
 

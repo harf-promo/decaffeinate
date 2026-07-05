@@ -4,6 +4,54 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] — 2026-07-05
+
+Modern automation and forward-compatibility: Decaffeinate is now scriptable from
+Shortcuts, Spotlight, Siri, a URL scheme, and the CLI, with a global Sleep-Now
+hotkey — plus a macOS 26 Tahoe reliability fix and correctness hardening.
+
+### Added
+- **App Intents + Shortcuts / Spotlight / Siri.** Four actions — *Sleep Now*,
+  *What's Keeping My Mac Awake*, *Keep Awake for…* (15/30/60/120 min), and *Stop
+  Keeping Awake* — appear in Shortcuts.app and answer Siri/Spotlight. Discovery
+  works from the SwiftPM build via a `Metadata.appintents` bundle generated in
+  `build-app.sh` from the Swift Build backend's const-value metadata.
+- **`decaffeinate://` URL scheme** — `sleep-now`, `keep-awake?minutes=N`,
+  `stop-awake` — the always-reliable automation surface (Shortcuts' *Open URLs*
+  action needs no metadata).
+- **CLI actions** — `--sleep-now` (exits non-zero on launch failure) and
+  `--keep-awake N` (a foreground hold, like `caffeinate -t`).
+- **Global "Sleep Now" hotkey** — an opt-in, system-wide shortcut recorded in
+  Settings → General (via the KeyboardShortcuts package). No default combo, so it
+  never clobbers an existing shortcut.
+
+### Fixed
+- **Settings opens reliably on macOS 26 Tahoe.** SwiftUI's `SettingsLink` /
+  `openSettings()` silently no-op from a `MenuBarExtra` on Tahoe; the footer now
+  activates the app and falls back to the AppKit `showSettingsWindow:` selector,
+  working across macOS 14–26.
+- **Stable hold-row identity.** When IOKit omitted an assertion id, the row id
+  derived from global scan order, so the same hold could churn between ticks
+  (SwiftUI row flicker). The id now derives from stable per-process fields.
+- **Restart-advice de-dup no longer touches the real `UserDefaults`.** It routes
+  through the injected defaults like the rest of the app, keeping `swift test`
+  isolated from the developer's real preferences.
+
+### Changed
+- **Keep-awake windows persist** across a background relaunch, so a hold set via
+  an intent / URL scheme isn't silently dropped when the app is relaunched to run it.
+
+### Internal
+- `build-app.sh` resolves Sparkle's framework version dir dynamically (no more
+  hardcoded `Versions/B`) and hard-fails if it can't — closing a silent
+  notarization-break vector on a Sparkle framework-version bump.
+- `AGENTS.md` corrected (the app is a *sleep firewall*, not a caffeinate wrapper;
+  the suite is XCTest with 256+ tests, not empty/Swift Testing). `ROADMAP.md`
+  brought current through 1.11.0.
+- +17 tests (273 total): App Intents summary / preset logic, URL parsing, stable
+  assertion-id invariants, and restart-advice persistence. `swift format lint
+  --strict` clean.
+
 ## [1.11.0] — 2026-06-23
 
 Radically simplifies the menu so it answers one question per hold: "Will my Mac

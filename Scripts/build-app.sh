@@ -75,13 +75,64 @@ if [[ -d "${FRAMEWORK}" ]]; then
     cp -R "${FRAMEWORK}" "${APP_BUNDLE}/Contents/Frameworks/"
 fi
 
+# Extract App Intents metadata so Shortcuts / Spotlight / Siri can discover the
+# intents. SwiftPM's Swift Build backend emits per-module `.swiftconstvalues`
+# during the build above; `appintentsmetadataprocessor` turns those into the
+# `Metadata.appintents` bundle (SwiftPM's `swift build` does NOT run it — only
+# Xcode does). Must run BEFORE codesign so the bundle is inside the seal. Fully
+# guarded: any missing piece degrades to the `decaffeinate://` URL scheme + CLI,
+# which always work — so a toolchain change can never fail the release build.
+APPINTENTS_PROC="$(xcrun --find appintentsmetadataprocessor 2>/dev/null || true)"
+APPINTENTS_CONST="$(find .build -path "*${APP_NAME}.build*" \
+    -name "${APP_NAME}-primary.swiftconstvalues" 2>/dev/null | head -1)"
+if [[ -n "${APPINTENTS_PROC}" && -x "${APPINTENTS_PROC}" && -n "${APPINTENTS_CONST}" ]]; then
+    echo "▸ Extracting App Intents metadata …"
+    _AI_SRCS="${BUILD_DIR}/appintents-sources.txt"
+    _AI_CONST="${BUILD_DIR}/appintents-constvals.txt"
+    _AI_XCODE="$(xcodebuild -version 2>/dev/null | awk '/Build version/{print $NF}')"
+    find "Sources/${APP_NAME}" -name '*.swift' >"${_AI_SRCS}"
+    printf '%s\n' "${APPINTENTS_CONST}" >"${_AI_CONST}"
+    if "${APPINTENTS_PROC}" \
+        --output "${APP_BUNDLE}/Contents/Resources" \
+        --toolchain-dir "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain" \
+        --module-name "${APP_NAME}" \
+        --sdk-root "$(xcrun --show-sdk-path)" \
+        --xcode-version "${_AI_XCODE:-1}" \
+        --platform-family macOS \
+        --deployment-target 14.0 \
+        --target-triple "arm64-apple-macos14.0" \
+        --source-file-list "${_AI_SRCS}" \
+        --swift-const-vals-list "${_AI_CONST}"; then
+        echo "  ✓ Metadata.appintents written (Shortcuts/Spotlight/Siri discovery)"
+    else
+        echo "  (App Intents metadata step failed — Shortcuts still works via the URL scheme)"
+    fi
+    rm -f "${_AI_SRCS}" "${_AI_CONST}"
+else
+    echo "  (No App Intents const-values found — Shortcuts discovery falls back to the URL scheme)"
+fi
+
 ENTITLEMENTS="Resources/Decaffeinate.entitlements"
 SPARKLE="${APP_BUNDLE}/Contents/Frameworks/Sparkle.framework"
 if [[ -n "${DEVELOPER_ID:-}" ]]; then
     echo "▸ Signing with Developer ID (hardened runtime) …"
     if [[ -d "${SPARKLE}" ]]; then
         # Sign Sparkle inside-out (notarization requires every nested binary signed).
-        V="${SPARKLE}/Versions/B"
+        # Resolve the current framework version dir dynamically — do NOT hardcode
+        # "Versions/B": a Sparkle framework-version-letter bump would otherwise make
+        # this loop silently sign nothing and fail notarization downstream.
+        if [[ -L "${SPARKLE}/Versions/Current" ]]; then
+            V="${SPARKLE}/Versions/$(readlink "${SPARKLE}/Versions/Current")"
+        else
+            V=""
+            for cand in "${SPARKLE}"/Versions/[A-Z]; do
+                [[ -d "${cand}" ]] && V="${cand}"
+            done
+        fi
+        if [[ -z "${V}" || ! -d "${V}" ]]; then
+            echo "✗ Could not resolve Sparkle framework version dir under ${SPARKLE}/Versions" >&2
+            exit 1
+        fi
         for item in \
             "${V}/XPCServices/Downloader.xpc" \
             "${V}/XPCServices/Installer.xpc" \

@@ -1,3 +1,4 @@
+import KeyboardShortcuts
 import SwiftUI
 
 /// Settings as a native sidebar (the macOS idiom for many sections) instead of
@@ -141,6 +142,11 @@ private struct GeneralSettings: View {
                     )
                     .font(.caption).foregroundStyle(Color.warning)
                 }
+
+                KeyboardShortcuts.Recorder(
+                    "Global \u{201C}Sleep Now\u{201D} hotkey", name: .sleepNow)
+                Text("Set a system-wide shortcut to put the Mac to sleep from any app.")
+                    .settingsCaption()
             }
 
             Section("Never sleep at a bad moment") {
