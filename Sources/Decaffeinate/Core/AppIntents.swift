@@ -98,7 +98,12 @@ struct WhatsKeepingMacAwakeIntent: AppIntent {
     static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<[String]> & ProvidesDialog {
-        let report = AwakeReport.summarize(TelemetryEngine().scan())
+        // The intent runs inside the app process — filter our own pid exactly
+        // like AppState.tick() does, or an active keep-awake/quiet window makes
+        // Siri answer "Decaffeinate is keeping your Mac awake" as a blocker.
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let report = AwakeReport.summarize(
+            TelemetryEngine().scan().filter { $0.pid != ownPID })
         return .result(value: report.items, dialog: IntentDialog(stringLiteral: report.spoken))
     }
 }

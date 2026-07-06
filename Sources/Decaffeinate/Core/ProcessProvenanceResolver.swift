@@ -43,6 +43,15 @@ final class ProcessProvenanceResolver {
         let startTime: TimeInterval
     }
     private var cache: [pid_t: CacheEntry] = [:]
+    /// Entries are only evicted on re-lookup of the same pid — but a vanished
+    /// holder (e.g. each `caffeinate -t` respawn of a long agent session) is
+    /// never looked up again, so orphans would accumulate for the app's whole
+    /// lifetime without this periodic sweep.
+    private var lastSweep = Date.distantPast
+    private let sweepInterval: TimeInterval = 60
+
+    /// Test hook: number of cached entries currently held.
+    var cachedEntryCount: Int { cache.count }
 
     init(
         introspector: any ProcessIntrospecting = LiveProcessIntrospector(),
@@ -55,6 +64,7 @@ final class ProcessProvenanceResolver {
     /// Resolve (and cache) the provenance for a holder pid. Nil if the process is
     /// gone or nothing readable. Cache key is pid+startTime (defeats PID reuse).
     func provenance(for pid: pid_t) -> ProcessProvenance? {
+        sweepIfDue()
         guard let holder = introspector.facts(for: pid) else {
             cache[pid] = nil
             return nil
@@ -67,6 +77,15 @@ final class ProcessProvenanceResolver {
         let resolved = resolve(holder: holder)
         cache[pid] = CacheEntry(value: resolved, at: now(), startTime: holder.startTime)
         return resolved
+    }
+
+    /// Drop entries that have sat unrefreshed well past the TTL (any live row
+    /// re-resolves within `ttl`, so a stale entry belongs to a gone process).
+    private func sweepIfDue() {
+        let t = now()
+        guard t.timeIntervalSince(lastSweep) >= sweepInterval else { return }
+        lastSweep = t
+        cache = cache.filter { t.timeIntervalSince($0.value.at) < sweepInterval }
     }
 
     private func resolve(holder: ProcessFacts) -> ProcessProvenance {

@@ -13,7 +13,7 @@ macOS menu-bar app (SwiftPM executable, macOS 14+) — a *sleep firewall*: it sh
 
 ```bash
 swift build            # debug build (~10 s warm)
-swift test             # XCTest suite — 256 tests across 20 files in Tests/DecaffeinateTests
+swift test             # XCTest suite — 307 tests across 27 files in Tests/DecaffeinateTests
 swift build -c release
 ```
 

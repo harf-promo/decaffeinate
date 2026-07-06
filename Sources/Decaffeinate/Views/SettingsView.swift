@@ -205,10 +205,25 @@ private struct GeneralSettings: View {
                 if LoginItem.isAvailable {
                     Toggle("Launch at login", isOn: s.launchAtLogin)
                         .onChange(of: store.settings.launchAtLogin) { _, newValue in
+                            // No-op when the OS already matches (the onAppear
+                            // reconcile writes the live value back through this
+                            // handler; re-registering can throw and would then
+                            // wrongly flip the user's login item off).
+                            if LoginItem.isEnabled == newValue { return }
                             // Revert the toggle if SMAppService registration fails
                             // so it always reflects the actual login-item state.
                             if !LoginItem.setEnabled(newValue) {
                                 store.settings.launchAtLogin = !newValue
+                            }
+                        }
+                        .onAppear {
+                            // The OS owns this state (System Settings → Login
+                            // Items can flip it behind our back) — reconcile the
+                            // cached setting with the live status on every open.
+                            if let live = LoginItem.isEnabled,
+                                live != store.settings.launchAtLogin
+                            {
+                                store.settings.launchAtLogin = live
                             }
                         }
                 }

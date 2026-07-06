@@ -100,16 +100,74 @@ enum CLI {
     /// Hold this Mac awake for `minutes`, then release — a foreground, blocking
     /// hold (like `caffeinate -t`). Ctrl-C exits early; the kernel releases the
     /// assertion automatically on process exit.
+    ///
+    /// The hold is watched by the same safety rails as the GUI toggle: every few
+    /// seconds the thermal and battery state are re-evaluated, and the hold is
+    /// released (with a non-zero exit so scripts can react) the moment a rail
+    /// demands it — the Backpack Guard and Battery Floor are unconditional
+    /// promises, not GUI-only ones.
     @MainActor
     private static func runKeepAwake(minutes: Int) {
         let clamped = min(max(minutes, 1), 24 * 60)
+        let power = PowerSourceReader()
+
+        // Re-reads the user's settings on every check: a hold can run for up to
+        // 24 h, and a battery-floor / thermal-guard change made in the GUI
+        // mid-hold must apply to it, not a snapshot from launch time. (Shared
+        // defaults domain when run from the installed app; safe defaults
+        // otherwise.)
+        func dropReason() -> String? {
+            keepAwakeSafetyDropReason(
+                power: power.snapshot(),
+                thermalState: ProcessInfo.processInfo.thermalState,
+                settings: SettingsStore().settings)
+        }
+
+        // Rails apply from the very first moment — never create a hold on a Mac
+        // that is already below the floor or thermally stressed.
+        if let reason = dropReason() {
+            FileHandle.standardError.write(
+                Data("🛟  \(reason) — not keeping this Mac awake.\n".utf8))
+            exit(EXIT_FAILURE)
+        }
+
         let engine = CaffeineEngine()
         engine.update(
             keepSystemAwake: true, keepDisplayAwake: false, reason: "Decaffeinate --keep-awake")
         print("☕️  Keeping this Mac awake for \(clamped) min. Press Ctrl-C to stop early.")
-        Thread.sleep(forTimeInterval: TimeInterval(clamped) * 60)
+        let deadline = Date().addingTimeInterval(TimeInterval(clamped) * 60)
+        while true {
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining <= 0 { break }
+            Thread.sleep(forTimeInterval: min(5, remaining))
+            // A hold that ran its full course is a success — don't let a rail
+            // dip during the final nap turn a completed hold into exit 1.
+            if deadline.timeIntervalSinceNow <= 0 { break }
+            if let reason = dropReason() {
+                engine.releaseAll()
+                FileHandle.standardError.write(
+                    Data("🛟  \(reason) — released the keep-awake hold.\n".utf8))
+                exit(EXIT_FAILURE)
+            }
+        }
         engine.releaseAll()
         print("✓  Done — this Mac can sleep again.")
+    }
+
+    /// Why the safety rails demand dropping a keep-awake hold right now, or nil.
+    /// Pure mapping over `SafetyRails` so `--keep-awake`'s guard is testable.
+    static func keepAwakeSafetyDropReason(
+        power: PowerSnapshot,
+        thermalState: ProcessInfo.ThermalState,
+        settings: DecaffeinateSettings
+    ) -> String? {
+        let decision = SafetyRails.evaluate(
+            assertions: [],
+            power: power,
+            thermalState: thermalState,
+            whitelistedAwakeAppNames: [],
+            settings: settings)
+        return decision.dropKeepAwakeReasons.first
     }
 
     @MainActor
@@ -153,7 +211,13 @@ enum CLI {
         if let secs = reason.autoReleaseSeconds {
             why += " · auto-releases in \(secs)s"
         }
-        print("  • \(a.displayName)\(via)  (pid \(a.pid))")
+        // The GUI filters its own hold out of the app; the CLI keeps it visible
+        // for honesty, tagged so the reader knows who it belongs to. (A scan runs
+        // as its own process, so match the app by name, not pid.)
+        let selfTag =
+            a.pid == ProcessInfo.processInfo.processIdentifier || a.processName == "Decaffeinate"
+            ? " ← this app" : ""
+        print("  • \(a.displayName)\(selfTag)\(via)  (pid \(a.pid))")
         print("      \(why)")
         print("      \(a.assertionType): “\(name)”")
     }

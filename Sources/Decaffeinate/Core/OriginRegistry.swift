@@ -14,7 +14,7 @@ enum OriginRegistry {
     /// Agent / CLI hosts worth naming as the origin command's owner. Matched
     /// against argv[0]'s basename and the proc name.
     static let agentCLIs: Set<String> = [
-        "claude", "claude-code", "cursor", "aider", "node", "deno", "bun",
+        "claude", "claude-code", "cursor", "cursor-agent", "aider", "node", "deno", "bun",
         "python", "python3", "ruby", "go", "cargo", "xcodebuild", "swift",
         "make", "docker", "npm", "pnpm", "yarn",
     ]
@@ -52,6 +52,7 @@ enum OriginRegistry {
         ("com.exafunction.windsurf", "Windsurf", .editor),
         ("dev.zed.Zed", "Zed", .editor),
         ("com.anthropic.claude", "Claude", .agentHost),
+        ("com.anthropic.claudefordesktop", "Claude", .agentHost),
     ]
 
     /// Electron helper proc-name needles whose bundle is the real editor/host.
@@ -72,7 +73,17 @@ enum OriginRegistry {
             return (AssertionOwner(name: hit.name, bundleIdentifier: bundleID), hit.kind)
         }
         if let bundleID {
-            for entry in byBundlePrefix where bundleID.hasPrefix(entry.prefix) {
+            // Match on a segment boundary ("." or "-"), not a bare prefix: with
+            // bare `hasPrefix`, "com.microsoft.VSCode" swallowed
+            // "com.microsoft.VSCodeInsiders" (making that entry dead code and
+            // misattributing the bundle id). The "-" boundary keeps channel
+            // variants like dev.warp.Warp-Stable / dev.zed.Zed-Preview matching;
+            // distinct products get their own entries (e.g.
+            // com.anthropic.claudefordesktop above).
+            for entry in byBundlePrefix
+            where bundleID == entry.prefix || bundleID.hasPrefix(entry.prefix + ".")
+                || bundleID.hasPrefix(entry.prefix + "-")
+            {
                 return (
                     AssertionOwner(name: entry.name, bundleIdentifier: entry.prefix), entry.kind
                 )

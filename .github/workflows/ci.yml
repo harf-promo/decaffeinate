@@ -30,6 +30,9 @@ jobs:
       - name: Lint (swift-format)
         run: swift format lint --strict --recursive --configuration .swift-format Sources Tests Package.swift
 
+      - name: Cask sanity (brew style)
+        run: brew style Casks/decaffeinate.rb
+
       - name: Build
         run: swift build -v
 

@@ -4,6 +4,81 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] — Unreleased
+
+A correctness and pipeline-hardening round driven by a full adversarial audit
+(every finding below was independently verified against the code before fixing).
+
+### Fixed
+- **Keep-awake now yields to the safety rails.** With the keep-awake toggle on
+  and the battery below your floor (or thermal pressure high), the rails dropped
+  the hold — but force-sleep never re-engaged, leaving the Mac awake and
+  draining until the 3%-critical emergency guard. The toggle now counts as
+  "holding" only while the rails permit it, exactly like quiet windows and
+  triggers.
+- **The app no longer reports itself as a blocker.** Decaffeinate's own
+  keep-awake assertion was scanned back in as an unclassified third-party hold —
+  it could inflate the holding count and even fire a "new app is keeping your
+  Mac awake" notification about itself. Its own pid is now filtered from every
+  scan (`--scan` still lists it, tagged "← this app", for honesty).
+- **`--keep-awake` honors the Backpack Guard and Battery Floor.** The CLI hold
+  used to sleep blind for its whole duration; it now re-checks the safety rails
+  every few seconds and releases (exiting non-zero so scripts can react) the
+  moment a rail demands it.
+- **Watched agents/builds no longer read as "finished" mid-work.** Subtree CPU
+  was summed over currently-alive processes only, so fork-heavy workloads
+  (exactly the agent/build case) could look quiet while still working — risking
+  a forced sleep mid-task. CPU of exited children is now retained in a
+  monotonic per-target total (keyed by pid + start time against pid reuse).
+- **No more instant re-sleep after a wake.** HID idle survives a sleep as
+  wall-clock time, so a lid-open or scheduled wake with no fresh input read as
+  hours idle and could fire `pmset` straight back in your face. A 60-second
+  post-wake grace now applies (the immediate thermal/battery guards keep their
+  own separate, shorter cooldown).
+- **Strict takeover is inert while auto-sleep is off.** The combination held a
+  permanent assertion (blocking macOS's own idle sleep) while the idle engine —
+  gated on the master switch — never slept the Mac either: a "never sleeps"
+  dead end.
+- **Skipping onboarding no longer forfeits notifications.** Both "Skip" and
+  "Get started" now request notification permission.
+- **The first-run window no longer clips its footer** — it is sized from the
+  view's own fitting size instead of a drifted hardcoded height.
+- **VS Code Insiders is attributed correctly.** Bundle-prefix matching now
+  requires a segment boundary, so `com.microsoft.VSCode` can't swallow
+  `com.microsoft.VSCodeInsiders` (Claude Desktop's real bundle id got its own
+  entry).
+- **Agent labels need a word boundary.** A folder like
+  `~/dev/cursor-pagination-demo` or a `--cursor` flag no longer relabels an
+  ordinary hold as a "Cursor" agent session.
+- **"Launch at login" reflects reality.** The toggle now reconciles with the
+  live `SMAppService` status when Settings opens (System Settings can flip it
+  behind the app's back), and a `caffeinate -w` wait-target's name is only
+  resolved while the target is still alive (PID-reuse guard).
+- The provenance cache no longer grows unboundedly across `caffeinate -t`
+  respawns (periodic sweep), and watching by PID no longer resolves display
+  names for every process on the system each second.
+
+### Release pipeline
+- **A release can no longer ship with auto-update silently broken**:
+  `SPARKLE_PRIVATE_KEY` joined the required-secrets preflight, and a skipped
+  appcast now fails the job instead of warning.
+- **`Package.resolved` is committed** — signed releases build against pinned,
+  reviewed dependency versions instead of whatever is newest at tag time.
+- CI now runs `brew style` on the cask; the cask gained an `uninstall
+  login_item` stanza and a fuller `zap` list.
+
+### Internal
+- +21 tests (307 total): regression tests for every fix above, plus first direct
+  coverage of `SleepController`'s real `pmset` launch path (via the `pmsetURL`
+  seam) and `CaffeineEngine`'s reconcile state machine (extracted as a pure,
+  testable function). An adversarial review of the fixes themselves then caught
+  and fixed nine follow-on regressions (stale CLI settings snapshot, accumulator
+  double-count on transient misses, hyphenated bundle-id variants, `cursor-agent`
+  attribution, the Siri intent's own-pid filter, login-item reconcile ping-pong).
+- Docs re-synced with shipped reality: `docs/ARCHITECTURE.md` rewritten for the
+  current engine surface, `docs/ROADMAP.md` caught up three releases,
+  `docs/DISTRIBUTION.md` now describes the (manual) cask bump truthfully.
+
 ## [1.13.0] — 2026-07-05
 
 A UX-clarity round: the menu now gives ONE confident answer to "will my Mac

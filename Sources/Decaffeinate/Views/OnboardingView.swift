@@ -227,7 +227,10 @@ final class OnboardingPresenter: NSObject, NSWindowDelegate {
         window.styleMask = [.titled, .closable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
-        window.setContentSize(NSSize(width: 480, height: 400))
+        // Size the (non-resizable) window from the view's own fitting size so
+        // the two can never drift apart — a hardcoded height once clipped the
+        // footer 20pt off the bottom of the first thing a new user ever sees.
+        window.setContentSize(hosting.view.fittingSize)
         window.center()
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -238,6 +241,11 @@ final class OnboardingPresenter: NSObject, NSWindowDelegate {
 
     private func finish() {
         settingsStore?.settings.hasCompletedOnboarding = true
+        // Both exits (Skip and "Get started") request notification permission:
+        // start() only asks once onboarding is complete, so skipping used to
+        // forfeit the prompt — and with it every notification — for the whole
+        // session. The request is idempotent; the OS prompt shows at most once.
+        AppState.shared.requestNotificationAuthorization()
         window?.close()
     }
 

@@ -38,6 +38,11 @@ enum Fixtures {
     static let defaultSettings = DecaffeinateSettings()
 }
 
+/// A mutable clock for tests that drive time-dependent behavior.
+final class MutableClock: @unchecked Sendable {
+    var date = Date(timeIntervalSince1970: 1_000_000)
+}
+
 /// An injectable process graph for testing the provenance walk without syscalls.
 @MainActor
 final class FakeProcessIntrospector: ProcessIntrospecting {

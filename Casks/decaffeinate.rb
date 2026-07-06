@@ -21,5 +21,14 @@ cask "decaffeinate" do
 
   app "Decaffeinate.app"
 
-  zap trash: "~/Library/Preferences/com.harfpromo.Decaffeinate.plist"
+  # The in-app "Launch at login" toggle registers via SMAppService; remove the
+  # login item on uninstall so no ghost entry lingers in System Settings.
+  uninstall login_item: "Decaffeinate"
+
+  zap trash: [
+    "~/Library/Caches/com.harfpromo.Decaffeinate",
+    "~/Library/HTTPStorages/com.harfpromo.Decaffeinate",
+    "~/Library/Preferences/com.harfpromo.Decaffeinate.plist",
+    "~/Library/Saved Application State/com.harfpromo.Decaffeinate.savedState",
+  ]
 end

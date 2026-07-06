@@ -6,6 +6,14 @@ import ServiceManagement
 enum LoginItem {
     static var isAvailable: Bool { Bundle.main.bundleIdentifier != nil }
 
+    /// The live registration state from the OS, or nil when unbundled. The OS
+    /// owns this state — System Settings can flip it behind the app's back — so
+    /// UI must read this, never a cached preference.
+    static var isEnabled: Bool? {
+        guard isAvailable else { return nil }
+        return SMAppService.mainApp.status == .enabled
+    }
+
     @discardableResult
     static func setEnabled(_ enabled: Bool) -> Bool {
         guard isAvailable else { return false }

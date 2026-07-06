@@ -63,10 +63,23 @@ extension ProcessProvenance {
         if base == "claude" || joined.contains("/.claude/") || joined.contains("claude code") {
             return "Claude Code"
         }
-        if joined.contains("cursor") { return "Cursor" }
-        if joined.contains("windsurf") { return "Windsurf" }
-        if base == "aider" || joined.contains(" aider") { return "Aider" }
+        if hasToolToken(argv, "cursor") || hasToolToken(argv, "cursor-agent") { return "Cursor" }
+        if hasToolToken(argv, "windsurf") { return "Windsurf" }
+        if base == "aider" || hasToolToken(argv, "aider") { return "Aider" }
         return nil
+    }
+
+    /// True when an argv element *is* the tool — its basename equals `tool`, or
+    /// its path passes through the tool's app bundle. A bare substring match
+    /// here would relabel ordinary holds as agent sessions (a project folder
+    /// like `~/dev/cursor-pagination-demo` or a `--cursor` flag), changing row
+    /// titles and the session-coalescing key.
+    private static func hasToolToken(_ argv: [String], _ tool: String) -> Bool {
+        argv.contains {
+            let lower = $0.lowercased()
+            return (lower as NSString).lastPathComponent == tool
+                || lower.contains("/\(tool).app/")
+        }
     }
 
     /// Compose the one-line session label from already-resolved parts.

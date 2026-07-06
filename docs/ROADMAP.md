@@ -58,14 +58,28 @@ notification-auth gating, an updater no longer stuck on "Checking…", a widened
 an aggregate verdict banner, a consolidated action area, and plain-language "Always
 allow" / "Sleep anyway" / "Allow for…" with a single source of truth for policy verbs.
 
+**1.12.0 / 1.12.1** — **automation surface**: App Intents (Sleep Now, "What's keeping
+my Mac awake", Keep Awake for…, Stop) as Shortcuts / Siri / Spotlight actions, the
+`decaffeinate://` URL scheme, `--sleep-now` / `--keep-awake` CLI, and a global
+Sleep-Now hotkey — then a packaging fix (SwiftPM resource bundles copied into the
+app so Settings can't crash).
+
+**1.13.0** — **one confident sleep verdict**: `SleepOutlook` becomes the single
+source of truth for the header, banner, rows, and menu-bar icon; simpler Settings;
+Sleep-Now failure feedback.
+
+**1.14.0** — a **correctness & pipeline hardening** round from a full adversarial
+audit: keep-awake now yields to the battery floor/thermal rails (force-sleep
+re-engages), the app no longer scans its own assertion back in as a "blocker",
+`--keep-awake` honors the safety rails, watched-agent CPU accounting survives
+fork-heavy workloads, a post-wake grace stops instant re-sleep, strict takeover
+is inert while auto-sleep is off, plus release-pipeline integrity (appcast
+preflight, pinned `Package.resolved`, cask lint in CI).
+
 ## Near term
 
 - [ ] **Submit to homebrew/cask core** (removes the one-time tap step) — the cask
   is style-ready; gated only on notability. See [`HOMEBREW-CORE.md`](HOMEBREW-CORE.md).
-- [ ] **App Intents / Shortcuts & URL-scheme automation** — Sleep Now, "What's
-  keeping my Mac awake", Keep Awake for…, and Stop as Shortcuts / Siri / Spotlight
-  actions, plus a `decaffeinate://` URL scheme, `--sleep-now` / `--keep-awake` CLI,
-  and a global Sleep-Now hotkey. *(In progress.)*
 
 ## Deeper system insight
 

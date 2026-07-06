@@ -103,6 +103,8 @@ final class AppState: ObservableObject {
 
     private var timer: Timer?
     private var restObserverTokens: [NSObjectProtocol] = []
+    /// This process's pid — its own assertions are filtered out of every scan.
+    private static let ownPID: pid_t = ProcessInfo.processInfo.processIdentifier
     private static let lastBootKey = "DecaffeinateLastBootTime.v1"
     /// Persisted restart-advice state — keyed by boot time so it auto-resets after
     /// a real restart. Stores { "bootSecs": Double, "advice": String }.
@@ -366,6 +368,7 @@ final class AppState: ObservableObject {
                     // can measure how long the Mac actually stayed asleep.
                     if kind == .wake {
                         self.history.recordWakeDuration(at: wakeDate)
+                        self.systemDidWake()
                     }
                 }
             }
@@ -479,10 +482,12 @@ final class AppState: ObservableObject {
     /// `caffeinate` hold is doing (e.g. "…until npm run build (PID 8123) finishes").
     func displayReason(for assertion: PowerAssertion) -> String {
         if let invocation = caffeinateInvocation(for: assertion) {
-            // A gone target resolves to "PID N" — pass nil so the explainer uses
-            // the cleaner "until process N exits" form.
+            // Same PID-reuse guard as `agentWaitTarget`: a gone target's pid may
+            // already belong to an unrelated live process, so only resolve a
+            // name while the original target is alive. A gone target resolves to
+            // nil so the explainer uses the cleaner "until process N exits" form.
             let waitName = invocation.waitPID
-                .map { processName(forPID: $0) }
+                .flatMap { isAlive($0) ? processName(forPID: $0) : nil }
                 .flatMap { $0.hasPrefix("PID ") ? nil : $0 }
             return CaffeinateExplainer.explain(invocation, waitTargetName: waitName)
         }
@@ -660,7 +665,12 @@ final class AppState: ObservableObject {
 
     func tick() {
         let s = settings
-        assertions = telemetry.scan()
+        // Never treat our own keep-awake assertion as a third-party blocker: the
+        // blocker rows, counts, firewall queue, and SafetyRails media detection
+        // must only ever see *other* processes' holds. (`--scan` still lists it,
+        // tagged, for honesty — a separate `--keep-awake` process is a real hold
+        // and intentionally stays visible.)
+        assertions = telemetry.scan().filter { $0.pid != Self.ownPID }
         idleSeconds = idleMonitor.secondsSinceLastInput()
         power = powerReader.snapshot()
         thermalState = thermalProvider()
@@ -713,8 +723,12 @@ final class AppState: ObservableObject {
 
         // 1) Reconcile keep-awake holds (caffeine + strict takeover + quiet
         //    window + triggers) — all dropped when a safety rail demands it.
+        //    Strict takeover only holds while the master switch is on: with the
+        //    switch off, nothing would ever sleep the Mac, so the hold would be
+        //    a "never sleeps" dead end rather than a takeover.
+        let strictTakeoverHolding = s.strictTakeoverMode && s.decaffeinateEnabled
         let wantsAwake =
-            (s.caffeinateEnabled || s.strictTakeoverMode || quietWindowActive || triggerHolding)
+            (s.caffeinateEnabled || strictTakeoverHolding || quietWindowActive || triggerHolding)
             && !decision.shouldDropKeepAwake
         let wantsDisplayAwake =
             s.caffeinateEnabled
@@ -762,8 +776,14 @@ final class AppState: ObservableObject {
         //    agent/build has finished, collapse the idle requirement to a short
         //    grace so the Mac sleeps soon after you've stepped away.
         //    Suppressed while the user is intentionally caffeinating.
+        //    Like the quiet window and triggers, the keep-awake toggle only
+        //    counts as holding while the safety rails permit it — once the
+        //    battery floor / thermal rail drops the hold, force-sleep must
+        //    re-engage rather than leave the Mac awake and draining until the
+        //    3%-critical emergency guard.
+        let caffeinateHolding = s.caffeinateEnabled && !decision.shouldDropKeepAwake
         var remaining: TimeInterval?
-        if s.decaffeinateEnabled, !s.caffeinateEnabled, !quietWindowHoldingAwake, !triggerHolding {
+        if s.decaffeinateEnabled, !caffeinateHolding, !quietWindowHoldingAwake, !triggerHolding {
             let base = s.effectiveIdleSeconds(onBattery: power.onBattery)
             let threshold = agentFinished ? min(base, completionGraceSeconds) : base
             let r = threshold - idleSeconds
@@ -925,6 +945,17 @@ final class AppState: ObservableObject {
         if let at = lastErrorAt, now().timeIntervalSince(at) > errorVisibilitySeconds {
             clearError()
         }
+    }
+
+    /// The Mac just finished waking (NSWorkspace.didWake). Grace the idle engine:
+    /// HID idle survives the sleep as wall-clock time, so a wake with no fresh
+    /// input yet (lid open, scheduled wake) reads as hours idle on the very next
+    /// tick — without this, pmset would fire straight back in the user's face.
+    /// (The pmset-time cooldown only covers sleeps shorter than itself.) The
+    /// immediate thermal/battery guards keep their own separate cooldown.
+    /// Internal (not private) so tests can drive it without a live NSWorkspace.
+    func systemDidWake() {
+        suppressForceSleepUntil = now().addingTimeInterval(idleCooldownSeconds)
     }
 
     /// The kernel is beginning a real sleep transition (NSWorkspace.willSleep).
@@ -1200,7 +1231,8 @@ final class AppState: ObservableObject {
     /// (keep-awake, an active quiet window, an active-hours schedule, or a safety
     /// hold). Used so the watcher doesn't promise "sleeping soon" when it can't.
     var isAutoSleepHeld: Bool {
-        settings.caffeinateEnabled || quietWindowHoldingAwake || !decision.canForceSleep
+        (settings.caffeinateEnabled && !decision.shouldDropKeepAwake)
+            || quietWindowHoldingAwake || !decision.canForceSleep
     }
 
     /// When a quiet window is set but a safety rail has paused its hold, why.

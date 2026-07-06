@@ -76,8 +76,10 @@ brew install --cask decaffeinate
 ```
 
 **Per-release tap mirror (REQUIRED — do not skip):**
-1. Bump `version` + `sha256` in **this repo's** `Casks/decaffeinate.rb` (done by CI
-   workflow after the sha is known).
+1. Bump `version` + `sha256` in **this repo's** `Casks/decaffeinate.rb` — a
+   **manual** commit after the release publishes (the sha is in the release's
+   `SHA256SUMS.txt`; nothing in CI edits the cask). CI runs `brew style` on the
+   cask, but only a human bumps it.
 2. **Also mirror those same two values** into the separate
    `harf-promo/homebrew-tap` repo's `Casks/decaffeinate.rb` — Homebrew reads
    the _tap_, not this repo. Without this step, `brew upgrade --cask decaffeinate`

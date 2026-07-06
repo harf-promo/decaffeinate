@@ -23,6 +23,73 @@ final class ProcessProvenanceTests: XCTestCase {
         XCTAssertNil(OriginRegistry.classify(name: "zsh", bundleID: nil))
     }
 
+    func testFriendlyAgentNameRequiresAWordBoundary() {
+        // A bare substring match relabeled ordinary holds as agent sessions —
+        // changing row titles and the session-coalescing key.
+        XCTAssertNil(
+            ProcessProvenance.friendlyAgentName(
+                argv: ["/bin/sh", "/Users/x/dev/cursor-pagination-demo/run.sh"]))
+        XCTAssertNil(ProcessProvenance.friendlyAgentName(argv: ["psql", "--cursor", "q"]))
+        XCTAssertEqual(ProcessProvenance.friendlyAgentName(argv: ["cursor", "chat"]), "Cursor")
+        XCTAssertEqual(
+            ProcessProvenance.friendlyAgentName(
+                argv: ["/Applications/Cursor.app/Contents/MacOS/Cursor", "--type=utility"]),
+            "Cursor")
+        XCTAssertEqual(
+            ProcessProvenance.friendlyAgentName(argv: ["/usr/local/bin/windsurf"]), "Windsurf")
+        // Cursor's standalone CLI must keep its attribution under the
+        // word-boundary rule.
+        XCTAssertEqual(
+            ProcessProvenance.friendlyAgentName(argv: ["cursor-agent", "fix the tests"]),
+            "Cursor")
+    }
+
+    func testProvenanceCacheSweepsOrphanedEntries() {
+        // Each `caffeinate -t` respawn caches one entry under a pid that is
+        // never looked up again once the process exits; the sweep must reclaim
+        // them instead of growing for the app's whole lifetime.
+        let intro = FakeProcessIntrospector()
+        let clock = MutableClock()
+        let resolver = ProcessProvenanceResolver(introspector: intro, now: { clock.date })
+
+        intro.add(300, ppid: 1, name: "caffeinate", argv: ["caffeinate", "-t", "300"])
+        XCTAssertNotNil(resolver.provenance(for: 300))
+        XCTAssertEqual(resolver.cachedEntryCount, 1)
+
+        intro.graph[300] = nil  // the -t hold expired; pid never queried again
+        clock.date += 120
+        intro.add(301, ppid: 1, name: "caffeinate", argv: ["caffeinate", "-t", "300"])
+        _ = resolver.provenance(for: 301)
+        XCTAssertEqual(resolver.cachedEntryCount, 1, "the orphaned entry was swept")
+    }
+
+    func testRegistryMatchesBundlePrefixOnSegmentBoundary() {
+        // Bare hasPrefix made "com.microsoft.VSCode" swallow VS Code Insiders,
+        // leaving that entry unreachable and reporting the wrong bundle id.
+        let insiders = OriginRegistry.classify(
+            name: "x", bundleID: "com.microsoft.VSCodeInsiders")
+        XCTAssertEqual(insiders?.0.name, "VS Code Insiders")
+        XCTAssertEqual(insiders?.0.bundleIdentifier, "com.microsoft.VSCodeInsiders")
+
+        // A dot-separated sub-bundle still resolves to its parent entry…
+        let helper = OriginRegistry.classify(name: "x", bundleID: "com.microsoft.VSCode.helper")
+        XCTAssertEqual(helper?.0.name, "VS Code")
+
+        // …and Claude Desktop's real bundle id keeps matching via its own entry.
+        XCTAssertEqual(
+            OriginRegistry.classify(name: "x", bundleID: "com.anthropic.claudefordesktop")?.1,
+            .agentHost)
+
+        // Channel variants separated by "-" (Warp-Stable, Zed-Preview) still match…
+        XCTAssertEqual(
+            OriginRegistry.classify(name: "x", bundleID: "dev.warp.Warp-Stable")?.0.name, "Warp")
+        XCTAssertEqual(
+            OriginRegistry.classify(name: "x", bundleID: "dev.zed.Zed-Preview")?.0.name, "Zed")
+
+        // …but an unrelated id sharing a bare string prefix never matches.
+        XCTAssertNil(OriginRegistry.classify(name: "x", bundleID: "dev.zed.ZedPreviewFake"))
+    }
+
     func testRegistryShellAndAgentCLI() {
         XCTAssertTrue(OriginRegistry.isShell("zsh"))
         XCTAssertTrue(OriginRegistry.isShell("-bash"))

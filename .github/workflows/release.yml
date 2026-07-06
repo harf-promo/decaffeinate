@@ -61,13 +61,18 @@ jobs:
           NKEY: ${{ secrets.NOTARY_KEY_P8 }}
           NKEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
+          # SPARKLE_KEY is as load-bearing as the signing secrets: SUFeedURL
+          # points at latest/download/appcast.xml, so one release published
+          # without an appcast silently breaks auto-update for every installed
+          # copy. Fail here, before any expensive signing/notarization work.
           missing=""
-          for name in CERT CERT_PASSWORD DEV_ID NKEY NKEY_ID NISSUER; do
+          for name in CERT CERT_PASSWORD DEV_ID NKEY NKEY_ID NISSUER SPARKLE_KEY; do
             [ -z "${!name}" ] && missing="$missing $name"
           done
           if [ -n "$missing" ]; then
-            echo "::error::Missing signing secrets:$missing — see docs/DISTRIBUTION.md."
+            echo "::error::Missing release secrets:$missing — see docs/DISTRIBUTION.md."
             exit 1
           fi
 
@@ -128,9 +133,9 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
-            echo "::warning::SPARKLE_PRIVATE_KEY not set — skipping appcast."; exit 0
-          fi
+          # Presence is enforced by the preflight step; this is just a loud
+          # backstop (never a second, separately-worded gate to keep in sync).
+          : "${SPARKLE_PRIVATE_KEY:?guaranteed non-empty by the preflight step}"
           KEYFILE="$(mktemp)"; printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEYFILE"
           BIN=".build/artifacts/sparkle/Sparkle/bin/generate_appcast"
           [ -x "$BIN" ] || { echo "::error::generate_appcast not found at $BIN — Sparkle layout may have changed"; exit 1; }

@@ -362,6 +362,21 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(h.sleeper.callCount, 0)
     }
 
+    func testWakeGracePreventsInstantResleep() {
+        // HID idle survives a sleep as wall-clock time: after a lid-open or
+        // scheduled wake with no fresh input yet, the first tick reads hours of
+        // idle. The post-wake grace must hold pmset off; after it lapses (still
+        // no input), the idle engine re-engages.
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.idle.seconds = 8 * 3600
+        h.state.systemDidWake()
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "no pmset inside the post-wake grace")
+        h.clock.advance(61)
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "idle engine re-engages after the grace")
+    }
+
     func testIdleThresholdClampPreventsConstantSleep() {
         let h = makeHarness { $0.idleThresholdMinutes = 0 }; defer { h.cleanup() }
         h.idle.seconds = 30  // below the clamped 60s floor
@@ -381,7 +396,60 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(h.caffeine.holdingSystem, "keep-awake is dropped below the battery floor")
     }
 
+    func testBatteryFloorDropReEngagesForceSleepWhileCaffeinated() {
+        // Keep-awake ON + battery below the user's floor: the rail drops the
+        // hold, and force-sleep must re-engage — exactly like a rail-paused
+        // quiet window — instead of leaving the Mac awake and draining until
+        // the 3%-critical emergency guard.
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1
+            $0.caffeinateEnabled = true
+            $0.batteryFloorPercent = 30
+        }; defer { h.cleanup() }
+        h.power.snap = PowerSnapshot(onBattery: true, charge: 0.20, isCharging: false)
+        h.idle.seconds = 600  // stepped away, well past the threshold
+        h.state.tick()
+        XCTAssertFalse(h.caffeine.holdingSystem, "rail must drop the keep-awake hold")
+        XCTAssertEqual(h.sleeper.callCount, 1, "force-sleep re-engages once the hold is dropped")
+    }
+
+    func testStrictTakeoverIsInertWhileMasterSwitchOff() {
+        // Strict takeover with the master switch off must not hold an assertion:
+        // that combination would block macOS's own idle sleep while the idle
+        // engine (gated on the master switch) never sleeps the Mac either.
+        let h = makeHarness {
+            $0.strictTakeoverMode = true
+            $0.decaffeinateEnabled = false
+        }; defer { h.cleanup() }
+        h.state.tick()
+        XCTAssertFalse(h.caffeine.holdingSystem, "no takeover hold while auto-sleep is off")
+
+        h.settings.settings.decaffeinateEnabled = true
+        h.state.tick()
+        XCTAssertTrue(h.caffeine.holdingSystem, "takeover holds again with the master switch on")
+    }
+
     // MARK: Firewall queue
+
+    func testOwnAssertionIsInvisibleToTheFirewall() {
+        // Decaffeinate's own keep-awake hold must never be scanned back in as a
+        // third-party blocker — no self-notification, no phantom holding count.
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [
+            Fixtures.assertion(
+                pid: ProcessInfo.processInfo.processIdentifier,
+                process: "Decaffeinate", bundle: "com.harfpromo.Decaffeinate",
+                name: "Decaffeinate keep-awake"),
+            systemBlocker("Chrome"),
+        ]
+        h.state.tick()
+        XCTAssertEqual(h.state.assertions.count, 1, "own-pid assertion is filtered out")
+        XCTAssertEqual(h.state.assertions.first?.processName, "Chrome")
+        XCTAssertEqual(h.state.activeHoldingCount, 1)
+        XCTAssertFalse(
+            h.notifier.notifications.contains { $0.app == "Decaffeinate" },
+            "the firewall must never notify about the app itself")
+    }
 
     func testFirewallSurfacesNewBlockerAndNotifiesOnce() {
         let h = makeHarness(); defer { h.cleanup() }

@@ -46,6 +46,18 @@ final class CaffeineEngine {
         update(keepSystemAwake: false, keepDisplayAwake: false, reason: "")
     }
 
+    /// The reconcile state machine, separated from the IOKit call sites so the
+    /// decision is unit-testable (the IOKit calls stay thin and obvious).
+    enum ReconcileAction: Equatable { case create, release, keep }
+
+    nonisolated static func reconcileAction(hold: Bool, currentlyHolding: Bool) -> ReconcileAction {
+        switch (hold, currentlyHolding) {
+        case (true, false): return .create
+        case (false, true): return .release
+        default: return .keep
+        }
+    }
+
     private func reconcile(
         hold: Bool,
         currentlyHolding: inout Bool,
@@ -53,7 +65,8 @@ final class CaffeineEngine {
         type: String,
         reason: String
     ) {
-        if hold, !currentlyHolding {
+        switch Self.reconcileAction(hold: hold, currentlyHolding: currentlyHolding) {
+        case .create:
             var newID = IOPMAssertionID(0)
             let result = IOPMAssertionCreateWithName(
                 type as CFString,
@@ -61,14 +74,18 @@ final class CaffeineEngine {
                 reason as CFString,
                 &newID
             )
+            // On a failed create, `currentlyHolding` stays false so the next
+            // tick retries rather than believing a hold exists that doesn't.
             if result == kIOReturnSuccess {
                 assertionID = newID
                 currentlyHolding = true
             }
-        } else if !hold, currentlyHolding {
+        case .release:
             IOPMAssertionRelease(assertionID)
             assertionID = IOPMAssertionID(0)
             currentlyHolding = false
+        case .keep:
+            break
         }
     }
 }

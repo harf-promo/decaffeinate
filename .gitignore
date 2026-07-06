@@ -1,7 +1,7 @@
-# SwiftPM
+# SwiftPM (Package.resolved is committed: signed releases must build against
+# pinned, reviewed dependency versions, not whatever is newest at tag time)
 .build/
 .swiftpm/
-Package.resolved
 
 # Build output
 build/
