@@ -103,6 +103,12 @@ final class FakeSystemStateReader: SystemStateReading {
     func bootTime() -> Date? { boot }
 }
 
+/// A canned wake-reason reader for tests (no pmset subprocess).
+struct FakeWakeReasonReader: WakeReasonReading {
+    var reason: String?
+    func latestWakeReason() -> String? { reason }
+}
+
 /// A canned audio-device resolver for tests (no CoreAudio).
 @MainActor
 final class FakeAudioDeviceResolver: AudioDeviceResolving {

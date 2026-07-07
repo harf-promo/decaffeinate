@@ -47,7 +47,40 @@ enum CLI {
             runProvenance(pid: pid)
             return true
         }
+        if arguments.contains("--diagnose") {
+            runDiagnose()
+            return true
+        }
         return false
+    }
+
+    /// Print a copy-pasteable diagnostics report — the artifact a bug report
+    /// needs (effective settings + rules + the current scan). Headless, so it
+    /// captures the settings *combination*, not just the live assertions.
+    @MainActor
+    private static func runDiagnose() {
+        let settings = SettingsStore().settings
+        let rules = RulesEngine()
+        let all = TelemetryEngine().scan().filter {
+            $0.pid != ProcessInfo.processInfo.processIdentifier
+        }
+        let uptime = SystemStateReader().bootTime().map { Date().timeIntervalSince($0) }
+        let snapshot = Diagnostics.Snapshot(
+            version: AppInfo.version,
+            macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+            model: SystemProfile.modelIdentifier(),
+            generatedAt: Date(),
+            settings: settings,
+            rules: rules.rules,
+            power: PowerSourceReader().snapshot(),
+            thermal: ProcessInfo.processInfo.thermalState,
+            idleSeconds: IdleMonitor().secondsSinceLastInput(),
+            uptimeSeconds: uptime,
+            stateHeadline: "(run the app for the live verdict)",
+            stateDetail: "headless --diagnose snapshot",
+            systemBlockers: all.filter(\.blocksSystemSleep),
+            otherAssertions: all.filter { !$0.blocksSystemSleep })
+        print(Diagnostics.report(snapshot))
     }
 
     /// Resolve and print where each sleep-holder came from — the window / agent /
@@ -233,6 +266,7 @@ enum CLI {
               Decaffeinate --sleep-now      Put this Mac to sleep now and exit
               Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit
               Decaffeinate --provenance     Trace each holder to its window / agent / project
+              Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)
               Decaffeinate --icon [dir]     Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)
               Decaffeinate --version        Print the version and exit
               Decaffeinate --help           Show this help

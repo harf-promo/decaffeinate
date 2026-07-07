@@ -48,6 +48,7 @@ final class AppState: ObservableObject {
     private let provenanceResolver: any ProcessProvenanceResolving
     private let audioResolver: any AudioDeviceResolving
     private let systemState: any SystemStateReading
+    private let wakeReasonReader: any WakeReasonReading
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -181,6 +182,7 @@ final class AppState: ObservableObject {
         provenanceResolver: any ProcessProvenanceResolving = ProcessProvenanceResolver(),
         audioResolver: any AudioDeviceResolving = AudioDeviceResolver(),
         systemState: any SystemStateReading = SystemStateReader(),
+        wakeReasonReader: any WakeReasonReading = LiveWakeReasonReader(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -199,7 +201,53 @@ final class AppState: ObservableObject {
         self.provenanceResolver = provenanceResolver
         self.audioResolver = audioResolver
         self.systemState = systemState
+        self.wakeReasonReader = wakeReasonReader
         self.now = now
+    }
+
+    // MARK: Insight (v1.16)
+
+    /// A one-line "while you were away" recap of the recent rest timeline, or nil
+    /// when nothing noteworthy happened. Shown in Rest & Restart.
+    var restDigest: String? {
+        RestDigest.summary(rest: restHistory.events, now: now())
+    }
+
+    /// The friendly reason the Mac last woke ("You opened the lid", "Scheduled
+    /// wake"…), resolved off the main actor from `pmset -g log` (best-effort;
+    /// nil when unavailable). The mirror of the app's "what's keeping it awake".
+    func latestWakeReason() async -> String? {
+        let reader = wakeReasonReader
+        return await Task.detached { reader.latestWakeReason() }.value
+    }
+
+    /// Copy the live diagnostics report to the clipboard (the About-pane action).
+    func copyDiagnostics() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(diagnosticsReport(), forType: .string)
+    }
+
+    /// Build a copy-pasteable diagnostics report of the live state — the artifact
+    /// a bug report needs (effective settings + rules + the current scan).
+    func diagnosticsReport() -> String {
+        let all = telemetry.scan().filter { $0.pid != Self.ownPID }
+        let snapshot = Diagnostics.Snapshot(
+            version: AppInfo.version,
+            macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+            model: SystemProfile.modelIdentifier(),
+            generatedAt: now(),
+            settings: settings,
+            rules: rulesEngine.rules,
+            power: power,
+            thermal: thermalState,
+            idleSeconds: idleSeconds,
+            uptimeSeconds: uptime,
+            stateHeadline: headline,
+            stateDetail: detail,
+            systemBlockers: all.filter(\.blocksSystemSleep),
+            otherAssertions: all.filter { !$0.blocksSystemSleep })
+        return Diagnostics.report(snapshot)
     }
 
     /// Friendly device name(s) behind an audio hold ("AirPods Pro", "Built-in
@@ -912,6 +960,9 @@ final class AppState: ObservableObject {
 
         switch sleepController.sleepNow() {
         case .success:
+            AppLog.engine.notice(
+                "Forced sleep: \(reason, privacy: .public) (immediate=\(immediate), userInitiated=\(userInitiated), onBattery=\(self.power.onBattery))"
+            )
             clearError()
             // Arm the idle cooldown so we don't re-sleep right after wake.
             suppressForceSleepUntil = now().addingTimeInterval(idleCooldownSeconds)

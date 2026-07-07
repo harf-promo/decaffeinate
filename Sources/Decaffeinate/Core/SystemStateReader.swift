@@ -16,3 +16,16 @@ struct SystemStateReader: SystemStateReading {
             timeIntervalSince1970: TimeInterval(tv.tv_sec) + TimeInterval(tv.tv_usec) / 1_000_000)
     }
 }
+
+/// Small read-only facts about the machine, for the diagnostics report.
+enum SystemProfile {
+    /// The hardware model identifier, e.g. "MacBookPro18,3" (public `sysctl
+    /// hw.model`), or "unknown".
+    static func modelIdentifier() -> String {
+        var size = 0
+        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else { return "unknown" }
+        var buffer = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("hw.model", &buffer, &size, nil, 0) == 0 else { return "unknown" }
+        return String(cString: buffer)
+    }
+}

@@ -501,6 +501,7 @@ private struct FreshnessSettings: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var store: SettingsStore
     @EnvironmentObject var restHistory: RestHistoryStore
+    @State private var lastWakeReason: String?
 
     private var adviceColor: Color {
         switch appState.restartAdvice {
@@ -533,6 +534,20 @@ private struct FreshnessSettings: View {
                 restRow("Last sleep", restHistory.lastSystemSleep?.date)
                 restRow("Last screen rest", restHistory.lastDisplayOff?.date)
                 restRow("Last restart", restHistory.lastRestart?.date)
+                if let wake = lastWakeReason {
+                    HStack {
+                        Text("Last wake")
+                        Spacer()
+                        Text(wake).foregroundStyle(Color.ink2)
+                    }
+                }
+            }
+
+            if let digest = appState.restDigest {
+                Section("While you were away") {
+                    Label(digest, systemImage: "moon.stars")
+                        .font(HarfFont.body).foregroundStyle(Color.ink2)
+                }
             }
 
             Section("Recommendation") {
@@ -590,6 +605,11 @@ private struct FreshnessSettings: View {
             }
         }
         .formStyle(.grouped)
+        .task {
+            // Best-effort: resolve the last wake reason from pmset off the main
+            // actor. Nil when unavailable — the row just doesn't appear.
+            lastWakeReason = await appState.latestWakeReason()
+        }
     }
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
@@ -705,6 +725,9 @@ private struct AboutView: View {
                 OnboardingPresenter.shared.present(settingsStore: appState.settingsStore)
             }
             .buttonStyle(.link).font(HarfFont.caption).tint(Color.ink2)
+            Button("Copy diagnostics") { appState.copyDiagnostics() }
+                .buttonStyle(.link).font(HarfFont.caption).tint(Color.ink2)
+                .help("Copy settings, rules, and the current scan for a bug report.")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(Space.s5)

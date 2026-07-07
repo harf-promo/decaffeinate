@@ -4,6 +4,36 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] — Unreleased
+
+An "evidence & insight" round — the app already explains what holds your Mac
+awake; now it also tells you when it slept, why it woke, and gives you something
+to hand a maintainer.
+
+### Added
+- **"While you were away."** Rest & Restart now shows a one-line recap of the
+  recent rest timeline — "Last slept 23:41 · woken twice · Decaffeinate stepped
+  in once" — built entirely from the rest log the app already keeps.
+- **Wake-reason.** The mirror of "what's keeping my Mac awake": a "Last wake"
+  line ("You opened the lid", "Scheduled wake", "Network (Wake on LAN)"…),
+  parsed from public `pmset -g log` (no root), resolved off the main actor.
+- **Diagnostics export.** A "Copy diagnostics" button (Settings → About) and a
+  `Decaffeinate --diagnose` CLI verb produce a copy-pasteable report bundling the
+  **effective settings, rules, and the current scan** — so the settings-*combination*
+  bugs a bare `--scan` can't reveal (keep-awake + battery floor, strict-takeover
+  + auto-sleep off) are finally reportable. All free text is sanitized.
+- **Structured logging.** Forced sleeps are now logged via `os.Logger`
+  (`subsystem == "com.harfpromo.Decaffeinate"`), visible in Console.app and
+  folded into the diagnostics story — sparse by design (state changes only, never
+  per-tick noise, never identifying text).
+
+### Internal
+- New pure, fully-tested cores: `WakeReasonParser`, `RestDigest`, `Diagnostics`
+  (+12 tests, 321 total). Wake-reason reading is behind an injected `Sendable`
+  seam. **Deferred:** stale-holder CPU evidence (labelling ~0%-CPU holds as
+  likely stale) — it needs continuous multi-PID sampling infrastructure and is
+  tracked for a follow-up.
+
 ## [1.15.0] — Unreleased
 
 A brand + polish round: a new logo, and a sweep of the small rough edges that
