@@ -80,6 +80,14 @@ preflight, pinned `Package.resolved`, cask lint in CI).
 
 - [ ] **Submit to homebrew/cask core** (removes the one-time tap step) — the cask
   is style-ready; gated only on notability. See [`HOMEBREW-CORE.md`](HOMEBREW-CORE.md).
+- [ ] **First-class agent integration** — a hook installer (`--install-hook` /
+  `--uninstall-hook`, marker-based clean uninstall for Claude Code / Codex / …)
+  and an **MCP server** so an agent can request a hold or "sleep when I finish"
+  directly. The scriptable foundation (CLI `--status --json`, `--why-awake`,
+  `--sleep-now`, `--display-off`) shipped in 1.17; see [`AUTOMATION.md`](AUTOMATION.md).
+- [ ] **Localization** — a String Catalog (`.xcstrings`) + the SwiftPM resource
+  plumbing to load it, then translations. No scaffolding exists yet (the app is
+  English-only); this is a good first infrastructure PR.
 
 ## Deeper system insight
 

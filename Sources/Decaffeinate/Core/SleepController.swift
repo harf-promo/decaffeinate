@@ -34,6 +34,14 @@ struct SleepController {
         run(arguments: ["sleepnow"])
     }
 
+    /// Turn the display off now, leaving the system running — the inverse of the
+    /// Rest & Restart "display off vs sleep" distinction the app already teaches.
+    /// `pmset displaysleepnow` needs no root, same as `sleepnow`.
+    @discardableResult
+    func displayOffNow() -> Result<Void, SleepError> {
+        run(arguments: ["displaysleepnow"])
+    }
+
     private func run(arguments: [String]) -> Result<Void, SleepError> {
         let process = Process()
         process.executableURL = pmsetURL

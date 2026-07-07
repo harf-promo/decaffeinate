@@ -4,6 +4,29 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] — Unreleased
+
+A "connected" round — Decaffeinate is now scriptable and hookable, the
+foundation for the agentic era.
+
+### Added
+- **Machine-readable status.** `Decaffeinate --status --json` (and `--why-awake
+  --json`, `--scan --json`) emit a stable, sorted JSON shape — so scripts, CI,
+  and agent hooks can ask "is my Mac free to sleep?" without scraping text. Own
+  hold excluded; free text sanitized.
+- **`--status`** (human one-liner), **`--display-off`** (turn the display off,
+  keep the system running) CLI verbs, and a **"Turn display off"** menu action —
+  completing the display-off / sleep distinction the Rest & Restart copy teaches.
+- **`docs/AUTOMATION.md`** — the CLI/URL-scheme reference plus a safe,
+  idle-gated agent-hook recipe (the honest version of "sleep when my agent
+  finishes," which the app already does automatically).
+
+### Internal
+- New pure, tested `StatusReport` (`Codable`, round-trips). `SystemSleeping`
+  gains `displayOffNow()`. +6 tests (324 total). **Scoped for a follow-up**
+  (tracked in ROADMAP): a first-class hook installer + MCP server, and
+  localization scaffolding (needs the SwiftPM String-Catalog resource plumbing).
+
 ## [1.16.0] — Unreleased
 
 An "evidence & insight" round — the app already explains what holds your Mac

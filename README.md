@@ -160,11 +160,16 @@ is done. Decaffeinate understands that: it reads the agent's own `caffeinate -w`
 to tell you *exactly* what it's waiting on, offers a one-click **"Sleep when it
 finishes,"** and can auto-sleep the moment a watched agent's task completes.
 
-### 🖥 Terminal-friendly
+### 🖥 Terminal-friendly & scriptable
 ```sh
-Decaffeinate --scan         # print exactly what's keeping this Mac awake
-Decaffeinate --provenance   # …and trace each one to its window / agent / project
+Decaffeinate --scan          # print exactly what's keeping this Mac awake
+Decaffeinate --provenance    # …and trace each one to its window / agent / project
+Decaffeinate --status --json # machine-readable status for scripts / agent hooks
+Decaffeinate --sleep-now     # sleep now · --display-off  turn the screen off
+Decaffeinate --diagnose      # settings + rules + scan, for a bug report
 ```
+See [`docs/AUTOMATION.md`](docs/AUTOMATION.md) for the full CLI, the
+`decaffeinate://` URL scheme, and a safe agent-hook recipe.
 
 ---
 

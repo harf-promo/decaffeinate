@@ -432,6 +432,14 @@ final class AppState: ObservableObject {
         forceSleep(reason: "Sleep Now pressed", bypassCooldown: true, userInitiated: true)
     }
 
+    /// Turn the display off now (system keeps running) — the menu's "Turn display
+    /// off" action. Surfaces an error if the launch fails, like Sleep Now.
+    func displayOff() {
+        if case .failure(let error) = sleepController.displayOffNow() {
+            setError(error.description)
+        }
+    }
+
     /// Clear a firewall rule and allow this app to be re-surfaced as a new
     /// blocker again later.
     func clearRule(for assertion: PowerAssertion) {

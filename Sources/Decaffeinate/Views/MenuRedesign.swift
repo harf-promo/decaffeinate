@@ -152,6 +152,9 @@ private struct RDActionBar: View {
                         Divider()
                         Toggle("Keep awake indefinitely", isOn: settings.caffeinateEnabled)
                     }
+                    Section {
+                        Button("Turn display off") { appState.displayOff() }
+                    }
                     Section("Sleep when done") {
                         if !appState.runningWatchCandidates.isEmpty {
                             ForEach(appState.runningWatchCandidates, id: \.self) { name in

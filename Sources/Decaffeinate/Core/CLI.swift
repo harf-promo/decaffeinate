@@ -15,12 +15,22 @@ enum CLI {
             print("Decaffeinate \(AppInfo.version)")
             return true
         }
-        if arguments.contains("--scan") || arguments.contains("-s") {
-            runScan()
+        if arguments.contains("--scan") || arguments.contains("-s")
+            || arguments.contains("--why-awake")
+        {
+            if arguments.contains("--json") { runStatus(json: true) } else { runScan() }
+            return true
+        }
+        if arguments.contains("--status") {
+            runStatus(json: arguments.contains("--json"))
             return true
         }
         if arguments.contains("--sleep-now") {
             runSleepNow()
+            return true
+        }
+        if arguments.contains("--display-off") {
+            runDisplayOff()
             return true
         }
         if let index = arguments.firstIndex(of: "--keep-awake") {
@@ -115,6 +125,43 @@ enum CLI {
             return
         }
         for holder in holders { dump(holder.pid, label: holder.displayName) }
+    }
+
+    /// Machine-readable status — the JSON scripts and agent hooks consume. A
+    /// stable, sorted shape; the process's own hold is excluded.
+    @MainActor
+    private static func runStatus(json: Bool) {
+        let report = StatusReport.from(
+            version: AppInfo.version, now: Date(),
+            ownPID: ProcessInfo.processInfo.processIdentifier,
+            assertions: TelemetryEngine().scan(),
+            power: PowerSourceReader().snapshot(),
+            thermal: ProcessInfo.processInfo.thermalState,
+            idleSeconds: IdleMonitor().secondsSinceLastInput(),
+            uptimeSeconds: SystemStateReader().bootTime().map { Date().timeIntervalSince($0) })
+        if json {
+            print(report.jsonString())
+        } else {
+            // A terse human line for `--status` without --json.
+            let verb = report.holdingSystemSleep == 0 ? "free to sleep" : "held awake"
+            let by =
+                report.holdingSystemSleep == 0
+                ? ""
+                : " by \(report.holdingSystemSleep) app\(report.holdingSystemSleep == 1 ? "" : "s")"
+            print("This Mac is \(verb)\(by). Idle \(report.idleSeconds)s.")
+        }
+    }
+
+    /// Turn the display off now (system keeps running). Exits non-zero on failure.
+    @MainActor
+    private static func runDisplayOff() {
+        switch SleepController().displayOffNow() {
+        case .success:
+            print("🌙  Turning the display off…")
+        case .failure(let error):
+            FileHandle.standardError.write(Data("decaffeinate: \(error.description)\n".utf8))
+            exit(EXIT_FAILURE)
+        }
     }
 
     /// Put the Mac to sleep now — the same headless `pmset sleepnow` path the app
@@ -263,7 +310,10 @@ enum CLI {
             USAGE:
               Decaffeinate                  Run the menu-bar app
               Decaffeinate --scan           Print active sleep assertions and exit
+              Decaffeinate --status [--json]  Print a status line (or JSON for scripts/hooks)
+              Decaffeinate --why-awake [--json]  Alias for --scan (add --json for machine output)
               Decaffeinate --sleep-now      Put this Mac to sleep now and exit
+              Decaffeinate --display-off    Turn the display off now (system keeps running)
               Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit
               Decaffeinate --provenance     Trace each holder to its window / agent / project
               Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)

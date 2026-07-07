@@ -31,8 +31,13 @@ private final class ThermalBox: @unchecked Sendable {
 @MainActor private final class FakeSleeper: SystemSleeping {
     var result: Result<Void, SleepController.SleepError> = .success(())
     private(set) var callCount = 0
+    private(set) var displayOffCount = 0
     func sleepNow() -> Result<Void, SleepController.SleepError> {
         callCount += 1
+        return result
+    }
+    func displayOffNow() -> Result<Void, SleepController.SleepError> {
+        displayOffCount += 1
         return result
     }
 }
@@ -316,6 +321,20 @@ final class AppStateTests: XCTestCase {
         h.clock.advance(11)  // short failure cooldown
         h.state.tick()
         XCTAssertEqual(h.sleeper.callCount, 2)
+    }
+
+    func testDisplayOffInvokesTheController() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.state.displayOff()
+        XCTAssertEqual(h.sleeper.displayOffCount, 1)
+        XCTAssertNil(h.state.lastError, "no error on a successful display-off")
+    }
+
+    func testDisplayOffSurfacesFailure() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.sleeper.result = .failure(.launchFailed("boom"))
+        h.state.displayOff()
+        XCTAssertNotNil(h.state.lastError, "a failed display-off surfaces an error")
     }
 
     func testWatchTargetLabelNamesTheWatchedTarget() {

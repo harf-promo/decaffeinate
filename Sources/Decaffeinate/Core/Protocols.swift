@@ -27,6 +27,8 @@ protocol PowerReading {
 protocol SystemSleeping {
     @discardableResult
     func sleepNow() -> Result<Void, SleepController.SleepError>
+    @discardableResult
+    func displayOffNow() -> Result<Void, SleepController.SleepError>
 }
 
 @MainActor
