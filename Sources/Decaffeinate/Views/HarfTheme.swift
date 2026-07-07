@@ -149,6 +149,38 @@ extension View {
             .tracking(1.1)
             .foregroundStyle(color)
     }
+
+    /// A Dynamic-Type-aware system font at a Harf design size — scales with the
+    /// user's text-size preference (unlike the fixed `HarfFont` tokens, which
+    /// suit the fixed-size menu HUD). Use on resizable surfaces (onboarding,
+    /// about) so low-vision users can read the explanatory copy.
+    func scaledFont(
+        _ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default,
+        relativeTo style: Font.TextStyle = .body
+    ) -> some View {
+        modifier(ScaledSystemFont(size, weight: weight, design: design, relativeTo: style))
+    }
+}
+
+/// Backs `View.scaledFont` — `@ScaledMetric` scales the point size relative to a
+/// text style so a specific design size still honours Dynamic Type.
+struct ScaledSystemFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+    private let design: Font.Design
+
+    init(
+        _ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default,
+        relativeTo style: Font.TextStyle = .body
+    ) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: style)
+        self.weight = weight
+        self.design = design
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight, design: design))
+    }
 }
 
 /// A 1px hairline rule — the system runs on these, not shadows.
@@ -169,9 +201,16 @@ struct DecaffeinateMark: View {
             let rect = CGRect(
                 x: (sz.width - s) / 2, y: (sz.height - s) / 2, width: s, height: s)
             for el in BrandMark.logo(in: rect) {
-                let fill: GraphicsContext.Shading =
-                    el.ink == .moon ? .color(.harfGreen) : .color(.ink1)
-                ctx.fill(Path(el.path), with: fill, style: FillStyle(eoFill: el.evenOdd))
+                // In-app the mark is line-art on paper: green moon/steam, and the
+                // porcelain cup + stars render as adaptive ink (dark on light,
+                // light on dark) since cream would vanish on white paper.
+                let color: Color
+                switch el.ink {
+                case .moon: color = .harfGreen
+                case .zzz: color = .ink2
+                case .cream: color = .ink1
+                }
+                ctx.fill(Path(el.path), with: .color(color), style: FillStyle(eoFill: el.evenOdd))
             }
         }
         .frame(width: size, height: size)

@@ -426,7 +426,10 @@ private struct AutomationSettings: View {
                             .accessibilityLabel("Remove rule: \(rule.displayName)")
                         }
                     }
-                    Button("Clear all rules", role: .destructive) { rules.removeAll() }
+                    ConfirmableDestructiveButton(
+                        title: "Clear all rules", confirmLabel: "Clear all rules",
+                        message: "Remove every app sleep permission? This can\u{2019}t be undone."
+                    ) { rules.removeAll() }
                 }
             }
 
@@ -579,7 +582,10 @@ private struct FreshnessSettings: View {
                                 .font(.caption).foregroundStyle(Color.ink3)
                         }
                     }
-                    Button("Clear activity", role: .destructive) { restHistory.clear() }
+                    ConfirmableDestructiveButton(
+                        title: "Clear activity", confirmLabel: "Clear activity",
+                        message: "Clear the recent rest activity log? This can\u{2019}t be undone."
+                    ) { restHistory.clear() }
                 }
             }
         }
@@ -662,7 +668,10 @@ private struct HistorySettings: View {
                 }
                 HStack {
                     Spacer()
-                    Button("Clear history", role: .destructive) { history.clear() }.padding(8)
+                    ConfirmableDestructiveButton(
+                        title: "Clear history", confirmLabel: "Clear history",
+                        message: "Clear the forced-sleep history? This can\u{2019}t be undone."
+                    ) { history.clear() }.padding(8)
                 }
             }
         }
@@ -676,9 +685,10 @@ private struct AboutView: View {
     var body: some View {
         VStack(spacing: Space.s3) {
             DecaffeinateMark(size: 64)
-            Text("Decaffeinate").font(HarfFont.h2).foregroundStyle(Color.ink1)
+            Text("Decaffeinate").scaledFont(20, weight: .semibold, relativeTo: .title)
+                .foregroundStyle(Color.ink1)
             Text("The truth about what's keeping your Mac awake — and the power to make it sleep.")
-                .font(HarfFont.lede)
+                .scaledFont(15)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.ink2)
                 .fixedSize(horizontal: false, vertical: true)

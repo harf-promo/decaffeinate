@@ -5,13 +5,15 @@ import XCTest
 final class BrandMarkTests: XCTestCase {
     // ── logo() ────────────────────────────────────────────────────────────────
 
-    func testLogoContainsMoonAndZzz() {
+    func testLogoContainsMoonAndCup() {
+        // The moon-in-cup mark: a green crescent + steam-z (.moon) and a
+        // porcelain cup + star (.cream).
         let elements = BrandMark.logo(in: CGRect(x: 0, y: 0, width: 64, height: 64))
         XCTAssertFalse(elements.isEmpty)
         XCTAssertTrue(
-            elements.contains { $0.ink == .moon }, "logo must include a moon element")
+            elements.contains { $0.ink == .moon }, "logo must include a green moon/steam element")
         XCTAssertTrue(
-            elements.contains { $0.ink == .zzz }, "logo must include zzz elements")
+            elements.contains { $0.ink == .cream }, "logo must include a porcelain cup element")
     }
 
     func testLogoElementsHaveNonEmptyPaths() {
@@ -21,13 +23,14 @@ final class BrandMarkTests: XCTestCase {
         }
     }
 
-    func testMoonElementUsesEvenOddFill() {
+    func testCrescentElementUsesNonZeroFill() {
+        // The crescent is a single arc-traced lune (not an even-odd carve of two
+        // circles, which would fill both opposing lunes into a ring). It must be
+        // filled non-zero so the moon shape appears solid.
         let elements = BrandMark.logo(in: CGRect(x: 0, y: 0, width: 64, height: 64))
-        guard let moon = elements.first(where: { $0.ink == .moon }) else {
-            XCTFail("logo must contain a moon element"); return
-        }
         XCTAssertTrue(
-            moon.evenOdd, "the crescent must use even-odd fill so the carve hole appears")
+            elements.contains { $0.ink == .moon && !$0.evenOdd },
+            "logo must contain a non-zero-filled crescent element")
     }
 
     func testLogoScalesToDifferentSizes() {
@@ -97,15 +100,36 @@ final class BrandMarkTests: XCTestCase {
         XCTAssertFalse(path.isEmpty)
     }
 
-    func testCrescentPathContainsTwoSubpaths() {
-        // The crescent is two overlapping ellipses; CGPath breaks each ellipse
-        // into a moveTo + curves + close, so the path should have two closePath ops.
+    func testCrescentPathIsOneClosedLune() {
+        // The crescent is one closed lune (outer moon arc + inner carve arc),
+        // not two separate ellipses.
         let path = BrandMark.crescent(cx: 32, cy: 32, r: 18)
         var closeCount = 0
         path.applyWithBlock { el in
             if el.pointee.type == .closeSubpath { closeCount += 1 }
         }
-        XCTAssertEqual(closeCount, 2, "crescent path must contain exactly two closed sub-paths")
+        XCTAssertEqual(closeCount, 1, "crescent path must be a single closed sub-path")
+    }
+
+    func testCrescentIsAWideMouthedMoonNotARing() {
+        // Regression guard: the old mark carved with ~0.76r radius at a ~0.25r
+        // offset, reaching only ~1.007r past the centre — the "moon" read as a
+        // near-closed ring. The carve must reach well past the rim so a real
+        // crescent mouth opens.
+        XCTAssertGreaterThan(
+            BrandMark.crescentReachRatio, 1.2,
+            "the carve must clear the rim so the moon reads as a crescent, not a ring")
+
+        // And prove it on the geometry: a point out toward the carve mouth is
+        // OPEN (carved away), while the fat side (opposite the carve) is FILLED.
+        let r: CGFloat = 100
+        let path = BrandMark.crescent(cx: 0, cy: 0, r: r)
+        let mouth = CGPoint(x: 0.94 * 0.7 * r, y: -0.34 * 0.7 * r)  // toward the carve
+        let fatSide = CGPoint(x: -0.94 * 0.775 * r, y: 0.34 * 0.775 * r)  // opposite the carve
+        XCTAssertFalse(
+            path.contains(mouth, using: .evenOdd), "the crescent mouth must be open, not filled")
+        XCTAssertTrue(
+            path.contains(fatSide, using: .evenOdd), "the crescent's fat side must be solid")
     }
 
     // ── Primitive: zGlyph ────────────────────────────────────────────────────

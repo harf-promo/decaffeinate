@@ -7,12 +7,35 @@ import AppKit
 enum IconRenderer {
     // Brand palette (same constants as HarfTheme; duplicated so IconRenderer has
     // no SwiftUI dependency and can be used from a headless CLI context).
-    private static let night = NSColor(
-        srgbRed: 0x1A / 255, green: 0x1B / 255, blue: 0x1D / 255, alpha: 1)
+    // Night gradient poles (top → bottom) behind the mark.
+    private static let nightTop = CGColor(
+        srgbRed: 0x23 / 255, green: 0x25 / 255, blue: 0x2E / 255, alpha: 1)
+    private static let nightBottom = CGColor(
+        srgbRed: 0x12 / 255, green: 0x13 / 255, blue: 0x18 / 255, alpha: 1)
     private static let moonColor = CGColor(
         srgbRed: 0xA4 / 255, green: 0xCD / 255, blue: 0x39 / 255, alpha: 1)
     private static let zColor = CGColor(
         srgbRed: 0x93 / 255, green: 0x95 / 255, blue: 0x98 / 255, alpha: 1)
+    // Porcelain — the cup and stars.
+    private static let creamColor = CGColor(
+        srgbRed: 0xF2 / 255, green: 0xED / 255, blue: 0xE4 / 255, alpha: 1)
+
+    private static func fill(for ink: BrandMark.Ink) -> CGColor {
+        switch ink {
+        case .moon: return moonColor
+        case .zzz: return zColor
+        case .cream: return creamColor
+        }
+    }
+
+    // SVG hex per role (matches the fills above).
+    private static func svgHex(for ink: BrandMark.Ink) -> String {
+        switch ink {
+        case .moon: return "#A4CD39"
+        case .zzz: return "#939598"
+        case .cream: return "#F2EDE4"
+        }
+    }
 
     // ── Public entry point ────────────────────────────────────────────────────
 
@@ -79,11 +102,26 @@ enum IconRenderer {
             roundedRect: CGRect(x: 0, y: 0, width: s, height: s),
             xRadius: corner, yRadius: corner)
         clip.addClip()
-        night.setFill()
-        clip.fill()
 
         guard let ctx = NSGraphicsContext.current?.cgContext else {
             img.unlockFocus(); return img
+        }
+
+        // Night-sky gradient behind the mark (top lighter → bottom darker).
+        if let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [nightTop, nightBottom] as CFArray, locations: [0, 1])
+        {
+            ctx.saveGState()
+            ctx.addPath(
+                CGPath(
+                    roundedRect: CGRect(x: 0, y: 0, width: s, height: s),
+                    cornerWidth: corner, cornerHeight: corner, transform: nil))
+            ctx.clip()
+            ctx.drawLinearGradient(
+                gradient, start: CGPoint(x: 0, y: s), end: CGPoint(x: 0, y: 0),
+                options: [])
+            ctx.restoreGState()
         }
 
         // BrandMark is y-down; lockFocus is y-up — flip the CTM.
@@ -92,7 +130,7 @@ enum IconRenderer {
         ctx.scaleBy(x: 1, y: -1)
 
         for el in BrandMark.logo(in: CGRect(x: 0, y: 0, width: s, height: s)) {
-            ctx.setFillColor(el.ink == .moon ? moonColor : zColor)
+            ctx.setFillColor(fill(for: el.ink))
             ctx.addPath(el.path)
             ctx.fillPath(using: el.evenOdd ? .evenOdd : .winding)
         }
@@ -118,13 +156,21 @@ enum IconRenderer {
 
     private static func writeSVG(to url: URL, size: CGFloat) {
         let sz = Int(size)
+        let corner = String(format: "%.1f", size * 0.2237)
         var lines = [
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
             "<svg xmlns=\"http://www.w3.org/2000/svg\""
                 + " viewBox=\"0 0 \(sz) \(sz)\" width=\"\(sz)\" height=\"\(sz)\">",
+            // Night-sky gradient background — parity with the PNG/ICNS icon
+            // (the SVG used to export the mark on a transparent canvas).
+            "  <defs><linearGradient id=\"night\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">",
+            "    <stop offset=\"0\" stop-color=\"#23252E\"/>",
+            "    <stop offset=\"1\" stop-color=\"#121318\"/>",
+            "  </linearGradient></defs>",
+            "  <rect width=\"\(sz)\" height=\"\(sz)\" rx=\"\(corner)\" fill=\"url(#night)\"/>",
         ]
         for el in BrandMark.logo(in: CGRect(x: 0, y: 0, width: size, height: size)) {
-            let fill = el.ink == .moon ? "#A4CD39" : "#939598"
+            let fill = svgHex(for: el.ink)
             let rule = el.evenOdd ? "evenodd" : "nonzero"
             let d = svgPath(el.path)
             lines.append(

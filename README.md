@@ -52,13 +52,31 @@ Every match is something quietly voting to keep your Mac awake. Decaffeinate sho
 | Make the Mac **sleep** on demand |                    ❌                     |        ✅         |
 | Force sleep **after you're idle**, overriding rogue holds |          ❌                     |        ✅         |
 | Show you **what's** keeping it awake (by process) |                 ❌                     |        ✅         |
-| Per-app rules — allow or block individual apps  |                  ❌                     |        ✅         |
+| Per-app rules — allow or ignore individual apps  |                  ❌                     |        ✅         |
 | **Sleep when your build / agent finishes** |                  ❌                     |        ✅         |
 | Battery-floor + overheating safety guards |                ➖                     |        ✅         |
 | **Track uptime & recommend a weekly restart** |              ❌                     |        ✅         |
 | Headless `--scan` from the terminal |                  ❌                     |        ✅         |
 
 Keeping a Mac awake is a one-liner. **Knowing when it's safe to sleep — and making it happen without losing your work — is the hard, useful part.** That's the part we built.
+
+### And versus the newer sleep tools?
+
+A handful of apps tackle *pieces* of this — but none combine per-process
+attribution, on-demand force-sleep, and being free & open source:
+
+| | What it does | Force-sleep past holds? | Root? | Free / OSS |
+| --- | --- | :---: | :---: | :---: |
+| **Sleep Aid** (Ohanaware) | Shows a history of what *prevented* sleep | ❌ | No | Paid |
+| **MacRest** | Per-app *allow/deny* of keep-awake requests (app-level) | ❌ (blocks, doesn't force) | No | Paid, closed |
+| **Adrafinil** | Keeps the Mac awake *only while an AI agent works* (incl. lid-closed) | ❌ (the opposite job) | **Yes** (root helper + `pmset disablesleep`) | Free / OSS |
+| **Decaffeinate** | Per-**process** truth + one-click & idle **force-sleep** | ✅ | **No** | **Free / OSS** |
+
+Adrafinil is a clever, philosophically-aligned cousin (both believe "a Mac should
+sleep when the work is done") — but it needs a **root helper** and flips the
+global `pmset disablesleep` switch to hold the lid closed. Decaffeinate stays
+**entirely in user space — no root, no helper daemon, nothing to trust** — and
+runs on **macOS 14+**. Different job, and a smaller trust boundary.
 
 ---
 

@@ -404,6 +404,17 @@ final class AppState: ObservableObject {
 
     // MARK: Agent watcher
 
+    /// The label of whatever is being watched right now ("xcodebuild", "npm run
+    /// build"…), or nil when idle — so the menu can name it instead of a generic
+    /// "Stop watching".
+    var watchTargetLabel: String? {
+        switch watchStatus {
+        case .idle: return nil
+        case .waiting(let label), .watching(let label, _), .completed(let label, _):
+            return label
+        }
+    }
+
     /// Watch a process (tree) and let the Mac sleep once it finishes. Pass `nil`
     /// to stop watching.
     func setWatchTarget(_ target: WatchTarget?) {

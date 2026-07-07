@@ -140,13 +140,17 @@ private struct RDActionBar: View {
                 // watch targets so they're accessible but not shouting.
                 Menu {
                     Section("Keep awake") {
-                        Toggle("Keep awake now", isOn: settings.caffeinateEnabled)
+                        // Timed holds are the first-class, self-releasing path —
+                        // they auto-expire, so the Mac can never be left awake by
+                        // a forgotten toggle. Indefinite is a deliberate opt-in.
                         Button("30 minutes") { appState.stayAwake(forMinutes: 30) }
                         Button("1 hour") { appState.stayAwake(forMinutes: 60) }
                         Button("2 hours") { appState.stayAwake(forMinutes: 120) }
                         Button(untilWorkHoursLabel) {
                             appState.stayAwake(untilHour: settingsStore.settings.activeHoursEnd)
                         }
+                        Divider()
+                        Toggle("Keep awake indefinitely", isOn: settings.caffeinateEnabled)
                     }
                     Section("Sleep when done") {
                         if !appState.runningWatchCandidates.isEmpty {
@@ -232,7 +236,10 @@ private struct RDActiveControls: View {
                 row("clock.fill", "Cancel quiet window") { appState.clearQuietWindow() }
             }
             if isWatchActive {
-                row("binoculars.fill", "Stop watching") { appState.setWatchTarget(nil) }
+                let label = appState.watchTargetLabel
+                row("binoculars.fill", label.map { "Stop watching \($0)" } ?? "Stop watching") {
+                    appState.setWatchTarget(nil)
+                }
             }
             if appState.settings.caffeinateEnabled {
                 row("bolt.fill", "Stop keeping awake") {
@@ -331,7 +338,8 @@ private struct RDList: View {
             Text(
                 "Each row shows something that asked macOS to stay awake. "
                     + "\u{2713} rows end on their own \u{2014} your Mac will sleep when the job is done. "
-                    + "\u{26A0} rows hold indefinitely \u{2014} tap the row for options."
+                    + "\u{26A0} rows hold indefinitely \u{2014} tap \u{22EF} for options. "
+                    + "Tap a row for the full detail."
             )
             .font(.system(size: 12)).foregroundStyle(theme.ink3)
             .fixedSize(horizontal: false, vertical: true)

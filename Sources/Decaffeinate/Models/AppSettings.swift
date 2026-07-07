@@ -98,7 +98,7 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     // MARK: Firewall / notifications
 
     /// Post a notification when a *new* unclassified app starts holding the Mac
-    /// awake, so you can choose to allow or block it.
+    /// awake, so you can choose to allow it or let the Mac sleep anyway.
     var notifyOnNewBlocker: Bool = true
 
     /// Post a notification when Decaffeinate confirms the Mac actually went to

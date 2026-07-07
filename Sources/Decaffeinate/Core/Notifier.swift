@@ -29,7 +29,7 @@ final class Notifier {
     func notifyNewBlocker(appName: String, reason: String) {
         post(
             title: "\(appName) is keeping your Mac awake",
-            body: "\(reason) — open Decaffeinate to Allow or Block it.")
+            body: "\(reason) — open Decaffeinate to allow it or let your Mac sleep anyway.")
     }
 
     func notifyForcedSleep(reason: String) {

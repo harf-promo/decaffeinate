@@ -4,6 +4,53 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] — Unreleased
+
+A brand + polish round: a new logo, and a sweep of the small rough edges that
+erode trust on first run.
+
+### Added
+- **A new logo — "the moon in your cup."** A top-down coffee cup whose coffee
+  surface is the night sky, a **real** green crescent moon floating in it, a
+  star, and the steam rising as an ascending "Zzz." It tells the whole product
+  story in one mark: the caffeine is gone, the moon is in the cup. The old mark's
+  "crescent" was geometrically a near-closed ring (the carve reached only
+  ~1.007× the radius, so it read as a green "O"); the crescent is now a true
+  arc-traced lune with a wide, unmistakable mouth — inherited by the app icon,
+  the four menu-bar states, the in-app mark, and the SVG from one geometry. The
+  app icon gains a night-sky gradient, and the exported SVG now includes the
+  background for parity with the PNG/ICNS.
+- **Destructive actions now ask first.** "Clear all rules", "Clear history", and
+  "Clear activity" show a confirmation dialog — a stray click can no longer wipe
+  your rules or history for good.
+- **A privacy policy** (`PRIVACY.md`) spelling out the no-telemetry, no-accounts,
+  all-on-device posture, alongside the existing `SECURITY.md`.
+- **Dynamic Type** on the onboarding and About surfaces — the explanatory copy
+  now scales with the system text-size setting (the fixed-size menu HUD stays
+  fixed, as menu-bar extras should).
+
+### Changed
+- **The menu names what it's watching** — "Stop watching **xcodebuild**" instead
+  of a generic "Stop watching."
+- **Honest copy.** The explainer now points at the "⋯" menu for options (tapping
+  a row opens its detail); the "new blocker" notification says "allow it or let
+  your Mac sleep anyway" to match the real buttons (there is no "Block").
+- **Keep-awake favors timed holds.** The menu leads with self-releasing
+  durations (30 min / 1 h / 2 h / until end of day); the indefinite hold is now
+  a clearly-labeled "Keep awake indefinitely" opt-in, so the Mac can't be left
+  awake by a forgotten toggle.
+- **One palette.** The menu theme now references the shared `HarfTheme` colour
+  tokens instead of re-declaring its own (the two had already drifted on the
+  dark-mode background).
+- The README comparison table adds Sleep Aid, MacRest, and Adrafinil, and states
+  the no-root / macOS-14+ advantage explicitly.
+
+### Internal
+- The crescent is now a single arc-traced lune (non-zero fill) rather than an
+  even-odd XOR of two circles (which fills both opposing lunes into a ring); a
+  test guards that the carve reaches well past the rim so the ring can never
+  return, plus regeneration of every brand asset. +1 UI regression test.
+
 ## [1.14.0] — Unreleased
 
 A correctness and pipeline-hardening round driven by a full adversarial audit

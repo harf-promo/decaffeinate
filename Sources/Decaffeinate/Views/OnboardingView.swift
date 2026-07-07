@@ -18,7 +18,7 @@ struct OnboardingView: View {
             // Masthead — a quiet brand anchor.
             HStack(spacing: Space.s2) {
                 DecaffeinateMark(size: 22)
-                Text("Decaffeinate").font(HarfFont.bodyMedium).foregroundStyle(Color.ink1)
+                Text("Decaffeinate").scaledFont(13, weight: .medium).foregroundStyle(Color.ink1)
                 Spacer()
                 Text("Welcome").eyebrow(.ink4)
             }
@@ -164,12 +164,12 @@ private struct OnboardingPanelContent: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text(panel.step).eyebrow()
             Text(panel.title)
-                .font(HarfFont.display)
+                .scaledFont(30, weight: .semibold, relativeTo: .largeTitle)
                 .foregroundStyle(Color.ink1)
                 .tracking(-0.5)
                 .fixedSize(horizontal: false, vertical: true)
             Text(panel.body)
-                .font(HarfFont.lede)
+                .scaledFont(15)
                 .foregroundStyle(Color.ink2)
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -178,7 +178,7 @@ private struct OnboardingPanelContent: View {
                     ForEach(panel.bullets, id: \.self) { bullet in
                         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                             Circle().fill(Color.harfGreen).frame(width: 5, height: 5)
-                            Text(bullet).font(HarfFont.body).foregroundStyle(Color.ink2)
+                            Text(bullet).scaledFont(13).foregroundStyle(Color.ink2)
                         }
                     }
                 }

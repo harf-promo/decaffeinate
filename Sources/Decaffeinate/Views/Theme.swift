@@ -52,34 +52,24 @@ struct Theme: Equatable {
 }
 
 extension Theme {
-    /// Dynamic light/dark colour from two 0xRRGGBB literals.
-    fileprivate static func dyn(_ light: UInt, _ dark: UInt) -> Color {
-        Color(
-            nsColor: NSColor(name: nil) { appearance in
-                let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                let hex = isDark ? dark : light
-                return NSColor(
-                    srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
-                    green: CGFloat((hex >> 8) & 0xFF) / 255,
-                    blue: CGFloat(hex & 0xFF) / 255,
-                    alpha: 1)
-            })
-    }
-
     /// A — cool, native, airy. Hairlines, zero-radius rows, cool ink.
+    ///
+    /// Surfaces and ink reference the shared `HarfTheme` `Color.*` tokens so the
+    /// palette has a single source of truth — the two used to drift (this theme
+    /// once declared its own dark paper `0x121315` vs `Color.paper`'s `0x0F1011`).
     static let nightcap = Theme(
         id: "nightcap",
         displayName: "Nightcap — cool & native",
-        paper: dyn(0xFFFFFF, 0x121315),
-        card: dyn(0xFAFAF9, 0x1B1C1E),
-        cardActive: dyn(0xF1F1F2, 0x232427),
-        hairline: dyn(0xE6E6E7, 0x2C2E32),
-        ink1: dyn(0x1A1B1D, 0xF2F2F3),
-        ink2: dyn(0x3A3B3D, 0xC9CACB),
-        ink3: dyn(0x6B6C6E, 0x9A9B9D),
-        ink4: dyn(0x939598, 0x6B6C6E),
+        paper: .paper,
+        card: .paper2,
+        cardActive: .paper3,
+        hairline: .rule,
+        ink1: .ink1,
+        ink2: .ink2,
+        ink3: .ink3,
+        ink4: .ink4,
         accent: Color.harfGreen,
-        teal: Color(srgb: 0x2F8C5A),
+        teal: Color.positive,
         popoverWidth: 340,
         rowMinHeight: 44,
         usesCards: false,
@@ -89,18 +79,6 @@ extension Theme {
         headlineSize: 18
     )
 
-}
-
-extension Color {
-    /// Solid sRGB colour from a 0xRRGGBB literal (non-fileprivate helper for themes).
-    fileprivate init(srgb hex: UInt) {
-        self.init(
-            .sRGB,
-            red: Double((hex >> 16) & 0xFF) / 255,
-            green: Double((hex >> 8) & 0xFF) / 255,
-            blue: Double(hex & 0xFF) / 255,
-            opacity: 1)
-    }
 }
 
 private struct ThemeKey: EnvironmentKey {

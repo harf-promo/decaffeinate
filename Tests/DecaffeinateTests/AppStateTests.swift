@@ -318,6 +318,17 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(h.sleeper.callCount, 2)
     }
 
+    func testWatchTargetLabelNamesTheWatchedTarget() {
+        let h = makeHarness(); defer { h.cleanup() }
+        XCTAssertNil(h.state.watchTargetLabel, "no label while idle")
+        h.state.setWatchTarget(.processName("xcodebuild"))
+        XCTAssertEqual(
+            h.state.watchTargetLabel, "xcodebuild",
+            "the menu must be able to name what it's watching")
+        h.state.setWatchTarget(nil)
+        XCTAssertNil(h.state.watchTargetLabel, "cleared when watching stops")
+    }
+
     func testAgentCompletionSleepIsOneShot() {
         let watcher = AgentWatcher(sampler: QuietSampler(pids: [500]))
         watcher.requiredQuietSeconds = 2

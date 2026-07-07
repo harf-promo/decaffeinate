@@ -25,6 +25,27 @@ struct Chip: View {
     }
 }
 
+/// A destructive text button that asks for confirmation before running — the
+/// app's one guard against a stray click wiping rules or history for good.
+struct ConfirmableDestructiveButton: View {
+    let title: String
+    /// The dialog's confirm-button label (e.g. "Clear all rules").
+    let confirmLabel: String
+    /// The one-line "this can't be undone" message.
+    let message: String
+    let action: () -> Void
+
+    @State private var showConfirm = false
+
+    var body: some View {
+        Button(title, role: .destructive) { showConfirm = true }
+            .confirmationDialog(message, isPresented: $showConfirm, titleVisibility: .visible) {
+                Button(confirmLabel, role: .destructive, action: action)
+                Button("Cancel", role: .cancel) {}
+            }
+    }
+}
+
 /// A reusable "Allow for…" submenu offering the standard duration presets.
 /// Used by both the firewall prompt and the per-app row menu.
 struct AllowForMenu: View {
