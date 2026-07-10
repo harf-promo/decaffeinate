@@ -54,6 +54,23 @@ enum AssertionCategory: String, Sendable, Hashable {
         case .unknown: return "sun.max.fill"
         }
     }
+
+    /// Whether subtree CPU is a valid proxy for "is this hold doing real work" —
+    /// the precondition for stale-holder evidence. It is NOT for the categories
+    /// whose work is inherently low-CPU: hardware-accelerated media/audio, a
+    /// live call, I/O-bound backups/downloads/updates, or system-mediated holds
+    /// (location, push, Handoff). Flagging those as "~0% CPU — likely stale"
+    /// would be a false alarm. It IS meaningful for a bare `caffeinate`, a stuck
+    /// background task, or an unexplained app hold — the leaked-hold cases.
+    var cpuReflectsActivity: Bool {
+        switch self {
+        case .keepAwakeTool, .systemBackground, .unknown:
+            return true
+        case .microphone, .audioPlayback, .mediaPlayback, .networkTransfer, .handoff,
+            .softwareUpdate, .backup, .displayOn, .location, .push:
+            return false
+        }
+    }
 }
 
 /// The classified "why" for one assertion.

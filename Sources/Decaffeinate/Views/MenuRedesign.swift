@@ -557,6 +557,8 @@ private struct RDRow: View {
                 tail.append("auto-releases in \(secs)s")
             }
         }
+        // CPU evidence: this holder has been idle so long it's likely a leaked hold.
+        if let stale = appState.staleLabel(for: assertion) { tail.append(stale) }
         if !tail.isEmpty {
             t = t + Text(" · " + tail.joined(separator: " · ")).foregroundStyle(theme.ink4)
         }

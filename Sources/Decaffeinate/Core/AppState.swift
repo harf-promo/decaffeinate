@@ -49,6 +49,8 @@ final class AppState: ObservableObject {
     private let audioResolver: any AudioDeviceResolving
     private let systemState: any SystemStateReading
     private let wakeReasonReader: any WakeReasonReading
+    private let subtreeSampler: any SubtreeCPUSampling
+    private var staleDetector: StaleHolderDetector
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -86,6 +88,12 @@ final class AppState: ObservableObject {
 
     /// Status of the "sleep when my agent/build finishes" watcher.
     @Published private(set) var watchStatus: AgentWatcher.Status = .idle
+
+    /// CPU evidence per system-sleep holder pid: a holder that has been ~0% CPU for
+    /// a sustained window while still asserting is "likely stale". Keyed by the
+    /// hold's effective owner pid (`onBehalfOfPID ?? pid`). Read by the row subtitle
+    /// and the stale-aware `rowVerdict`. Evidence only — never forces sleep.
+    @Published private(set) var staleEvidence: [pid_t: StaleEvidence] = [:]
 
     /// One-shot "stay awake until …" quiet window from the menu. While set and in
     /// the future, Decaffeinate actively holds the Mac awake and never forces
@@ -183,6 +191,8 @@ final class AppState: ObservableObject {
         audioResolver: any AudioDeviceResolving = AudioDeviceResolver(),
         systemState: any SystemStateReading = SystemStateReader(),
         wakeReasonReader: any WakeReasonReading = LiveWakeReasonReader(),
+        subtreeSampler: any SubtreeCPUSampling = SubtreeSampler(),
+        staleDetector: StaleHolderDetector = StaleHolderDetector(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -202,6 +212,8 @@ final class AppState: ObservableObject {
         self.audioResolver = audioResolver
         self.systemState = systemState
         self.wakeReasonReader = wakeReasonReader
+        self.subtreeSampler = subtreeSampler
+        self.staleDetector = staleDetector
         self.now = now
     }
 
@@ -657,9 +669,37 @@ final class AppState: ObservableObject {
         outlook.banner(hasHolds: !groupedSystemBlockers.isEmpty, anyIndefinite: anyIndefiniteHold)
     }
 
-    /// A per-row verdict, projected from `outlook` + the hold's lifetime.
+    /// CPU evidence for this hold's row, keyed to the real owner behind a
+    /// daemon-mediated hold. Nil for holds whose category is inherently low-CPU
+    /// (media/call/backup/…), where a ~0% reading is not evidence of staleness.
+    func staleEvidence(for assertion: PowerAssertion) -> StaleEvidence? {
+        guard assertion.reason.category.cpuReflectsActivity else { return nil }
+        return staleEvidence[assertion.onBehalfOfPID ?? assertion.pid]
+    }
+
+    /// The subtitle evidence token when this hold looks stale, else nil.
+    func staleLabel(for assertion: PowerAssertion) -> String? {
+        staleEvidence(for: assertion)?.isStale == true ? "~0% CPU \u{2014} likely stale" : nil
+    }
+
+    /// A per-row verdict, projected from `outlook` + the hold's lifetime — upgraded
+    /// from heuristic classification to CPU *evidence* when an indefinite hold has
+    /// been demonstrably idle for the stale window AND the app would actually sleep
+    /// after you step away. In every other outlook (a real rail holds, auto-sleep is
+    /// off, or you're deliberately keeping the Mac awake) the honest base verdict
+    /// stands and only the subtitle carries the ~0%-CPU token.
     func rowVerdict(for assertion: PowerAssertion) -> SleepVerdict {
-        outlook.rowVerdict(for: holdLifetime(for: assertion))
+        let lifetime = holdLifetime(for: assertion)
+        let base = outlook.rowVerdict(for: lifetime)
+        guard lifetime == .indefinite,
+            outlook.overridesIndefiniteHoldsAfterIdle,
+            let evidence = staleEvidence(for: assertion), evidence.isStale
+        else { return base }
+        return SleepVerdict(
+            glyph: "checkmark",
+            text:
+                "Idle \(Format.duration(evidence.quietSeconds)) at ~0% CPU \u{2014} likely stale, safe to sleep",
+            tone: .calm)
     }
 
     /// True when any grouped hold is indefinite — decides banner tone.
@@ -824,6 +864,24 @@ final class AppState: ObservableObject {
         agentWatcher.tick(now: now(), systemBlockingPIDs: Set(systemBlockers.map(\.pid)))
         watchStatus = agentWatcher.status
         let agentFinished = agentWatcher.hasCompleted
+
+        // 2.6) Stale-holder CPU evidence: sample each system-sleep holder's process
+        //       subtree; a holder that keeps asserting but has been ~0% CPU for a
+        //       sustained window is likely a leaked/forgotten hold. This LABELS the
+        //       row (and, only where the app would actually sleep, its verdict) —
+        //       it never forces sleep. Gated to non-empty holders so no libproc runs
+        //       when nothing holds the Mac awake. Daemon-mediated holds are keyed to
+        //       the real owner (`onBehalfOfPID`), so a broker's idleness isn't read
+        //       as the app's. Only holders whose category makes CPU a valid activity
+        //       proxy are sampled — media/backup/call holds are low-CPU by nature.
+        let evidenceRoots = Set(
+            systemBlockers
+                .filter { $0.reason.category.cpuReflectsActivity }
+                .map { $0.onBehalfOfPID ?? $0.pid })
+        let subtreeSamples =
+            evidenceRoots.isEmpty ? [:] : subtreeSampler.sampleSubtrees(evidenceRoots, now: now())
+        staleEvidence = staleDetector.update(
+            samples: subtreeSamples, holding: evidenceRoots, now: now())
 
         // 3) Immediate-sleep guards (overheating / critically low battery). These
         //    run regardless of `decaffeinateEnabled` — overheating in a bag is a

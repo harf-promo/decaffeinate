@@ -85,6 +85,32 @@ private final class ThermalBox: @unchecked Sendable {
     }
 }
 
+/// Default holder sampler for AppState tests — reports nothing, so no test hits
+/// real libproc and none sees stale evidence unless it opts in.
+@MainActor private final class NoopSubtreeSampler: SubtreeCPUSampling {
+    func sampleSubtrees(_ roots: Set<pid_t>, now: Date) -> [pid_t: ProcessSample] { [:] }
+}
+
+/// A holder sampler whose per-pid cumulative CPU is scripted by the test. Roots
+/// listed in `missing` report as vanished; all others as a live single-pid subtree
+/// at their (default 0) cumulative CPU.
+@MainActor private final class FakeSubtreeSampler: SubtreeCPUSampling {
+    var cpuByPID: [pid_t: UInt64] = [:]
+    var missing: Set<pid_t> = []
+    func sampleSubtrees(_ roots: Set<pid_t>, now: Date) -> [pid_t: ProcessSample] {
+        var out: [pid_t: ProcessSample] = [:]
+        for pid in roots {
+            if missing.contains(pid) {
+                out[pid] = ProcessSample(pids: [], cpuNanoseconds: 0, at: now)
+            } else {
+                out[pid] = ProcessSample(
+                    pids: [pid], cpuNanoseconds: cpuByPID[pid] ?? 0, at: now)
+            }
+        }
+        return out
+    }
+}
+
 // MARK: - Tests
 
 @MainActor
@@ -121,6 +147,8 @@ final class AppStateTests: XCTestCase {
         provenance: FakeProvenanceResolver = FakeProvenanceResolver(),
         audio: FakeAudioDeviceResolver = FakeAudioDeviceResolver(),
         system: FakeSystemStateReader = FakeSystemStateReader(),
+        subtreeSampler: any SubtreeCPUSampling = NoopSubtreeSampler(),
+        staleDetector: StaleHolderDetector = StaleHolderDetector(),
         _ configure: (inout DecaffeinateSettings) -> Void = { _ in }
     ) -> Harness {
         let suite = "decaf.appstate.\(UUID().uuidString)"
@@ -155,6 +183,8 @@ final class AppStateTests: XCTestCase {
             provenanceResolver: provenance,
             audioResolver: audio,
             systemState: system,
+            subtreeSampler: subtreeSampler,
+            staleDetector: staleDetector,
             now: { clock.date }
         )
         return Harness(
@@ -1457,5 +1487,109 @@ final class AppStateTests: XCTestCase {
         h.clock.advance(31)  // past errorVisibilitySeconds
         h.state.tick()
         XCTAssertNil(h.state.lastError, "a one-off error clears itself")
+    }
+
+    // MARK: Stale-holder CPU evidence (v1.18)
+
+    func testStaleHolderFlipsEvidenceAndVerdict() {
+        let sampler = FakeSubtreeSampler()  // pid 1234 → constant 0 CPU (idle)
+        let h = makeHarness(
+            subtreeSampler: sampler, staleDetector: StaleHolderDetector(requiredStaleSeconds: 3)
+        ) { $0.idleThresholdMinutes = 10 }
+        defer { h.cleanup() }
+        let chrome = systemBlocker("Chrome")
+        h.scanner.assertions = [chrome]
+        h.idle.seconds = 2  // user active → the app WILL sleep after idle (overridable outlook)
+        for _ in 0..<6 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        // Evidence + subtitle token
+        XCTAssertEqual(h.state.staleEvidence(for: chrome)?.isStale, true)
+        XCTAssertNotNil(h.state.staleLabel(for: chrome))
+        // Verdict upgraded from classification to calm evidence
+        let v = h.state.rowVerdict(for: chrome)
+        XCTAssertEqual(v.tone, .calm)
+        XCTAssertTrue(v.text.lowercased().contains("stale"), "got: \(v.text)")
+        // Honesty: a stale label NEVER forces sleep
+        XCTAssertEqual(h.sleeper.callCount, 0)
+        // Aggregate outlook is untouched by per-holder evidence
+        if case .willSleepAfterIdle = h.state.outlook {
+        } else {
+            XCTFail("aggregate outlook must be unchanged; got \(h.state.outlook)")
+        }
+    }
+
+    func testBusyHolderNotStaleAtAppState() {
+        let sampler = FakeSubtreeSampler()
+        let h = makeHarness(
+            subtreeSampler: sampler, staleDetector: StaleHolderDetector(requiredStaleSeconds: 3)
+        ) { $0.idleThresholdMinutes = 10 }
+        defer { h.cleanup() }
+        let chrome = systemBlocker("Chrome")
+        h.scanner.assertions = [chrome]
+        h.idle.seconds = 2
+        for _ in 0..<8 {
+            sampler.cpuByPID[chrome.pid, default: 0] += 2_000_000_000  // ~200% busy each tick
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        XCTAssertNotEqual(h.state.staleEvidence(for: chrome)?.isStale, true)
+        XCTAssertNil(h.state.staleLabel(for: chrome))
+        XCTAssertFalse(h.state.rowVerdict(for: chrome).text.lowercased().contains("stale"))
+    }
+
+    func testStaleUpgradeSuppressedWhenAutoSleepOff() {
+        let sampler = FakeSubtreeSampler()
+        let h = makeHarness(
+            subtreeSampler: sampler, staleDetector: StaleHolderDetector(requiredStaleSeconds: 3)
+        ) {
+            $0.decaffeinateEnabled = false  // master switch off → outlook .autoSleepOff
+            $0.idleThresholdMinutes = 10
+        }
+        defer { h.cleanup() }
+        let chrome = systemBlocker("Chrome")
+        h.scanner.assertions = [chrome]
+        h.idle.seconds = 2
+        for _ in 0..<6 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        // The holder IS demonstrably stale — the subtitle token still surfaces it.
+        XCTAssertEqual(h.state.staleEvidence(for: chrome)?.isStale, true)
+        XCTAssertNotNil(h.state.staleLabel(for: chrome))
+        // But the verdict is NOT upgraded to "safe to sleep": with auto-sleep off the
+        // Mac won't sleep, so claiming it would be dishonest. Base verdict stands.
+        let v = h.state.rowVerdict(for: chrome)
+        XCTAssertFalse(
+            v.text.lowercased().contains("stale"),
+            "no false 'safe to sleep' when auto-sleep is off; got: \(v.text)")
+        XCTAssertEqual(v.tone, .warning)
+        if case .autoSleepOff = h.state.outlook {
+        } else {
+            XCTFail("expected .autoSleepOff; got \(h.state.outlook)")
+        }
+    }
+
+    func testLowCpuMediaHolderNeverLabelledStale() {
+        let sampler = FakeSubtreeSampler()  // idle CPU
+        let h = makeHarness(
+            subtreeSampler: sampler, staleDetector: StaleHolderDetector(requiredStaleSeconds: 3)
+        ) { $0.idleThresholdMinutes = 10 }
+        defer { h.cleanup() }
+        // An audio-out hold is legitimately low-CPU while playing — flagging it
+        // "~0% CPU — likely stale" would be a false alarm, so it's exempt.
+        let media = Fixtures.assertion(
+            pid: 1234, process: "Music", bundle: "com.apple.Music",
+            type: AssertionType.preventUserIdleSystemSleep, resources: ["audio-out"])
+        h.scanner.assertions = [media]
+        h.idle.seconds = 2
+        for _ in 0..<6 {
+            h.state.tick()
+            h.clock.advance(1)
+        }
+        XCTAssertNil(h.state.staleEvidence(for: media), "media/audio holds are exempt")
+        XCTAssertNil(h.state.staleLabel(for: media))
+        XCTAssertFalse(h.state.rowVerdict(for: media).text.lowercased().contains("stale"))
     }
 }

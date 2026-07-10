@@ -61,6 +61,14 @@ protocol ProcessSampling {
 }
 
 @MainActor
+protocol SubtreeCPUSampling {
+    /// Sample each pid-rooted subtree against ONE machine snapshot, folding each
+    /// holder's cumulative CPU monotonically. A non-running root returns an empty
+    /// sample. Used for stale-holder CPU evidence.
+    func sampleSubtrees(_ roots: Set<pid_t>, now: Date) -> [pid_t: ProcessSample]
+}
+
+@MainActor
 protocol SystemStateReading {
     /// The kernel boot time, or nil if it can't be read. Uptime = now − bootTime.
     func bootTime() -> Date?
@@ -83,4 +91,5 @@ extension SleepController: SystemSleeping {}
 extension CaffeineEngine: KeepAwakeControlling {}
 extension Notifier: BlockerNotifying {}
 extension ProcessWatcher: ProcessSampling {}
+extension SubtreeSampler: SubtreeCPUSampling {}
 extension ProcessProvenanceResolver: ProcessProvenanceResolving {}

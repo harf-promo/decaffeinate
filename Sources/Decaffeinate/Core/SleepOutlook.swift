@@ -342,6 +342,23 @@ extension SleepOutlook {
         }
     }
 
+    /// True only when the app WILL override an indefinite hold after you step away
+    /// — i.e. the states whose `.indefinite` row verdict is the calm "will sleep
+    /// after you step away". This is the honesty gate for the stale-holder verdict
+    /// upgrade: it's only truthful to tell the user a stale hold is "safe to sleep"
+    /// when the app is actually going to sleep. Under `.heldByBlocker` (a real
+    /// rail), `.autoSleepOff` (master switch off), `.keepingAwake`/`.keepAwakePaused`
+    /// (the user's own intent), the base verdict stays and only the subtitle carries
+    /// the ~0%-CPU evidence.
+    var overridesIndefiniteHoldsAfterIdle: Bool {
+        switch self {
+        case .freeToSleep, .willSleepAfterIdle, .sleepingSoon, .protectiveSleep:
+            return true
+        case .heldByBlocker, .autoSleepOff, .keepingAwake, .keepAwakePaused:
+            return false
+        }
+    }
+
     /// A per-hold row verdict — replaces `HoldLifetime.rowVerdict`. A bounded hold
     /// always ends itself (teal); an indefinite hold's verdict depends on whether
     /// the app will override it, so the row can never contradict the hero line.

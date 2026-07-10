@@ -4,6 +4,34 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] — Unreleased
+
+An "evidence" round — the app doesn't just *classify* a hold anymore; for the
+holds that matter it *measures* whether the process is actually doing anything.
+
+### Added
+- **Stale-holder CPU evidence.** Decaffeinate now samples each system-sleep
+  holder's process-tree CPU. A hold that keeps asserting but has been ~0% CPU for
+  ten straight minutes is labelled `held 2h · ~0% CPU — likely stale` in its row,
+  and — where the app would actually sleep after you step away — its verdict is
+  upgraded from a heuristic classification to evidence-backed reassurance ("Idle
+  10 min at ~0% CPU — likely stale, safe to sleep"). It's a *label*: it never
+  forces sleep, never shortens the idle timer, and never overrides the honest
+  verdict when a real rail (a call, media, the battery floor) or your own
+  keep-awake is the actual reason the Mac is staying up. Holds whose work is
+  inherently low-CPU — playing media, a live call, a Time Machine backup, a
+  download — are never flagged, since a quiet CPU there means "working," not
+  "stale."
+
+### Internal
+- New pure, fully-tested cores: `StaleHolderDetector` (the per-holder quiet-window
+  state machine, inverting `AgentWatcher`'s) and `StaleEvidence`. A new
+  single-enumeration multi-holder `SubtreeSampler` (behind an injectable
+  `SubtreeCPUSampling` seam) samples every holder's subtree against one machine
+  snapshot, and the `libproc` primitives it shares with `ProcessWatcher` are
+  factored into `ProcessTable` so the macOS-26 `proc_listallpids` handling stays
+  single-sourced. +10 tests.
+
 ## [1.17.0] — Unreleased
 
 A "connected" round — Decaffeinate is now scriptable and hookable, the

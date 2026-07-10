@@ -91,10 +91,10 @@ preflight, pinned `Package.resolved`, cask lint in CI).
 
 ## Deeper system insight
 
-- [ ] **Stale-holder CPU evidence** — sample each assertion holder's process-tree
+- [x] **Stale-holder CPU evidence** — sample each assertion holder's process-tree
   CPU and label a hold from a ~0%-CPU process as likely stale ("held 2 h · ~0%
-  CPU"), upgrading the sleep verdict from classification to evidence. Deferred
-  from 1.16 (needs continuous multi-PID sampling).
+  CPU"), upgrading the sleep verdict from classification to evidence. Shipped in
+  1.18.0 (single-enumeration multi-PID sampling with a 10-minute stale window).
 
 - [ ] **SMC sensors** — real temperature and fan reads for a smarter Backpack
   Guard, beyond `ProcessInfo.thermalState`. *(Reverse-engineered only — weigh the
