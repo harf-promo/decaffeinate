@@ -8,8 +8,15 @@
 	<string>Decaffeinate</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.harfpromo.Decaffeinate</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>de</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>Decaffeinate</string>
 	<key>CFBundlePackageType</key>

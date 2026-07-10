@@ -7,7 +7,8 @@ First off — **thank you.** Decaffeinate is built in the open precisely so peop
 - 🐛 **Report a bug** — open an [issue](https://github.com/harf-promo/decaffeinate/issues) with your macOS version and, ideally, the output of `Decaffeinate --scan`.
 - 💡 **Suggest a feature** — start a [discussion](https://github.com/harf-promo/decaffeinate/discussions) or a feature-request issue.
 - 🧑‍💻 **Write code** — grab a [`good first issue`](https://github.com/harf-promo/decaffeinate/labels/good%20first%20issue) or anything from the [roadmap](docs/ROADMAP.md).
-- 📝 **Improve docs** — clarity, guides, translations.
+- 📝 **Improve docs** — clarity, guides.
+- 🌍 **Translations** — add a language or widen coverage; see [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md).
 - ⭐️ **Spread the word** — a star, a tweet, a demo video genuinely helps.
 
 ## Project layout

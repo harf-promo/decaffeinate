@@ -84,6 +84,20 @@ if grep -q "KeyboardShortcuts" Package.swift \
     echo "✗ KeyboardShortcuts resource bundle missing — Settings would crash (Bundle.module)" >&2
     exit 1
 fi
+# Guard: the app's OWN resource bundle carries the localized string tables (L10n /
+# Bundle.module). A missing bundle would fatalError exactly like the 1.12.0 crash;
+# a missing de.lproj would silently ship an English-only "localized" app. Both are
+# copied by the *.bundle loop above — fail if SwiftPM didn't emit them.
+_app_bundle="${APP_BUNDLE}/Contents/Resources/Decaffeinate_Decaffeinate.bundle"
+if grep -q "defaultLocalization" Package.swift && [[ ! -d "${_app_bundle}" ]]; then
+    echo "✗ Decaffeinate resource bundle missing — localized UI would crash (Bundle.module)" >&2
+    exit 1
+fi
+if grep -q "defaultLocalization" Package.swift \
+    && [[ ! -e "${_app_bundle}/de.lproj/Localizable.strings" ]]; then
+    echo "✗ German localization missing from the app's string-table bundle" >&2
+    exit 1
+fi
 
 # Embed Sparkle.framework (the executable links @rpath/Sparkle.framework and has
 # an @executable_path/../Frameworks rpath). BIN_DIR was resolved above.

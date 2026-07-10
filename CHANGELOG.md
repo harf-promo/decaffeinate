@@ -4,6 +4,29 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] — Unreleased
+
+A "global" round — the plumbing for translations, with German seeded, so the app
+is no longer English-only by construction.
+
+### Added
+- **Localization scaffolding.** User-facing strings can now be translated. The
+  onboarding and About surfaces are wired to per-language `.lproj` string tables
+  (English + a seed German), loaded through a new `L10n` helper. A new
+  `LocalizationTests` proves the tables compile, ship in the app bundle, and
+  resolve — and `build-app.sh` fails the build if the localized bundle (or the
+  German table) is missing, so an English-only "localized" app can't ship
+  silently. Adding a language is now a `.strings` + `Info.plist` edit;
+  see [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md).
+
+### Internal
+- Strings resolve through `Bundle.module` via `L10n.localized(_:)`, because
+  SwiftUI's `Text("…")` localizes against `Bundle.main`, which never sees a
+  SwiftPM module's catalog. Tables are `.lproj/*.strings` (not a `.xcstrings`
+  String Catalog) because the plain `swift build` used here and in CI doesn't
+  compile catalogs — only Xcode's build system does; `.strings` load everywhere
+  the project builds. +4 tests.
+
 ## [1.19.0] — Unreleased
 
 An "integrated" round — Decaffeinate now installs its own agent hooks and speaks

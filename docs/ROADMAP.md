@@ -85,9 +85,11 @@ preflight, pinned `Package.resolved`, cask lint in CI).
   idle-gated `--sleep-if-idle` turn-end verb, and an **MCP server** (`--mcp`) so
   an agent can hold the Mac awake, ask what's holding it, or sleep it directly.
   Shipped in 1.19.0; see [`AUTOMATION.md`](AUTOMATION.md).
-- [ ] **Localization** — a String Catalog (`.xcstrings`) + the SwiftPM resource
-  plumbing to load it, then translations. No scaffolding exists yet (the app is
-  English-only); this is a good first infrastructure PR.
+- [x] **Localization scaffolding** — SwiftPM `.lproj` string tables loaded via
+  `Bundle.module` (an `L10n` helper, since SwiftUI `Text` uses `Bundle.main`), a
+  seed German translation of the onboarding + About surfaces, a proof test, and a
+  `build-app.sh` guard. Shipped in 1.20.0; see [`LOCALIZATION.md`](LOCALIZATION.md).
+  🙋 Adding more languages / widening coverage is now a great first PR.
 
 ## Deeper system insight
 
@@ -107,7 +109,8 @@ preflight, pinned `Package.resolved`, cask lint in CI).
 
 - [x] **Sleep history** — shipped in 1.4.0 (Settings → History), with a rough
   "needless wake avoided" estimate.
-- [ ] 🙋 **Localization** — translations beyond English.
+- [ ] 🙋 **Localization** — more languages, and widening coverage beyond the
+  seeded onboarding + About surfaces (see [`LOCALIZATION.md`](LOCALIZATION.md)).
 - [ ] 🙋 **More tests** — a sleep-simulation harness; broader coverage.
 
 ## Non-goals (for now)

@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Decaffeinate",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -23,6 +24,14 @@ let package = Package(
                 .product(name: "MCP", package: "swift-sdk"),
             ],
             path: "Sources/Decaffeinate",
+            resources: [
+                // Localized string tables (en/de .lproj). With defaultLocalization
+                // set above, SwiftPM copies these into Bundle.module
+                // (Decaffeinate_Decaffeinate.bundle) as loadable per-language
+                // tables — the .app carries the bundle via build-app.sh. See L10n
+                // and docs/LOCALIZATION.md.
+                .process("Resources")
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ],

@@ -20,7 +20,7 @@ struct OnboardingView: View {
                 DecaffeinateMark(size: 22)
                 Text("Decaffeinate").scaledFont(13, weight: .medium).foregroundStyle(Color.ink1)
                 Spacer()
-                Text("Welcome").eyebrow(.ink4)
+                Text(L10n.localized("Welcome")).eyebrow(.ink4)
             }
             .padding(.horizontal, Space.s5)
             .padding(.vertical, Space.s4)
@@ -41,7 +41,7 @@ struct OnboardingView: View {
             Hairline()
 
             HStack(spacing: Space.s3) {
-                Button("Skip") { onFinish() }
+                Button(L10n.localized("Skip")) { onFinish() }
                     .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
                     .fixedSize()
 
@@ -56,7 +56,7 @@ struct OnboardingView: View {
                         withAnimation(.easeInOut(duration: 0.2)) { page += 1 }
                     } label: {
                         HStack(spacing: Space.s2) {
-                            Text("Next")
+                            Text(L10n.localized("Next"))
                             Text("→").font(HarfFont.code)
                         }
                     }
@@ -69,7 +69,7 @@ struct OnboardingView: View {
                         onFinish()
                     } label: {
                         HStack(spacing: Space.s2) {
-                            Text("Get started")
+                            Text(L10n.localized("Get started"))
                             Text("→").font(HarfFont.code)
                         }
                     }

@@ -1,0 +1,18 @@
+/* Decaffeinate — base (English) strings.
+   Seed scaffolding: the onboarding + About surfaces. See docs/LOCALIZATION.md
+   to add a language or extend coverage. Keys are the English source text. */
+
+"Welcome" = "Welcome";
+"Skip" = "Skip";
+"Next" = "Next";
+"Get started" = "Get started";
+
+"The truth about what's keeping your Mac awake — and the power to make it sleep." = "The truth about what's keeping your Mac awake — and the power to make it sleep.";
+"Show welcome again" = "Show welcome again";
+"Copy diagnostics" = "Copy diagnostics";
+"Copy settings, rules, and the current scan for a bug report." = "Copy settings, rules, and the current scan for a bug report.";
+"Automatically check for updates" = "Automatically check for updates";
+"Check for Updates…" = "Check for Updates…";
+
+/* The app name — a brand mark; intentionally identical in every language. */
+"Decaffeinate" = "Decaffeinate";

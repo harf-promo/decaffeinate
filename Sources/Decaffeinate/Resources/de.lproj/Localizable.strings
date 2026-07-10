@@ -1,0 +1,18 @@
+/* Decaffeinate — German (Deutsch) seed translation.
+   Machine-drafted; marked for a native-speaker pass. Corrections welcome —
+   see docs/LOCALIZATION.md. Keys are the English source text. */
+
+"Welcome" = "Willkommen";
+"Skip" = "Überspringen";
+"Next" = "Weiter";
+"Get started" = "Loslegen";
+
+"The truth about what's keeping your Mac awake — and the power to make it sleep." = "Die Wahrheit darüber, was deinen Mac wachhält – und die Kontrolle, ihn schlafen zu legen.";
+"Show welcome again" = "Willkommen erneut anzeigen";
+"Copy diagnostics" = "Diagnose kopieren";
+"Copy settings, rules, and the current scan for a bug report." = "Einstellungen, Regeln und den aktuellen Scan für einen Fehlerbericht kopieren.";
+"Automatically check for updates" = "Automatisch nach Updates suchen";
+"Check for Updates…" = "Nach Updates suchen…";
+
+/* The app name — a brand mark; intentionally identical in every language. */
+"Decaffeinate" = "Decaffeinate";

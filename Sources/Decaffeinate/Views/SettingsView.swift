@@ -707,12 +707,16 @@ private struct AboutView: View {
             DecaffeinateMark(size: 64)
             Text("Decaffeinate").scaledFont(20, weight: .semibold, relativeTo: .title)
                 .foregroundStyle(Color.ink1)
-            Text("The truth about what's keeping your Mac awake — and the power to make it sleep.")
-                .scaledFont(15)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(Color.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal)
+            Text(
+                L10n.localized(
+                    "The truth about what's keeping your Mac awake — and the power to make it sleep."
+                )
+            )
+            .scaledFont(15)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.ink2)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal)
 
             softwareUpdate
 
@@ -721,13 +725,14 @@ private struct AboutView: View {
                 destination: URL(string: "https://github.com/harf-promo/decaffeinate")!
             )
             .font(HarfFont.caption).tint(Color.accentText)
-            Button("Show welcome again") {
+            Button(L10n.localized("Show welcome again")) {
                 OnboardingPresenter.shared.present(settingsStore: appState.settingsStore)
             }
             .buttonStyle(.link).font(HarfFont.caption).tint(Color.ink2)
-            Button("Copy diagnostics") { appState.copyDiagnostics() }
+            Button(L10n.localized("Copy diagnostics")) { appState.copyDiagnostics() }
                 .buttonStyle(.link).font(HarfFont.caption).tint(Color.ink2)
-                .help("Copy settings, rules, and the current scan for a bug report.")
+                .help(
+                    L10n.localized("Copy settings, rules, and the current scan for a bug report."))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(Space.s5)
@@ -738,8 +743,11 @@ private struct AboutView: View {
             Text("Version \(AppInfo.version)").eyebrow(.ink4)
             if updater.isAvailable {
                 updateStatusRow
-                Toggle("Automatically check for updates", isOn: $updater.automaticChecksEnabled)
-                    .font(HarfFont.caption).fixedSize()
+                Toggle(
+                    L10n.localized("Automatically check for updates"),
+                    isOn: $updater.automaticChecksEnabled
+                )
+                .font(HarfFont.caption).fixedSize()
             }
         }
         .padding(.vertical, Space.s2)
@@ -756,8 +764,10 @@ private struct AboutView: View {
                     Text("Last checked: \(lastChecked)")
                         .font(HarfFont.caption).foregroundStyle(Color.ink3)
                 }
-                Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
-                    .padding(.top, 2)
+                Button(L10n.localized("Check for Updates…")) {
+                    updater.checkForUpdatesUserInitiated()
+                }
+                .padding(.top, 2)
             }
         case .checking:
             HStack(spacing: Space.s2) {
@@ -772,8 +782,10 @@ private struct AboutView: View {
                     Text("· \(lastChecked)")
                         .font(HarfFont.caption).foregroundStyle(Color.ink3)
                 }
-                Button("Check for Updates…") { updater.checkForUpdatesUserInitiated() }
-                    .padding(.top, 2)
+                Button(L10n.localized("Check for Updates…")) {
+                    updater.checkForUpdatesUserInitiated()
+                }
+                .padding(.top, 2)
             }
         case .updateAvailable:
             VStack(spacing: Space.s1) {
