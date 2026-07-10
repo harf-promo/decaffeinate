@@ -93,8 +93,12 @@ if grep -q "defaultLocalization" Package.swift && [[ ! -d "${_app_bundle}" ]]; t
     echo "✗ Decaffeinate resource bundle missing — localized UI would crash (Bundle.module)" >&2
     exit 1
 fi
+# The .lproj can sit at the bundle root (SwiftPM's classic build system) or under
+# Contents/Resources/ (the Swift Build backend, e.g. on CI) — accept either, since
+# Bundle.module resolves both. A path-agnostic search is what makes the guard
+# survive the two build backends.
 if grep -q "defaultLocalization" Package.swift \
-    && [[ ! -e "${_app_bundle}/de.lproj/Localizable.strings" ]]; then
+    && ! find "${_app_bundle}" -path "*de.lproj/Localizable.strings" 2>/dev/null | grep -q .; then
     echo "✗ German localization missing from the app's string-table bundle" >&2
     exit 1
 fi

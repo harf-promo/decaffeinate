@@ -41,7 +41,8 @@ final class MCPServer {
         }
         await server.withMethodHandler(CallTool.self) { [weak self] params in
             guard let self else {
-                return CallTool.Result(content: [.text("Server stopped")], isError: true)
+                return CallTool.Result(
+                    content: [MCPServer.contentText("Server stopped")], isError: true)
             }
             return await self.handle(params)
         }
@@ -55,6 +56,12 @@ final class MCPServer {
         keepAwakeTask?.cancel()
         engine.releaseAll()
         await server.stop()
+    }
+
+    /// Non-deprecated `Tool.Content.text` — the SDK's `.text(_:)`/`.text(text:)`
+    /// convenience overloads are both deprecated in favor of the full enum case.
+    nonisolated private static func contentText(_ s: String) -> Tool.Content {
+        .text(text: s, annotations: nil, _meta: nil)
     }
 
     // MARK: - Tool catalogue (pure)
@@ -132,42 +139,52 @@ final class MCPServer {
     private func handle(_ params: CallTool.Parameters) async -> CallTool.Result {
         guard let action = MCPServer.parseAction(name: params.name, arguments: params.arguments)
         else {
-            return CallTool.Result(content: [.text("Unknown tool: \(params.name)")], isError: true)
+            return CallTool.Result(
+                content: [MCPServer.contentText("Unknown tool: \(params.name)")], isError: true)
         }
         switch action {
         case .status:
-            return .init(content: [.text(currentStatusJSON())], isError: false)
+            return .init(content: [MCPServer.contentText(currentStatusJSON())], isError: false)
         case .keepAwake(let minutes):
-            return .init(content: [.text(startKeepAwake(minutes: minutes))], isError: false)
+            return .init(
+                content: [MCPServer.contentText(startKeepAwake(minutes: minutes))], isError: false)
         case .releaseKeepAwake:
             keepAwakeTask?.cancel()
             engine.releaseAll()
-            return .init(content: [.text("Released the keep-awake hold.")], isError: false)
+            return .init(
+                content: [MCPServer.contentText("Released the keep-awake hold.")], isError: false)
         case .sleepNow:
             switch SleepController().sleepNow() {
             case .success:
-                return .init(content: [.text("Putting this Mac to sleep now.")], isError: false)
+                return .init(
+                    content: [MCPServer.contentText("Putting this Mac to sleep now.")],
+                    isError: false)
             case .failure(let error):
                 return .init(
-                    content: [.text("Couldn't sleep: \(error.description)")], isError: true)
+                    content: [MCPServer.contentText("Couldn't sleep: \(error.description)")],
+                    isError: true)
             }
         case .sleepIfIdle(let seconds):
             let idle = IdleMonitor().secondsSinceLastInput()
             guard CLI.shouldSleep(idleSeconds: idle, threshold: seconds) else {
                 return .init(
                     content: [
-                        .text("Active \(Int(idle))s ago (< \(seconds)s) — leaving this Mac awake.")
+                        MCPServer.contentText(
+                            "Active \(Int(idle))s ago (< \(seconds)s) — leaving this Mac awake.")
                     ],
                     isError: false)
             }
             switch SleepController().sleepNow() {
             case .success:
                 return .init(
-                    content: [.text("Idle \(Int(idle))s ≥ \(seconds)s — sleeping now.")],
+                    content: [
+                        MCPServer.contentText("Idle \(Int(idle))s ≥ \(seconds)s — sleeping now.")
+                    ],
                     isError: false)
             case .failure(let error):
                 return .init(
-                    content: [.text("Couldn't sleep: \(error.description)")], isError: true)
+                    content: [MCPServer.contentText("Couldn't sleep: \(error.description)")],
+                    isError: true)
             }
         }
     }
