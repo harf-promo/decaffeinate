@@ -2,8 +2,8 @@
 
 Decaffeinate is scriptable and hookable — everything the menu does has a
 headless equivalent, so you can wire it into shell scripts, CI, and AI-agent
-sessions. No daemon, no root, no MCP server to run: just the CLI (and the
-`decaffeinate://` URL scheme).
+sessions. No daemon, no root: just the CLI (and the `decaffeinate://` URL
+scheme), a one-command hook installer, and an opt-in MCP server.
 
 ## CLI verbs
 
@@ -14,9 +14,13 @@ Decaffeinate --why-awake            # same as --scan; add --json for structured 
 Decaffeinate --scan                 # what's keeping this Mac awake, in detail
 Decaffeinate --provenance           # …traced to the window / agent / project
 Decaffeinate --sleep-now            # sleep now (exit non-zero if it couldn't launch)
+Decaffeinate --sleep-if-idle 300    # sleep ONLY if idle ≥ 300 s (for turn-end hooks)
 Decaffeinate --display-off          # turn the display off, keep the system running
 Decaffeinate --keep-awake 60        # hold awake 60 min (honours the safety rails), then release
 Decaffeinate --diagnose             # settings + rules + scan, for a bug report
+Decaffeinate --install-hook [claude|codex|all]    # install a turn-end sleep hook
+Decaffeinate --uninstall-hook [claude|codex|all]  # remove it cleanly (marker-based)
+Decaffeinate --mcp                  # run an MCP server over stdio (see below)
 ```
 
 `--status --json` shape (stable, sorted keys):
@@ -54,39 +58,62 @@ agent's `caffeinate -w` hold and offers one-click **"Sleep when it finishes"**
 (or auto-arms it, if you enable that in Settings → Automation). So for most
 people **no hook is needed** — just leave Decaffeinate running.
 
-If you want an explicit hook — e.g. to force sleep the moment a long unattended
-job ends — add a **Stop hook** that calls the CLI. For Claude Code, in
-`~/.claude/settings.json`:
+If you want an explicit hook — e.g. to sleep the moment a long unattended job
+ends — let Decaffeinate install one:
+
+```sh
+Decaffeinate --install-hook          # Claude Code + Codex (default: all)
+Decaffeinate --install-hook claude   # just one
+Decaffeinate --uninstall-hook        # clean removal, any time
+```
+
+This writes a **turn-end hook** that runs `Decaffeinate --sleep-if-idle 300` —
+so the Mac sleeps at the end of a turn **only if you've also been idle ≥ 5 min**.
+That makes it safe for interactive sessions, not just overnight runs: while
+you're actively working, the hook is a no-op. The gating lives in Decaffeinate,
+so there's no wrapper script to maintain.
+
+- **Claude Code** → a `Stop` hook in `~/.claude/settings.json`. Every other key,
+  matcher, and hook you have is preserved; re-installing never duplicates.
+- **Codex** → the `notify` key in `~/.codex/config.toml`, tagged
+  `# decaffeinate-managed`. If you already set your own `notify`, the installer
+  refuses to overwrite it and tells you so.
+
+`--uninstall-hook` removes only Decaffeinate's entry (matched by that marker /
+the command signature) and leaves everything else untouched.
+
+Prefer to do it by hand? The Claude Code form is:
 
 ```json
 {
   "hooks": {
     "Stop": [
       { "hooks": [ { "type": "command",
-        "command": "/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --sleep-now" } ] }
+        "command": "/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --sleep-if-idle 300" } ] }
     ]
   }
 }
 ```
 
-> ⚠️ This sleeps the Mac at the **end of every turn**, so it's best for a truly
-> unattended overnight run, not interactive work. For interactive sessions,
-> prefer Decaffeinate's built-in idle-aware auto-sleep (which only sleeps once
-> *you've* also stepped away), or gate the hook on `--status --json`'s
-> `idleSeconds` in a small wrapper script.
+## MCP server
 
-A gated wrapper (`sleep-if-idle.sh`) that only sleeps when you're also away:
+`Decaffeinate --mcp` speaks the Model Context Protocol over stdio, so an agent
+can control sleep directly during a session. Register it with your client, e.g.:
 
-```sh
-#!/bin/sh
-DECAF="/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate"
-idle=$("$DECAF" --status --json | /usr/bin/plutil -extract idleSeconds raw - 2>/dev/null || echo 0)
-[ "${idle:-0}" -ge 300 ] && "$DECAF" --sleep-now
+```json
+{ "mcpServers": {
+    "decaffeinate": {
+      "command": "/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate",
+      "args": ["--mcp"]
+} } }
 ```
 
-## On the roadmap
+Tools: **`whats_keeping_awake`** (the `--status --json` shape),
+**`keep_awake`** `{minutes}` (a safety-railed hold that releases when the time
+elapses or the session ends), **`release_keep_awake`**, **`sleep_now`**, and
+**`sleep_if_idle`** `{seconds}`. The hold lives in the server process, so the
+kernel releases it automatically when your client closes the session.
 
-- A first-class **hook installer** (`--install-hook` / `--uninstall-hook`) with a
-  clean, marker-based uninstall, and an **MCP server** so an agent can request a
-  hold or a "sleep when I finish" directly. Tracked in
-  [`ROADMAP.md`](ROADMAP.md).
+> "Sleep when I finish" is deliberately **not** an MCP tool — a server has no
+> reliable end-of-turn signal and your client kills it at session end. Use the
+> Stop hook above for that; it fires as a fresh process exactly at turn end.

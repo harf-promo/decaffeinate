@@ -38,6 +38,23 @@ enum CLI {
             runKeepAwake(minutes: minutes ?? 30)
             return true
         }
+        if let index = arguments.firstIndex(of: "--sleep-if-idle") {
+            runSleepIfIdle(
+                threshold: idleThreshold(
+                    after: index, in: arguments, default: HookInstaller.defaultIdleSeconds))
+            return true
+        }
+        if let index = arguments.firstIndex(of: "--install-hook") {
+            runInstallHook(target: hookTarget(after: index, in: arguments))
+            return true
+        }
+        if let index = arguments.firstIndex(of: "--uninstall-hook") {
+            runUninstallHook(target: hookTarget(after: index, in: arguments))
+            return true
+        }
+        if arguments.contains("--mcp") {
+            runMCP()  // returns Never — serves stdio until the client disconnects
+        }
         if arguments.contains("--help") || arguments.contains("-h") {
             printHelp()
             return true
@@ -250,6 +267,204 @@ enum CLI {
         return decision.dropKeepAwakeReasons.first
     }
 
+    // MARK: --sleep-if-idle (idle-gated sleep — the turn-end hook target)
+
+    /// True iff the Mac has been idle at least `threshold` seconds (the boundary
+    /// sleeps). Pure so the gate is unit-testable.
+    static func shouldSleep(idleSeconds: TimeInterval, threshold: Int) -> Bool {
+        Int(idleSeconds) >= threshold
+    }
+
+    /// The idle threshold following `--sleep-if-idle`: the first Int-parseable
+    /// token after the flag, else `fallback`. This tolerates the trailing JSON blob
+    /// Codex appends to its `notify` program (a non-numeric arg → fallback), so the
+    /// same verb works for Claude (`--sleep-if-idle 300`) and Codex without parsing
+    /// JSON.
+    static func idleThreshold(after index: Int, in args: [String], default fallback: Int) -> Int {
+        guard args.indices.contains(index + 1), let n = Int(args[index + 1]) else {
+            return fallback
+        }
+        return n
+    }
+
+    /// Which agent(s) an `--install-hook` / `--uninstall-hook` targets; defaults to
+    /// all when no (or an unrecognized) argument follows.
+    static func hookTarget(after index: Int, in args: [String]) -> [HookInstaller.Client] {
+        guard args.indices.contains(index + 1) else { return HookInstaller.Client.allCases }
+        switch args[index + 1] {
+        case "claude": return [.claude]
+        case "codex": return [.codex]
+        default: return HookInstaller.Client.allCases
+        }
+    }
+
+    @MainActor
+    private static func runSleepIfIdle(threshold: Int) {
+        let idle = IdleMonitor().secondsSinceLastInput()
+        guard shouldSleep(idleSeconds: idle, threshold: threshold) else {
+            // Exit 0: a Stop hook fires every turn, so "still busy" is expected, not
+            // an error.
+            print("☕️  Active \(Int(idle))s ago (< \(threshold)s) — leaving this Mac awake.")
+            return
+        }
+        switch SleepController().sleepNow() {
+        case .success:
+            print("😴  Idle \(Int(idle))s ≥ \(threshold)s — putting this Mac to sleep now…")
+        case .failure(let error):
+            FileHandle.standardError.write(Data("decaffeinate: \(error.description)\n".utf8))
+            exit(EXIT_FAILURE)
+        }
+    }
+
+    // MARK: --install-hook / --uninstall-hook
+
+    @MainActor
+    private static func runInstallHook(target: [HookInstaller.Client]) {
+        let bin = HookInstaller.binaryPath()
+        if !bin.contains("/Applications/") {
+            FileHandle.standardError.write(
+                Data(
+                    "⚠️  Hook will run \(bin) — move Decaffeinate to /Applications for a stable path.\n"
+                        .utf8))
+        }
+        let seconds = HookInstaller.defaultIdleSeconds
+        var failed = false
+        let fm = FileManager.default
+        for client in target {
+            switch client {
+            case .claude:
+                let url = HookInstaller.claudeSettingsURL()
+                // A present-but-unreadable file reads as nil; only treat a genuinely
+                // absent file as "start fresh", never overwrite one we can't read.
+                let exists = fm.fileExists(atPath: url.path)
+                let data = try? Data(contentsOf: url)
+                if exists && data == nil {
+                    FileHandle.standardError.write(
+                        Data("✗ Couldn't read \(url.path) — left it untouched.\n".utf8))
+                    failed = true
+                    continue
+                }
+                guard
+                    let updated = HookInstaller.installClaudeHook(
+                        into: data, binaryPath: bin, seconds: seconds)
+                else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "✗ \(url.path) isn't JSON I can safely edit — left it untouched. Fix or remove it, then re-run.\n"
+                                .utf8))
+                    failed = true
+                    continue
+                }
+                if writeHook(updated, to: url, label: "Claude Code Stop hook") { failed = true }
+            case .codex:
+                let url = HookInstaller.codexConfigURL()
+                let existing: String
+                if fm.fileExists(atPath: url.path) {
+                    guard let contents = try? String(contentsOf: url, encoding: .utf8) else {
+                        FileHandle.standardError.write(
+                            Data("✗ \(url.path) isn't readable UTF-8 — left it untouched.\n".utf8))
+                        failed = true
+                        continue
+                    }
+                    existing = contents
+                } else {
+                    existing = ""
+                }
+                switch HookInstaller.installCodexNotify(
+                    into: existing, binaryPath: bin, seconds: seconds)
+                {
+                case .success(let text):
+                    if writeHook(Data(text.utf8), to: url, label: "Codex notify hook") {
+                        failed = true
+                    }
+                case .failure(.wouldClobberExistingNotify):
+                    FileHandle.standardError.write(
+                        Data(
+                            "✗ \(url.path) already sets `notify` — refusing to overwrite it. Remove it first, then re-run.\n"
+                                .utf8))
+                    failed = true
+                }
+            }
+        }
+        if failed { exit(EXIT_FAILURE) }
+    }
+
+    /// Write hook file content; returns true on failure (so the caller can exit
+    /// non-zero). Prints a confirmation on success.
+    @MainActor
+    private static func writeHook(_ data: Data, to url: URL, label: String) -> Bool {
+        do {
+            try HookInstaller.atomicWrite(data, to: url)
+            print("✓  Installed the \(label) → \(url.path)")
+            return false
+        } catch {
+            FileHandle.standardError.write(Data("✗ Couldn't write \(url.path): \(error)\n".utf8))
+            return true
+        }
+    }
+
+    @MainActor
+    private static func runUninstallHook(target: [HookInstaller.Client]) {
+        var failed = false
+        for client in target {
+            switch client {
+            case .claude:
+                let url = HookInstaller.claudeSettingsURL()
+                guard let existing = try? Data(contentsOf: url) else {
+                    print("·  No Claude settings at \(url.path).")
+                    continue
+                }
+                guard let updated = HookInstaller.uninstallClaudeHook(from: existing) else {
+                    FileHandle.standardError.write(
+                        Data("✗ Couldn't parse \(url.path) — left it untouched.\n".utf8))
+                    failed = true
+                    continue
+                }
+                removeHook(
+                    updated, wasUnchanged: updated == existing, to: url, label: "Claude Code")
+            case .codex:
+                let url = HookInstaller.codexConfigURL()
+                guard let existing = try? String(contentsOf: url, encoding: .utf8) else {
+                    print("·  No Codex config at \(url.path).")
+                    continue
+                }
+                let updated = HookInstaller.uninstallCodexNotify(from: existing)
+                removeHook(
+                    Data(updated.utf8), wasUnchanged: updated == existing, to: url, label: "Codex")
+            }
+        }
+        if failed { exit(EXIT_FAILURE) }
+    }
+
+    @MainActor
+    private static func removeHook(_ data: Data, wasUnchanged: Bool, to url: URL, label: String) {
+        if wasUnchanged {
+            print("·  No Decaffeinate hook in \(url.path).")
+            return
+        }
+        do {
+            try HookInstaller.atomicWrite(data, to: url)
+            print("✓  Removed the \(label) hook from \(url.path).")
+        } catch {
+            FileHandle.standardError.write(Data("✗ Couldn't write \(url.path): \(error)\n".utf8))
+        }
+    }
+
+    // MARK: --mcp
+
+    /// Serve the Model Context Protocol over stdio until the client disconnects.
+    /// Never returns: the server runs on a detached task and `dispatchMain()`
+    /// services the main-actor executor (a main-thread semaphore would deadlock it).
+    @MainActor
+    static func runMCP() -> Never {
+        let server = MCPServer()
+        Task.detached {
+            await server.run()
+            exit(EXIT_SUCCESS)
+        }
+        dispatchMain()
+    }
+
     @MainActor
     private static func runScan() {
         let assertions = TelemetryEngine().scan()
@@ -315,6 +530,10 @@ enum CLI {
               Decaffeinate --sleep-now      Put this Mac to sleep now and exit
               Decaffeinate --display-off    Turn the display off now (system keeps running)
               Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit
+              Decaffeinate --sleep-if-idle N  Sleep only if idle ≥ N seconds (default 300) — for turn-end hooks
+              Decaffeinate --install-hook [claude|codex|all]    Install a turn-end sleep hook (default all)
+              Decaffeinate --uninstall-hook [claude|codex|all]  Remove the hook (marker-based, clean)
+              Decaffeinate --mcp            Run an MCP server over stdio (keep-awake / status / sleep tools)
               Decaffeinate --provenance     Trace each holder to its window / agent / project
               Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)
               Decaffeinate --icon [dir]     Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)

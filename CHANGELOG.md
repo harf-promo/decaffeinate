@@ -4,6 +4,34 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] — Unreleased
+
+An "integrated" round — Decaffeinate now installs its own agent hooks and speaks
+MCP, so wiring it into an agent takes one command instead of hand-edited config.
+
+### Added
+- **One-command hook installer.** `Decaffeinate --install-hook [claude|codex|all]`
+  writes a turn-end sleep hook (and `--uninstall-hook` removes it cleanly). For
+  Claude Code it edits `~/.claude/settings.json` (preserving every other key and
+  hook, never duplicating on re-install); for Codex it sets the `notify` key in
+  `~/.codex/config.toml`, tagged `# decaffeinate-managed` and refusing to clobber
+  a `notify` you set yourself.
+- **`--sleep-if-idle N`.** The installed hook runs this: sleep at turn-end **only
+  if** you've also been idle ≥ N seconds (default 300) — so it's safe for
+  interactive sessions, not just overnight runs. The gating lives in Decaffeinate,
+  so there's no wrapper script. It tolerates the JSON payload Codex appends to its
+  `notify` program, so the same verb serves both agents.
+- **MCP server.** `Decaffeinate --mcp` runs a Model Context Protocol server over
+  stdio, exposing `whats_keeping_awake`, `keep_awake`, `release_keep_awake`,
+  `sleep_now`, and `sleep_if_idle`. The keep-awake hold honours the battery-floor
+  and thermal rails and the kernel releases it when the session ends. ("Sleep when
+  I finish" stays a Stop-hook job — an MCP server has no reliable turn-end signal.)
+
+### Internal
+- New pure, tested cores: `HookInstaller` (JSON + TOML editors, tested purely
+  on in-memory config) and `MCPServer`'s `parseAction`/`toolList`. New dependency
+  on the official MCP Swift SDK (`modelcontextprotocol/swift-sdk`). +33 tests.
+
 ## [1.18.0] — Unreleased
 
 An "evidence" round — the app doesn't just *classify* a hold anymore; for the

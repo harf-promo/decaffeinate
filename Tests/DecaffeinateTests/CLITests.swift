@@ -41,4 +41,47 @@ final class CLITests: XCTestCase {
             settings: relaxed)
         XCTAssertNil(reason, "the user's configured rails apply to the CLI too")
     }
+
+    // MARK: --sleep-if-idle gating (v1.19)
+
+    func testShouldSleepIsInclusiveAtTheBoundary() {
+        XCTAssertTrue(CLI.shouldSleep(idleSeconds: 300, threshold: 300))
+        XCTAssertTrue(CLI.shouldSleep(idleSeconds: 301, threshold: 300))
+        XCTAssertFalse(CLI.shouldSleep(idleSeconds: 299, threshold: 300))
+    }
+
+    func testIdleThresholdParsesNumberAfterFlag() {
+        let args = ["Decaffeinate", "--sleep-if-idle", "600"]
+        XCTAssertEqual(CLI.idleThreshold(after: 1, in: args, default: 300), 600)
+    }
+
+    func testIdleThresholdFallsBackWhenFlagAlone() {
+        let args = ["Decaffeinate", "--sleep-if-idle"]
+        XCTAssertEqual(CLI.idleThreshold(after: 1, in: args, default: 300), 300)
+    }
+
+    func testIdleThresholdIgnoresTrailingCodexJSON() {
+        // Codex invokes: notify = [bin, "--sleep-if-idle", "300"] and appends the
+        // JSON payload as the LAST argv — the number is still parsed, JSON ignored.
+        let args = ["Decaffeinate", "--sleep-if-idle", "300", "{\"type\":\"agent-turn-complete\"}"]
+        XCTAssertEqual(CLI.idleThreshold(after: 1, in: args, default: 300), 300)
+        // If Codex is configured without a number, the JSON is at i+1 → non-numeric
+        // → fall back to the default rather than crash.
+        let noNum = ["Decaffeinate", "--sleep-if-idle", "{\"type\":\"agent-turn-complete\"}"]
+        XCTAssertEqual(CLI.idleThreshold(after: 1, in: noNum, default: 300), 300)
+    }
+
+    // MARK: --install-hook target parsing
+
+    func testHookTargetDefaultsToAll() {
+        XCTAssertEqual(
+            CLI.hookTarget(after: 0, in: ["--install-hook"]), HookInstaller.Client.allCases)
+        XCTAssertEqual(
+            CLI.hookTarget(after: 0, in: ["--install-hook", "all"]), HookInstaller.Client.allCases)
+    }
+
+    func testHookTargetSelectsSingleClient() {
+        XCTAssertEqual(CLI.hookTarget(after: 0, in: ["--install-hook", "claude"]), [.claude])
+        XCTAssertEqual(CLI.hookTarget(after: 0, in: ["--install-hook", "codex"]), [.codex])
+    }
 }
