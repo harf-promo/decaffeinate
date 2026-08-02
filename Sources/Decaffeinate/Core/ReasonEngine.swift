@@ -19,6 +19,18 @@ enum AssertionCategory: String, Sendable, Hashable {
     case systemBackground  // runningboardd-mediated background task
     case unknown
 
+    // NOTE: deliberately NOT routed through `L10n.localized` here — `label` feeds
+    // `AssertionReason.explanation`, which in turn is embedded verbatim into
+    // `StatusReport`'s JSON (`--status --json`, the MCP `status` tool) and
+    // `AppIntents`'s structured Shortcuts return value (`AwakeReport.items`).
+    // Those are machine contracts that must stay stable/English regardless of
+    // the user's language — see the CLI's own "JSON output is never localized"
+    // rule. The strings below ARE seeded as lookup keys in Localizable.strings;
+    // the UI localizes this text at its own display call sites instead
+    // (`MenuRedesign.swift`'s row context text, `CLI.swift`'s human `--scan`
+    // line) by wrapping the *result* of this property in `L10n.localized(...)`
+    // there, so the machine-facing consumers that read this property directly
+    // never see a translated value.
     var label: String {
         switch self {
         case .microphone: return "Microphone in use"
@@ -173,6 +185,9 @@ enum ReasonEngine {
         var labels: [String] = []
         for token in resources.map({ $0.lowercased() }) {
             switch token {
+            // Not localized here either, for the same reason as `label` above —
+            // these feed `AssertionReason.resourceLabels`, which `StatusReport`
+            // embeds in `--status --json`. Localized at display call sites.
             case "audio-in": labels.append("Microphone")
             case "audio-out": labels.append("Speaker")
             case "network": labels.append("Network")

@@ -107,8 +107,8 @@ enum CLI {
             thermal: ProcessInfo.processInfo.thermalState,
             idleSeconds: IdleMonitor().secondsSinceLastInput(),
             uptimeSeconds: uptime,
-            stateHeadline: "(run the app for the live verdict)",
-            stateDetail: "headless --diagnose snapshot",
+            stateHeadline: L10n.localized("(run the app for the live verdict)"),
+            stateDetail: L10n.localized("headless --diagnose snapshot"),
             systemBlockers: all.filter(\.blocksSystemSleep),
             otherAssertions: all.filter { !$0.blocksSystemSleep })
         print(Diagnostics.report(snapshot))
@@ -122,27 +122,33 @@ enum CLI {
 
         func dump(_ pid: pid_t, label: String) {
             guard let p = resolver.provenance(for: pid) else {
-                print("• \(label) — pid \(pid): (unresolved)")
+                print(L10n.localized("• %@ — pid %d: (unresolved)", label, pid))
                 return
             }
             let chain = p.parentChain.map { "\($0.name)(\($0.pid))" }.joined(separator: " → ")
-            print("• \(label) — pid \(p.holderPid) [\(p.holderName)]")
-            print("    session:  \(p.sessionLabel ?? "—")")
-            print("    started by: \(p.originDisplayName ?? "—")  (\(p.originKind.rawValue))")
-            print("    tty:      \(p.ttyName ?? "—")")
-            print("    cwd:      \(p.cwd ?? "—")")
-            print("    argv:     \(p.holderArgv.joined(separator: " "))")
-            print("    parents:  \(chain.isEmpty ? "—" : chain)")
-            if let cmd = p.originCommand { print("    command:  \(cmd.joined(separator: " "))") }
+            print(
+                L10n.localized(
+                    "• %@ — pid %d [%@]", label, p.holderPid, p.holderName))
+            print(L10n.localized("    session:  %@", p.sessionLabel ?? "—"))
+            print(
+                L10n.localized(
+                    "    started by: %@  (%@)", p.originDisplayName ?? "—", p.originKind.rawValue))
+            print(L10n.localized("    tty:      %@", p.ttyName ?? "—"))
+            print(L10n.localized("    cwd:      %@", p.cwd ?? "—"))
+            print(L10n.localized("    argv:     %@", p.holderArgv.joined(separator: " ")))
+            print(L10n.localized("    parents:  %@", chain.isEmpty ? "—" : chain))
+            if let cmd = p.originCommand {
+                print(L10n.localized("    command:  %@", cmd.joined(separator: " ")))
+            }
         }
 
         if let pid {
-            dump(pid, label: "process")
+            dump(pid, label: L10n.localized("process"))
             return
         }
         let holders = TelemetryEngine().scan().filter(\.blocksSystemSleep)
         if holders.isEmpty {
-            print("☕️  Nothing is holding this Mac awake.")
+            print(L10n.localized("☕️  Nothing is holding this Mac awake."))
             return
         }
         for holder in holders { dump(holder.pid, label: holder.displayName) }
@@ -164,12 +170,20 @@ enum CLI {
             print(report.jsonString())
         } else {
             // A terse human line for `--status` without --json.
-            let verb = report.holdingSystemSleep == 0 ? "free to sleep" : "held awake"
-            let by =
-                report.holdingSystemSleep == 0
-                ? ""
-                : " by \(report.holdingSystemSleep) app\(report.holdingSystemSleep == 1 ? "" : "s")"
-            print("This Mac is \(verb)\(by). Idle \(report.idleSeconds)s.")
+            if report.holdingSystemSleep == 0 {
+                print(
+                    L10n.localized(
+                        "This Mac is free to sleep. Idle %ds.", report.idleSeconds))
+            } else if report.holdingSystemSleep == 1 {
+                print(
+                    L10n.localized(
+                        "This Mac is held awake by 1 app. Idle %ds.", report.idleSeconds))
+            } else {
+                print(
+                    L10n.localized(
+                        "This Mac is held awake by %d apps. Idle %ds.",
+                        report.holdingSystemSleep, report.idleSeconds))
+            }
         }
     }
 
@@ -196,12 +210,15 @@ enum CLI {
     static func clamshellStatusLine(_ readiness: ClamshellReadiness) -> String {
         switch readiness {
         case .notApplicable:
-            return "This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply."
+            return L10n.localized(
+                "This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply.")
         case .ready:
-            return "Ready for clamshell mode \u{2014} close the lid whenever you like."
+            return L10n.localized("Ready for clamshell mode \u{2014} close the lid whenever you like.")
         case .missing(let unmet):
-            let items = ClamshellRequirement.allCases.filter { unmet.contains($0) }.map(\.label)
-            return "Not ready for clamshell mode \u{2014} " + items.joined(separator: "; ") + "."
+            let items = ClamshellRequirement.allCases.filter { unmet.contains($0) }
+                .map { L10n.localized($0.label) }
+            return L10n.localized(
+                "Not ready for clamshell mode \u{2014} %@.", items.joined(separator: "; "))
         }
     }
 
@@ -210,9 +227,10 @@ enum CLI {
     private static func runDisplayOff() {
         switch SleepController().displayOffNow() {
         case .success:
-            print("🌙  Turning the display off…")
+            print(L10n.localized("🌙  Turning the display off…"))
         case .failure(let error):
-            FileHandle.standardError.write(Data("decaffeinate: \(error.description)\n".utf8))
+            FileHandle.standardError.write(
+                Data((L10n.localized("decaffeinate: %@", error.description) + "\n").utf8))
             exit(EXIT_FAILURE)
         }
     }
@@ -226,9 +244,10 @@ enum CLI {
     private static func runSleepNow() {
         switch SleepController().sleepNow() {
         case .success:
-            print("😴  Putting this Mac to sleep now…")
+            print(L10n.localized("😴  Putting this Mac to sleep now…"))
         case .failure(let error):
-            FileHandle.standardError.write(Data("decaffeinate: \(error.description)\n".utf8))
+            FileHandle.standardError.write(
+                Data((L10n.localized("decaffeinate: %@", error.description) + "\n").utf8))
             exit(EXIT_FAILURE)
         }
     }
@@ -263,14 +282,17 @@ enum CLI {
         // that is already below the floor or thermally stressed.
         if let reason = dropReason() {
             FileHandle.standardError.write(
-                Data("🛟  \(reason) — not keeping this Mac awake.\n".utf8))
+                Data(
+                    (L10n.localized("🛟  %@ — not keeping this Mac awake.", reason) + "\n").utf8))
             exit(EXIT_FAILURE)
         }
 
         let engine = CaffeineEngine()
         engine.update(
             keepSystemAwake: true, keepDisplayAwake: false, reason: "Decaffeinate --keep-awake")
-        print("☕️  Keeping this Mac awake for \(clamped) min. Press Ctrl-C to stop early.")
+        print(
+            L10n.localized(
+                "☕️  Keeping this Mac awake for %d min. Press Ctrl-C to stop early.", clamped))
         let deadline = Date().addingTimeInterval(TimeInterval(clamped) * 60)
         while true {
             let remaining = deadline.timeIntervalSinceNow
@@ -282,12 +304,14 @@ enum CLI {
             if let reason = dropReason() {
                 engine.releaseAll()
                 FileHandle.standardError.write(
-                    Data("🛟  \(reason) — released the keep-awake hold.\n".utf8))
+                    Data(
+                        (L10n.localized("🛟  %@ — released the keep-awake hold.", reason) + "\n")
+                            .utf8))
                 exit(EXIT_FAILURE)
             }
         }
         engine.releaseAll()
-        print("✓  Done — this Mac can sleep again.")
+        print(L10n.localized("✓  Done — this Mac can sleep again."))
     }
 
     /// Why the safety rails demand dropping a keep-awake hold right now, or nil.
@@ -343,14 +367,19 @@ enum CLI {
         guard shouldSleep(idleSeconds: idle, threshold: threshold) else {
             // Exit 0: a Stop hook fires every turn, so "still busy" is expected, not
             // an error.
-            print("☕️  Active \(Int(idle))s ago (< \(threshold)s) — leaving this Mac awake.")
+            print(
+                L10n.localized(
+                    "☕️  Active %ds ago (< %ds) — leaving this Mac awake.", Int(idle), threshold))
             return
         }
         switch SleepController().sleepNow() {
         case .success:
-            print("😴  Idle \(Int(idle))s ≥ \(threshold)s — putting this Mac to sleep now…")
+            print(
+                L10n.localized(
+                    "😴  Idle %ds ≥ %ds — putting this Mac to sleep now…", Int(idle), threshold))
         case .failure(let error):
-            FileHandle.standardError.write(Data("decaffeinate: \(error.description)\n".utf8))
+            FileHandle.standardError.write(
+                Data((L10n.localized("decaffeinate: %@", error.description) + "\n").utf8))
             exit(EXIT_FAILURE)
         }
     }
@@ -363,8 +392,10 @@ enum CLI {
         if !bin.contains("/Applications/") {
             FileHandle.standardError.write(
                 Data(
-                    "⚠️  Hook will run \(bin) — move Decaffeinate to /Applications for a stable path.\n"
-                        .utf8))
+                    (L10n.localized(
+                        "⚠️  Hook will run %@ — move Decaffeinate to /Applications for a stable path.",
+                        bin) + "\n"
+                    ).utf8))
         }
         let seconds = HookInstaller.defaultIdleSeconds
         var failed = false
@@ -379,7 +410,9 @@ enum CLI {
                 let data = try? Data(contentsOf: url)
                 if exists && data == nil {
                     FileHandle.standardError.write(
-                        Data("✗ Couldn't read \(url.path) — left it untouched.\n".utf8))
+                        Data(
+                            (L10n.localized("✗ Couldn't read %@ — left it untouched.", url.path)
+                                + "\n").utf8))
                     failed = true
                     continue
                 }
@@ -389,19 +422,27 @@ enum CLI {
                 else {
                     FileHandle.standardError.write(
                         Data(
-                            "✗ \(url.path) isn't JSON I can safely edit — left it untouched. Fix or remove it, then re-run.\n"
-                                .utf8))
+                            (L10n.localized(
+                                "✗ %@ isn't JSON I can safely edit — left it untouched. Fix or remove it, then re-run.",
+                                url.path) + "\n"
+                            ).utf8))
                     failed = true
                     continue
                 }
-                if writeHook(updated, to: url, label: "Claude Code Stop hook") { failed = true }
+                if writeHook(updated, to: url, label: L10n.localized("Claude Code Stop hook")) {
+                    failed = true
+                }
             case .codex:
                 let url = HookInstaller.codexConfigURL()
                 let existing: String
                 if fm.fileExists(atPath: url.path) {
                     guard let contents = try? String(contentsOf: url, encoding: .utf8) else {
                         FileHandle.standardError.write(
-                            Data("✗ \(url.path) isn't readable UTF-8 — left it untouched.\n".utf8))
+                            Data(
+                                (L10n.localized(
+                                    "✗ %@ isn't readable UTF-8 — left it untouched.",
+                                    url.path) + "\n"
+                                ).utf8))
                         failed = true
                         continue
                     }
@@ -413,14 +454,17 @@ enum CLI {
                     into: existing, binaryPath: bin, seconds: seconds)
                 {
                 case .success(let text):
-                    if writeHook(Data(text.utf8), to: url, label: "Codex notify hook") {
+                    if writeHook(Data(text.utf8), to: url, label: L10n.localized("Codex notify hook"))
+                    {
                         failed = true
                     }
                 case .failure(.wouldClobberExistingNotify):
                     FileHandle.standardError.write(
                         Data(
-                            "✗ \(url.path) already sets `notify` — refusing to overwrite it. Remove it first, then re-run.\n"
-                                .utf8))
+                            (L10n.localized(
+                                "✗ %@ already sets `notify` — refusing to overwrite it. Remove it first, then re-run.",
+                                url.path) + "\n"
+                            ).utf8))
                     failed = true
                 }
             }
@@ -434,10 +478,12 @@ enum CLI {
     private static func writeHook(_ data: Data, to url: URL, label: String) -> Bool {
         do {
             try HookInstaller.atomicWrite(data, to: url)
-            print("✓  Installed the \(label) → \(url.path)")
+            print(L10n.localized("✓  Installed the %@ → %@", label, url.path))
             return false
         } catch {
-            FileHandle.standardError.write(Data("✗ Couldn't write \(url.path): \(error)\n".utf8))
+            FileHandle.standardError.write(
+                Data(
+                    (L10n.localized("✗ Couldn't write %@: %@", url.path, "\(error)") + "\n").utf8))
             return true
         }
     }
@@ -450,26 +496,30 @@ enum CLI {
             case .claude:
                 let url = HookInstaller.claudeSettingsURL()
                 guard let existing = try? Data(contentsOf: url) else {
-                    print("·  No Claude settings at \(url.path).")
+                    print(L10n.localized("·  No Claude settings at %@.", url.path))
                     continue
                 }
                 guard let updated = HookInstaller.uninstallClaudeHook(from: existing) else {
                     FileHandle.standardError.write(
-                        Data("✗ Couldn't parse \(url.path) — left it untouched.\n".utf8))
+                        Data(
+                            (L10n.localized("✗ Couldn't parse %@ — left it untouched.", url.path)
+                                + "\n").utf8))
                     failed = true
                     continue
                 }
                 removeHook(
-                    updated, wasUnchanged: updated == existing, to: url, label: "Claude Code")
+                    updated, wasUnchanged: updated == existing, to: url,
+                    label: L10n.localized("Claude Code"))
             case .codex:
                 let url = HookInstaller.codexConfigURL()
                 guard let existing = try? String(contentsOf: url, encoding: .utf8) else {
-                    print("·  No Codex config at \(url.path).")
+                    print(L10n.localized("·  No Codex config at %@.", url.path))
                     continue
                 }
                 let updated = HookInstaller.uninstallCodexNotify(from: existing)
                 removeHook(
-                    Data(updated.utf8), wasUnchanged: updated == existing, to: url, label: "Codex")
+                    Data(updated.utf8), wasUnchanged: updated == existing, to: url,
+                    label: L10n.localized("Codex"))
             }
         }
         if failed { exit(EXIT_FAILURE) }
@@ -478,14 +528,16 @@ enum CLI {
     @MainActor
     private static func removeHook(_ data: Data, wasUnchanged: Bool, to url: URL, label: String) {
         if wasUnchanged {
-            print("·  No Decaffeinate hook in \(url.path).")
+            print(L10n.localized("·  No Decaffeinate hook in %@.", url.path))
             return
         }
         do {
             try HookInstaller.atomicWrite(data, to: url)
-            print("✓  Removed the \(label) hook from \(url.path).")
+            print(L10n.localized("✓  Removed the %@ hook from %@.", label, url.path))
         } catch {
-            FileHandle.standardError.write(Data("✗ Couldn't write \(url.path): \(error)\n".utf8))
+            FileHandle.standardError.write(
+                Data(
+                    (L10n.localized("✗ Couldn't write %@: %@", url.path, "\(error)") + "\n").utf8))
         }
     }
 
@@ -511,21 +563,24 @@ enum CLI {
         let displayOnly = assertions.filter { $0.kind == .displaySleep }
 
         if assertions.isEmpty {
-            print("☕️  Nothing is keeping this Mac awake. It is free to sleep.")
+            print(L10n.localized("☕️  Nothing is keeping this Mac awake. It is free to sleep."))
             return
         }
 
         if blockers.isEmpty {
-            print("☕️  Nothing is blocking *system* sleep.")
+            print(L10n.localized("☕️  Nothing is blocking *system* sleep."))
         } else {
-            print(
-                "☀️  \(blockers.count) assertion\(blockers.count == 1 ? "" : "s") are keeping this Mac awake:\n"
-            )
+            let header =
+                blockers.count == 1
+                ? L10n.localized("☀️  1 assertion is keeping this Mac awake:")
+                : L10n.localized(
+                    "☀️  %d assertions are keeping this Mac awake:", blockers.count)
+            print(header + "\n")
             for a in blockers { printRow(a) }
         }
 
         if !displayOnly.isEmpty {
-            print("\n🖥  Keeping the display on (likely media or a call):\n")
+            print("\n" + L10n.localized("🖥  Keeping the display on (likely media or a call):") + "\n")
             for a in displayOnly { printRow(a) }
         }
     }
@@ -538,50 +593,73 @@ enum CLI {
         let name = ReasonEngine.sanitize(rawName)
         let via = a.attribution.map { " (\($0))" } ?? ""
         let reason = a.reason
-        var why = "↳ \(reason.explanation)"
+        // `--scan` is the human-readable line (unlike `--status --json`, which
+        // embeds `reason.explanation`/`resourceLabels` verbatim and must stay
+        // English) — localize here, at the print site, not at the source.
+        var why = "↳ \(L10n.localized(reason.explanation))"
         if !reason.resourceLabels.isEmpty {
-            why += " · " + reason.resourceLabels.joined(separator: ", ")
+            why += " · " + reason.resourceLabels.map { L10n.localized($0) }.joined(separator: ", ")
         }
         if let secs = reason.autoReleaseSeconds {
-            why += " · auto-releases in \(secs)s"
+            why += " · " + L10n.localized("auto-releases in %ds", secs)
         }
         // The GUI filters its own hold out of the app; the CLI keeps it visible
         // for honesty, tagged so the reader knows who it belongs to. (A scan runs
         // as its own process, so match the app by name, not pid.)
         let selfTag =
             a.pid == ProcessInfo.processInfo.processIdentifier || a.processName == "Decaffeinate"
-            ? " ← this app" : ""
+            ? " " + L10n.localized("← this app") : ""
         print("  • \(a.displayName)\(selfTag)\(via)  (pid \(a.pid))")
         print("      \(why)")
         print("      \(a.assertionType): “\(name)”")
     }
 
     private static func printHelp() {
-        print(
-            """
-            Decaffeinate — the truth about what keeps your Mac awake.
-
-            USAGE:
-              Decaffeinate                  Run the menu-bar app
-              Decaffeinate --scan           Print active sleep assertions and exit
-              Decaffeinate --status [--json]  Print a status line (or JSON for scripts/hooks)
-              Decaffeinate --clamshell-status [--json]  Ready for Apple's lid-closed clamshell mode?
-              Decaffeinate --why-awake [--json]  Alias for --scan (add --json for machine output)
-              Decaffeinate --sleep-now      Put this Mac to sleep now and exit
-              Decaffeinate --display-off    Turn the display off now (system keeps running)
-              Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit
-              Decaffeinate --sleep-if-idle N  Sleep only if idle ≥ N seconds (default 300) — for turn-end hooks
-              Decaffeinate --install-hook [claude|codex|all]    Install a turn-end sleep hook (default all)
-              Decaffeinate --uninstall-hook [claude|codex|all]  Remove the hook (marker-based, clean)
-              Decaffeinate --mcp            Run an MCP server over stdio (keep-awake / status / sleep tools)
-              Decaffeinate --provenance     Trace each holder to its window / agent / project
-              Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)
-              Decaffeinate --icon [dir]     Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)
-              Decaffeinate --version        Print the version and exit
-              Decaffeinate --help           Show this help
-
-            Project: https://github.com/harf-promo/decaffeinate
-            """
-        )
+        let lines = [
+            L10n.localized("Decaffeinate — the truth about what keeps your Mac awake."),
+            "",
+            L10n.localized("USAGE:"),
+            L10n.localized("  Decaffeinate                  Run the menu-bar app"),
+            L10n.localized("  Decaffeinate --scan           Print active sleep assertions and exit"),
+            L10n.localized(
+                "  Decaffeinate --status [--json]  Print a status line (or JSON for scripts/hooks)"),
+            L10n.localized(
+                "  Decaffeinate --clamshell-status [--json]  Ready for Apple's lid-closed clamshell mode?"
+            ),
+            L10n.localized(
+                "  Decaffeinate --why-awake [--json]  Alias for --scan (add --json for machine output)"
+            ),
+            L10n.localized("  Decaffeinate --sleep-now      Put this Mac to sleep now and exit"),
+            L10n.localized(
+                "  Decaffeinate --display-off    Turn the display off now (system keeps running)"),
+            L10n.localized(
+                "  Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit"
+            ),
+            L10n.localized(
+                "  Decaffeinate --sleep-if-idle N  Sleep only if idle ≥ N seconds (default 300) — for turn-end hooks"
+            ),
+            L10n.localized(
+                "  Decaffeinate --install-hook [claude|codex|all]    Install a turn-end sleep hook (default all)"
+            ),
+            L10n.localized(
+                "  Decaffeinate --uninstall-hook [claude|codex|all]  Remove the hook (marker-based, clean)"
+            ),
+            L10n.localized(
+                "  Decaffeinate --mcp            Run an MCP server over stdio (keep-awake / status / sleep tools)"
+            ),
+            L10n.localized(
+                "  Decaffeinate --provenance     Trace each holder to its window / agent / project"),
+            L10n.localized(
+                "  Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)"
+            ),
+            L10n.localized(
+                "  Decaffeinate --icon [dir]     Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)"
+            ),
+            L10n.localized("  Decaffeinate --version        Print the version and exit"),
+            L10n.localized("  Decaffeinate --help           Show this help"),
+            "",
+            L10n.localized("Project: https://github.com/harf-promo/decaffeinate"),
+        ]
+        print(lines.joined(separator: "\n"))
     }
 }

@@ -114,14 +114,17 @@ private struct RDHeader: View {
     private var metaLine: String {
         var parts: [String] = []
         if appState.power.onBattery, let pct = appState.power.chargePercent {
-            parts.append("Battery \(pct)%")
+            parts.append(L10n.localized("Battery %d%%", pct))
         } else {
-            parts.append("AC power")
+            parts.append(L10n.localized("AC power"))
         }
         let n = appState.activeHoldingCount
-        if n > 0 { parts.append("\(n) app\(n == 1 ? "" : "s") holding") }
+        if n > 0 {
+            parts.append(
+                n == 1 ? L10n.localized("1 app holding") : L10n.localized("%d apps holding", n))
+        }
         if appState.idleSeconds >= 60 {
-            parts.append("Idle " + Format.duration(appState.idleSeconds))
+            parts.append(L10n.localized("Idle %@", Format.duration(appState.idleSeconds)))
         }
         return parts.joined(separator: " · ")
     }
@@ -141,40 +144,46 @@ private struct RDActionBar: View {
                 Button {
                     appState.sleepNow()
                 } label: {
-                    Label("Sleep Now", systemImage: "powersleep")
+                    Label(L10n.localized("Sleep Now"), systemImage: "powersleep")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RDPrimaryButton())
-                .help("Put the Mac to sleep now, overriding every sleep block.")
+                .help(L10n.localized("Put the Mac to sleep now, overriding every sleep block."))
 
                 // "Keep awake…" folds in the durations and Sleep-when-done watch
                 // targets so they're accessible but not shouting.
                 Menu {
-                    Section("Keep awake") {
+                    Section(L10n.localized("Keep awake")) {
                         // Timed holds are the first-class, self-releasing path —
                         // they auto-expire, so the Mac can never be left awake by
                         // a forgotten toggle. Indefinite is a deliberate opt-in.
-                        Button("30 minutes") { appState.stayAwake(forMinutes: 30) }
-                        Button("1 hour") { appState.stayAwake(forMinutes: 60) }
-                        Button("2 hours") { appState.stayAwake(forMinutes: 120) }
+                        Button(L10n.localized("30 minutes")) { appState.stayAwake(forMinutes: 30) }
+                        Button(L10n.localized("1 hour")) { appState.stayAwake(forMinutes: 60) }
+                        Button(L10n.localized("2 hours")) { appState.stayAwake(forMinutes: 120) }
                         Button(untilWorkHoursLabel) {
                             appState.stayAwake(untilHour: settingsStore.settings.activeHoursEnd)
                         }
                         Divider()
-                        Toggle("Keep awake indefinitely", isOn: settings.caffeinateEnabled)
+                        Toggle(
+                            L10n.localized("Keep awake indefinitely"),
+                            isOn: settings.caffeinateEnabled)
                     }
                     Section {
                         Button {
                             ClamshellAssistantPresenter.shared.present(appState: appState)
                         } label: {
-                            Label("Use with lid closed\u{2026}", systemImage: "laptopcomputer")
+                            Label(
+                                L10n.localized("Use with lid closed\u{2026}"),
+                                systemImage: "laptopcomputer")
                         }
                         .help(
-                            "Check whether this Mac is ready for Apple's own lid-closed clamshell mode."
+                            L10n.localized(
+                                "Check whether this Mac is ready for Apple's own lid-closed clamshell mode."
+                            )
                         )
-                        Button("Turn display off") { appState.displayOff() }
+                        Button(L10n.localized("Turn display off")) { appState.displayOff() }
                     }
-                    Section("Sleep when done") {
+                    Section(L10n.localized("Sleep when done")) {
                         if !appState.runningWatchCandidates.isEmpty {
                             ForEach(appState.runningWatchCandidates, id: \.self) { name in
                                 Button(name) { appState.setWatchTarget(.processName(name)) }
@@ -185,13 +194,15 @@ private struct RDActionBar: View {
                         }
                     }
                 } label: {
-                    Label("Keep awake\u{2026}", systemImage: "ellipsis.circle")
+                    Label(L10n.localized("Keep awake\u{2026}"), systemImage: "ellipsis.circle")
                 }
                 .menuStyle(.button)
                 .buttonStyle(RDSecondaryButton())
                 .fixedSize()
                 .help(
-                    "Keep the Mac awake on purpose, or sleep it the moment a build or agent finishes."
+                    L10n.localized(
+                        "Keep the Mac awake on purpose, or sleep it the moment a build or agent finishes."
+                    )
                 )
             }
 
@@ -213,18 +224,22 @@ private struct RDActionBar: View {
         // unless we ask first — this is that ask. The mic-active check that
         // arms it lives in `AppState.sleepNow()`.
         .alert(
-            "You appear to be on a call",
+            L10n.localized("You appear to be on a call"),
             isPresented: Binding(
                 get: { appState.pendingCallSleepConfirmation },
                 set: { presented in
                     if !presented { appState.cancelSleepDuringCall() }
                 })
         ) {
-            Button("Cancel", role: .cancel) { appState.cancelSleepDuringCall() }
-            Button("Sleep anyway", role: .destructive) { appState.confirmSleepDuringCall() }
+            Button(L10n.localized("Cancel"), role: .cancel) { appState.cancelSleepDuringCall() }
+            Button(L10n.localized("Sleep anyway"), role: .destructive) {
+                appState.confirmSleepDuringCall()
+            }
         } message: {
             Text(
-                "The microphone is in use, which usually means a call. Sleep anyway?"
+                L10n.localized(
+                    "The microphone is in use, which usually means a call. Sleep anyway?"
+                )
             )
         }
     }
@@ -235,7 +250,7 @@ private struct RDActionBar: View {
         let h = settingsStore.settings.activeHoursEnd
         let suffix = h >= 12 ? "PM" : "AM"
         let display = h > 12 ? h - 12 : (h == 0 ? 12 : h)
-        return "Until \(display) \(suffix)"
+        return L10n.localized("Until %d %@", display, suffix)
     }
 
     /// Auto-sleep toggle row — surfaces the master on/off without extra clutter.
@@ -244,16 +259,18 @@ private struct RDActionBar: View {
         HStack(spacing: Space.s2) {
             Image(systemName: "moon.zzz").scaledFont(12, relativeTo: .caption)
                 .foregroundStyle(theme.ink3).accessibilityHidden(true)
-            Text("Auto-sleep when idle")
+            Text(L10n.localized("Auto-sleep when idle"))
                 .scaledFont(13, relativeTo: .callout).foregroundStyle(theme.ink2)
             Spacer()
             Toggle("", isOn: settings.decaffeinateEnabled)
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .help("Auto-sleep the Mac after you step away")
-                .accessibilityLabel("Auto-sleep when idle")
+                .help(L10n.localized("Auto-sleep the Mac after you step away"))
+                .accessibilityLabel(L10n.localized("Auto-sleep when idle"))
                 .accessibilityHint(
-                    "Forces the Mac to sleep after you step away, overriding apps that hold it awake"
+                    L10n.localized(
+                        "Forces the Mac to sleep after you step away, overriding apps that hold it awake"
+                    )
                 )
         }
     }
@@ -273,16 +290,21 @@ private struct RDActiveControls: View {
     var body: some View {
         VStack(spacing: Space.s1) {
             if appState.isQuietWindowActive {
-                row("clock.fill", "Cancel quiet window") { appState.clearQuietWindow() }
+                row("clock.fill", L10n.localized("Cancel quiet window")) {
+                    appState.clearQuietWindow()
+                }
             }
             if isWatchActive {
                 let label = appState.watchTargetLabel
-                row("binoculars.fill", label.map { "Stop watching \($0)" } ?? "Stop watching") {
+                let watchLabel =
+                    label.map { L10n.localized("Stop watching %@", $0) }
+                    ?? L10n.localized("Stop watching")
+                row("binoculars.fill", watchLabel) {
                     appState.setWatchTarget(nil)
                 }
             }
             if appState.settings.caffeinateEnabled {
-                row("bolt.fill", "Stop keeping awake") {
+                row("bolt.fill", L10n.localized("Stop keeping awake")) {
                     settingsStore.settings.caffeinateEnabled = false
                 }
             }
@@ -290,7 +312,7 @@ private struct RDActiveControls: View {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "bolt.horizontal.circle.fill")
                         .font(.caption2).foregroundStyle(theme.accent).accessibilityHidden(true)
-                    Text("Kept awake — \(reason)")
+                    Text(L10n.localized("Kept awake — %@", reason))
                         .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink2).lineLimit(1)
                     Spacer()
                 }
@@ -303,9 +325,9 @@ private struct RDActiveControls: View {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "bell.slash.fill")
                         .font(.caption2).foregroundStyle(Color.warning).accessibilityHidden(true)
-                    Text("Notifications: Off")
+                    Text(L10n.localized("Notifications: Off"))
                         .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink2)
-                    Button("Enable") { Notifier.openSystemNotificationSettings() }
+                    Button(L10n.localized("Enable")) { Notifier.openSystemNotificationSettings() }
                         .buttonStyle(.plain)
                         .scaledFont(12, weight: .semibold, relativeTo: .caption)
                         .foregroundStyle(theme.accent)
@@ -313,8 +335,9 @@ private struct RDActiveControls: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Notifications are off")
-                .accessibilityHint("Activate to open System Settings and enable them")
+                .accessibilityLabel(L10n.localized("Notifications are off"))
+                .accessibilityHint(
+                    L10n.localized("Activate to open System Settings and enable them"))
             }
         }
     }
@@ -356,7 +379,9 @@ private struct RDList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: theme.usesCards ? theme.rowGap : 0) {
             if appState.assertions.isEmpty {
-                RDSectionLabel(text: "Keeping your Mac awake", trailing: "all clear")
+                RDSectionLabel(
+                    text: L10n.localized("Keeping your Mac awake"),
+                    trailing: L10n.localized("all clear"))
                 emptyState
             } else {
                 sectionHeader
@@ -382,7 +407,7 @@ private struct RDList: View {
 
     private var sectionHeader: some View {
         HStack {
-            Text("Keeping your Mac awake").textCase(.uppercase)
+            Text(L10n.localized("Keeping your Mac awake")).textCase(.uppercase)
                 .scaledFont(11, weight: .semibold, relativeTo: .caption2).tracking(0.8)
                 .foregroundStyle(theme.ink3)
                 .lineLimit(1)
@@ -393,8 +418,8 @@ private struct RDList: View {
                 Image(systemName: "info.circle").scaledFont(12, relativeTo: .caption)
             }
             .buttonStyle(.plain).foregroundStyle(showExplainer ? theme.accent : theme.ink4)
-            .help("What does this mean?")
-            .accessibilityLabel("What's keeping your Mac awake?")
+            .help(L10n.localized("What does this mean?"))
+            .accessibilityLabel(L10n.localized("What's keeping your Mac awake?"))
         }
         .padding(.horizontal, theme.contentInset)
         .padding(.bottom, Space.s1)
@@ -402,13 +427,15 @@ private struct RDList: View {
 
     private var explainerCard: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            Text("What\u{2019}s keeping your Mac awake?")
+            Text(L10n.localized("What\u{2019}s keeping your Mac awake?"))
                 .scaledFont(12, weight: .semibold, relativeTo: .caption).foregroundStyle(theme.ink1)
             Text(
-                "Each row shows something that asked macOS to stay awake. "
-                    + "\u{2713} rows end on their own \u{2014} your Mac will sleep when the job is done. "
-                    + "\u{26A0} rows hold indefinitely \u{2014} tap \u{22EF} for options. "
-                    + "Tap a row for the full detail."
+                L10n.localized(
+                    "Each row shows something that asked macOS to stay awake. "
+                        + "\u{2713} rows end on their own \u{2014} your Mac will sleep when the job is done. "
+                        + "\u{26A0} rows hold indefinitely \u{2014} tap \u{22EF} for options. "
+                        + "Tap a row for the full detail."
+                )
             )
             .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink3)
             .fixedSize(horizontal: false, vertical: true)
@@ -487,7 +514,8 @@ private struct RDList: View {
         Button(action: action) {
             HStack(spacing: Space.s2) {
                 Image(systemName: "chevron.down.circle").scaledFont(13, relativeTo: .callout)
-                Text("Show \(count) more").scaledFont(12, weight: .medium, relativeTo: .caption)
+                Text(L10n.localized("Show %d more", count))
+                    .scaledFont(12, weight: .medium, relativeTo: .caption)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(theme.ink3)
@@ -496,7 +524,7 @@ private struct RDList: View {
         .buttonStyle(.plain)
         .padding(.horizontal, theme.contentInset)
         .padding(.vertical, Space.s2)
-        .accessibilityLabel("Show \(count) more blockers")
+        .accessibilityLabel(L10n.localized("Show %d more blockers", count))
     }
 
     /// The "screen-only / background" section header, as a disclosure toggle —
@@ -509,7 +537,7 @@ private struct RDList: View {
             HStack {
                 Image(systemName: showOthers ? "chevron.down" : "chevron.right")
                     .scaledFont(9, weight: .semibold, relativeTo: .caption2)
-                Text("Screen-only / background").textCase(.uppercase)
+                Text(L10n.localized("Screen-only / background")).textCase(.uppercase)
                     .scaledFont(11, weight: .semibold, relativeTo: .caption2).tracking(0.8)
                     .lineLimit(1)
                 Spacer()
@@ -524,14 +552,16 @@ private struct RDList: View {
         .padding(.horizontal, theme.contentInset)
         .padding(.top, theme.usesCards ? 0 : Space.s2)
         .padding(.bottom, Space.s1)
-        .accessibilityLabel("Screen-only / background, \(others.count)")
-        .accessibilityHint(showOthers ? "Double-tap to collapse" : "Double-tap to expand")
+        .accessibilityLabel(L10n.localized("Screen-only / background, %d", others.count))
+        .accessibilityHint(
+            showOthers
+                ? L10n.localized("Double-tap to collapse") : L10n.localized("Double-tap to expand"))
     }
 
     private var emptyState: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: "checkmark.seal.fill").foregroundStyle(theme.teal)
-            Text("Nothing is holding your Mac awake.")
+            Text(L10n.localized("Nothing is holding your Mac awake."))
                 .scaledFont(14, relativeTo: .body).foregroundStyle(theme.ink2)
         }
         .padding(.horizontal, theme.contentInset)
@@ -667,19 +697,30 @@ private struct RDRow: View {
         .onTapGesture {
             if !pending { withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() } }
         }
-        .accessibilityHint(pending ? "" : (showDetails ? "Double-tap to hide details" : "Double-tap to show details"))
+        .accessibilityHint(
+            pending
+                ? ""
+                : (showDetails
+                    ? L10n.localized("Double-tap to hide details")
+                    : L10n.localized("Double-tap to show details")))
     }
 
     private var contextText: some View {
-        var t = Text(appState.displayReason(for: assertion)).foregroundStyle(theme.ink2)
+        // `displayReason` returns either a known `ReasonEngine` category label
+        // (a seeded lookup key — translated below) or fully-composed dynamic
+        // prose from `CaffeinateExplainer` (not a table key — `L10n.localized`
+        // is a safe no-op fallback to the same text in that case).
+        var t = Text(L10n.localized(appState.displayReason(for: assertion)))
+            .foregroundStyle(theme.ink2)
         var tail: [String] = []
         if group.isAgentSession {
             // Origin is the title; show the STABLE held duration (anchored to the
             // session's first sighting, not the churny -t respawn) + live count.
             if let held = appState.sessionHeldDuration(for: assertion) {
-                tail.append("held " + held.replacingOccurrences(of: "for ", with: ""))
+                tail.append(
+                    L10n.localized("held %@", held.replacingOccurrences(of: "for ", with: "")))
             }
-            if group.liveCount > 1 { tail.append("\(group.liveCount) live") }
+            if group.liveCount > 1 { tail.append(L10n.localized("%d live", group.liveCount)) }
         } else {
             if let origin = appState.originCrumb(for: assertion) {
                 tail.append(origin)
@@ -692,10 +733,11 @@ private struct RDRow: View {
                 tail.append(device)
             }
             if let held = appState.heldDuration(assertion) {
-                tail.append("held " + held.replacingOccurrences(of: "for ", with: ""))
+                tail.append(
+                    L10n.localized("held %@", held.replacingOccurrences(of: "for ", with: "")))
             }
             if let secs = assertion.reason.autoReleaseSeconds {
-                tail.append("auto-releases in \(secs)s")
+                tail.append(L10n.localized("auto-releases in %ds", secs))
             }
         }
         // CPU evidence: this holder has been idle so long it's likely a leaked hold.
@@ -714,11 +756,13 @@ private struct RDRow: View {
                 Button {
                     appState.setWatchTarget(.pid(target.pid))
                 } label: {
-                    Label("Sleep when it finishes", systemImage: "binoculars")
+                    Label(L10n.localized("Sleep when it finishes"), systemImage: "binoculars")
                 }
                 .buttonStyle(RDSecondaryButton(compact: true))
                 .fixedSize()
-                .help("Watch \(target.label) and put the Mac to sleep once it's done.")
+                .help(
+                    L10n.localized(
+                        "Watch %@ and put the Mac to sleep once it's done.", target.label))
                 Button {
                     appState.dismissWatchSuggestion(forHolder: assertion.pid)
                 } label: {
@@ -726,8 +770,8 @@ private struct RDRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(theme.ink4)
-                .help("Dismiss")
-                .accessibilityLabel("Dismiss suggestion")
+                .help(L10n.localized("Dismiss"))
+                .accessibilityLabel(L10n.localized("Dismiss suggestion"))
                 Spacer(minLength: 0)
             }
             .padding(.top, Space.s1)
@@ -739,7 +783,7 @@ private struct RDRow: View {
         case .allow, .allowUntil:
             // Route through RulePolicy.shortLabel so menu tag and Settings pill
             // always read the same word.
-            let label = policy?.shortLabel ?? ""
+            let label = L10n.localized(policy?.shortLabel ?? "")
             HStack(spacing: Space.s1) {
                 Circle().fill(theme.teal).frame(width: 5, height: 5)
                 Text(label)
@@ -747,7 +791,7 @@ private struct RDRow: View {
                     .tracking(0.7).foregroundStyle(theme.ink3).lineLimit(1)
             }
         case .ignore:
-            Text(RulePolicy.ignore.shortLabel)
+            Text(L10n.localized(RulePolicy.ignore.shortLabel))
                 .textCase(.uppercase).scaledFont(10, weight: .semibold, relativeTo: .caption2)
                 .tracking(0.7).foregroundStyle(theme.ink4).lineLimit(1)
         case .none:
@@ -757,49 +801,54 @@ private struct RDRow: View {
 
     private var approvalButtons: some View {
         HStack(spacing: Space.s2) {
-            Button(RulePolicy.allow.menuActionLabel) {
+            Button(L10n.localized(RulePolicy.allow.menuActionLabel)) {
                 appState.setPolicy(.allow, for: assertion)
             }
             .buttonStyle(RDPrimaryButton(compact: true))
             .fixedSize()
             .accessibilityLabel(
-                "Always allow \(assertion.displayName) to keep the Mac awake"
+                L10n.localized(
+                    "Always allow %@ to keep the Mac awake", assertion.displayName)
             )
-            Button(RulePolicy.ignore.menuActionLabel) {
+            Button(L10n.localized(RulePolicy.ignore.menuActionLabel)) {
                 appState.setPolicy(.ignore, for: assertion)
             }
             .buttonStyle(RDSecondaryButton(compact: true))
             .fixedSize()
             .accessibilityLabel(
-                "Sleep anyway — ignore \(assertion.displayName) and force sleep when idle"
+                L10n.localized(
+                    "Sleep anyway — ignore %@ and force sleep when idle", assertion.displayName)
             )
-            AllowForMenu(title: RulePolicy.allowUntil(Date()).menuActionLabel, assertion: assertion)
-                .menuStyle(.borderlessButton)
-                .tint(theme.ink3)
-                .fixedSize()
-                .accessibilityLabel("Allow \(assertion.displayName) for a set time")
+            AllowForMenu(
+                title: L10n.localized(RulePolicy.allowUntil(Date()).menuActionLabel),
+                assertion: assertion
+            )
+            .menuStyle(.borderlessButton)
+            .tint(theme.ink3)
+            .fixedSize()
+            .accessibilityLabel(L10n.localized("Allow %@ for a set time", assertion.displayName))
             Spacer(minLength: 0)
         }
     }
 
     private var rowMenu: some View {
         Menu {
-            Button(RulePolicy.allow.menuActionLabel) {
+            Button(L10n.localized(RulePolicy.allow.menuActionLabel)) {
                 appState.setPolicy(.allow, for: assertion)
             }
-            AllowForMenu(title: "Allow for\u{2026}", assertion: assertion)
-            Button(RulePolicy.ignore.menuActionLabel) {
+            AllowForMenu(title: L10n.localized("Allow for\u{2026}"), assertion: assertion)
+            Button(L10n.localized(RulePolicy.ignore.menuActionLabel)) {
                 appState.setPolicy(.ignore, for: assertion)
             }
             if policy != nil {
-                Button("Clear rule") { appState.clearRule(for: assertion) }
+                Button(L10n.localized("Clear rule")) { appState.clearRule(for: assertion) }
             }
             Divider()
             if let app = appState.frontableAppName(for: assertion) {
-                Button("Bring \(app) to front") { appState.bringToFront(assertion) }
+                Button(L10n.localized("Bring %@ to front", app)) { appState.bringToFront(assertion) }
             }
-            Button("Show in Activity Monitor") { appState.openActivityMonitor() }
-            Button("Copy details") { appState.copyDetails(assertion) }
+            Button(L10n.localized("Show in Activity Monitor")) { appState.openActivityMonitor() }
+            Button(L10n.localized("Copy details")) { appState.copyDetails(assertion) }
         } label: {
             Image(systemName: "ellipsis.circle")
         }
@@ -807,7 +856,7 @@ private struct RDRow: View {
         .menuIndicator(.hidden)
         .tint(theme.ink4)
         .fixedSize()
-        .accessibilityLabel("Rules for \(assertion.displayName)")
+        .accessibilityLabel(L10n.localized("Rules for %@", assertion.displayName))
     }
 
     @ViewBuilder private var rowBackground: some View {
@@ -868,14 +917,14 @@ private struct RDFooter: View {
                     Button {
                         updater.checkForUpdatesUserInitiated()
                     } label: {
-                        Label("Update available", systemImage: "arrow.down.circle.fill")
+                        Label(L10n.localized("Update available"), systemImage: "arrow.down.circle.fill")
                     }
                     .buttonStyle(RDPrimaryButton(compact: true))
                     .fixedSize()
-                    .help("A new version of Decaffeinate is ready — click to install.")
+                    .help(L10n.localized("A new version of Decaffeinate is ready — click to install."))
                 } else if let last = appState.lastSleepAt {
                     Label(
-                        "Slept \(Format.relative(since: last))",
+                        L10n.localized("Slept %@", Format.relative(since: last)),
                         systemImage: "clock.arrow.circlepath"
                     )
                     .scaledFont(11, relativeTo: .caption2).foregroundStyle(theme.ink3)
@@ -887,12 +936,12 @@ private struct RDFooter: View {
                 Button {
                     SettingsWindowOpener.open(openSettings)
                 } label: {
-                    Label("Settings", systemImage: "gearshape")
+                    Label(L10n.localized("Settings"), systemImage: "gearshape")
                         .scaledFont(12, weight: .medium, relativeTo: .caption)
                 }
                 .buttonStyle(.plain).foregroundStyle(theme.ink2)
-                .help("Open Settings").accessibilityLabel("Settings")
-                iconButton("power", "Quit Decaffeinate") { NSApp.terminate(nil) }
+                .help(L10n.localized("Open Settings")).accessibilityLabel(L10n.localized("Settings"))
+                iconButton("power", L10n.localized("Quit Decaffeinate")) { NSApp.terminate(nil) }
             }
             .padding(.horizontal, theme.contentInset)
             .padding(.vertical, Space.s2)

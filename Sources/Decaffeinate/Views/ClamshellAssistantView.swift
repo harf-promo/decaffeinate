@@ -83,11 +83,13 @@ struct ClamshellAssistantBody: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label("Use with lid closed", systemImage: "laptopcomputer")
+            Label(L10n.localized("Use with lid closed"), systemImage: "laptopcomputer")
                 .scaledFont(16, weight: .semibold, relativeTo: .title3)
                 .foregroundStyle(theme.ink1)
             Text(
-                "Decaffeinate detects Apple\u{2019}s own clamshell mode \u{2014} it never forces the lid closed to work on its own."
+                L10n.localized(
+                    "Decaffeinate detects Apple\u{2019}s own clamshell mode \u{2014} it never forces the lid closed to work on its own."
+                )
             )
             .scaledFont(12, relativeTo: .caption)
             .foregroundStyle(theme.ink3)
@@ -98,19 +100,23 @@ struct ClamshellAssistantBody: View {
     private var notApplicableRow: some View {
         HStack(alignment: .top, spacing: Space.s2) {
             Image(systemName: "desktopcomputer").foregroundStyle(theme.ink3)
-            Text("This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply.")
-                .scaledFont(13, relativeTo: .callout)
-                .foregroundStyle(theme.ink2)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                L10n.localized(
+                    "This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply.")
+            )
+            .scaledFont(13, relativeTo: .callout)
+            .foregroundStyle(theme.ink2)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
 
     private var checklist: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            checklistRow(.power, readyLabel: "On power")
-            checklistRow(.externalDisplay, readyLabel: "External display connected")
-            checklistRow(.externalInput, readyLabel: "Keyboard and mouse connected")
+            checklistRow(.power, readyLabel: L10n.localized("On power"))
+            checklistRow(
+                .externalDisplay, readyLabel: L10n.localized("External display connected"))
+            checklistRow(.externalInput, readyLabel: L10n.localized("Keyboard and mouse connected"))
         }
     }
 
@@ -118,17 +124,21 @@ struct ClamshellAssistantBody: View {
         -> some View
     {
         let done = !unmet.contains(requirement)
+        let requirementLabel = L10n.localized(requirement.label)
         return HStack(spacing: Space.s2) {
             Image(systemName: done ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(done ? theme.teal : theme.ink4)
                 .accessibilityHidden(true)
-            Text(done ? readyLabel : requirement.label)
+            Text(done ? readyLabel : requirementLabel)
                 .scaledFont(13, relativeTo: .callout)
                 .foregroundStyle(done ? theme.ink1 : theme.ink3)
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(done ? "\(readyLabel), ready" : "\(requirement.label), not yet")
+        .accessibilityLabel(
+            done
+                ? L10n.localized("%@, ready", readyLabel)
+                : L10n.localized("%@, not yet", requirementLabel))
     }
 
     @ViewBuilder private var primaryAction: some View {
@@ -136,18 +146,23 @@ struct ClamshellAssistantBody: View {
         case .ready:
             VStack(alignment: .leading, spacing: Space.s2) {
                 Button(action: onArmClamshellSession) {
-                    Label("Arm clamshell session", systemImage: "bolt.fill")
+                    Label(L10n.localized("Arm clamshell session"), systemImage: "bolt.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RDPrimaryButton())
-                .help("Turn on keep-awake so the Mac stays up on the external display.")
-                Text("Close the lid \u{2014} your Mac keeps working on the external display.")
-                    .scaledFont(12, relativeTo: .caption)
-                    .foregroundStyle(theme.ink3)
-                    .fixedSize(horizontal: false, vertical: true)
+                .help(
+                    L10n.localized("Turn on keep-awake so the Mac stays up on the external display.")
+                )
+                Text(
+                    L10n.localized(
+                        "Close the lid \u{2014} your Mac keeps working on the external display.")
+                )
+                .scaledFont(12, relativeTo: .caption)
+                .foregroundStyle(theme.ink3)
+                .fixedSize(horizontal: false, vertical: true)
             }
         case .missing:
-            Text("Once these are ready, you can arm a clamshell session.")
+            Text(L10n.localized("Once these are ready, you can arm a clamshell session."))
                 .scaledFont(12, relativeTo: .caption)
                 .foregroundStyle(theme.ink3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -158,17 +173,23 @@ struct ClamshellAssistantBody: View {
 
     private var screensOffFallback: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text("No external display?")
+            Text(L10n.localized("No external display?"))
                 .scaledFont(12, weight: .semibold, relativeTo: .caption)
                 .foregroundStyle(theme.ink2)
             Button(action: onKeepScreensOff) {
-                Label("Keep working with the screens off", systemImage: "moon.fill")
-                    .frame(maxWidth: .infinity)
+                Label(
+                    L10n.localized("Keep working with the screens off"), systemImage: "moon.fill"
+                )
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(RDSecondaryButton())
-            .help("Keep-awake + turn the display off now. The lid must stay open for this.")
+            .help(
+                L10n.localized(
+                    "Keep-awake + turn the display off now. The lid must stay open for this."))
             Text(
-                "The lid must stay open for this \u{2014} screens off isn\u{2019}t the same as lid closed."
+                L10n.localized(
+                    "The lid must stay open for this \u{2014} screens off isn\u{2019}t the same as lid closed."
+                )
             )
             .scaledFont(11, relativeTo: .caption2)
             .foregroundStyle(theme.ink4)
@@ -180,10 +201,13 @@ struct ClamshellAssistantBody: View {
         HStack(alignment: .top, spacing: Space.s2) {
             Image(systemName: "info.circle").foregroundStyle(Color.warning)
                 .accessibilityHidden(true)
-            Text("Sleep is disabled system-wide by something other than Decaffeinate.")
-                .scaledFont(11, relativeTo: .caption2)
-                .foregroundStyle(theme.ink3)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                L10n.localized(
+                    "Sleep is disabled system-wide by something other than Decaffeinate.")
+            )
+            .scaledFont(11, relativeTo: .caption2)
+            .foregroundStyle(theme.ink3)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
@@ -214,7 +238,7 @@ final class ClamshellAssistantPresenter: NSObject, NSWindowDelegate {
             .environmentObject(appState.settingsStore)
         let hosting = NSHostingController(rootView: view)
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Use With Lid Closed"
+        window.title = L10n.localized("Use With Lid Closed")
         window.styleMask = [.titled, .closable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true

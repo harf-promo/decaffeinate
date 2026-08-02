@@ -31,4 +31,14 @@ enum L10n {
     static func localized(_ key: String) -> String {
         bundle.localizedString(forKey: key, value: key, table: nil)
     }
+
+    /// Format-string + localize combo, for copy that interpolates a value (an
+    /// idle-minute count, an app name, a hold count…). `key` is a format string
+    /// using standard `.strings` placeholder conventions (`%@` for strings,
+    /// `%d`/`%ld` for integers); each language's table supplies its own
+    /// translated format string, so word order can differ per language without
+    /// touching the call site.
+    static func localized(_ key: String, _ args: CVarArg...) -> String {
+        String(format: localized(key), arguments: args)
+    }
 }

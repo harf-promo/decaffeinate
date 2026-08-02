@@ -74,9 +74,11 @@ final class Notifier: NSObject {
         guard isBundled, !categoriesRegistered else { return }
         categoriesRegistered = true
         let alwaysAllow = UNNotificationAction(
-            identifier: BlockerNotificationAction.alwaysAllow, title: "Always Allow", options: [])
+            identifier: BlockerNotificationAction.alwaysAllow,
+            title: L10n.localized("Always Allow"), options: [])
         let sleepAnyway = UNNotificationAction(
-            identifier: BlockerNotificationAction.sleepAnyway, title: "Sleep Anyway",
+            identifier: BlockerNotificationAction.sleepAnyway,
+            title: L10n.localized("Sleep Anyway"),
             options: [.destructive])
         let category = UNNotificationCategory(
             identifier: BlockerNotificationAction.category,
@@ -90,8 +92,9 @@ final class Notifier: NSObject {
 
     func notifyNewBlocker(appName: String, reason: String, holderKey: String) {
         post(
-            title: "\(appName) is keeping your Mac awake",
-            body: "\(reason) — open Decaffeinate to allow it or let your Mac sleep anyway.",
+            title: L10n.localized("%@ is keeping your Mac awake", appName),
+            body: L10n.localized(
+                "%@ — open Decaffeinate to allow it or let your Mac sleep anyway.", reason),
             categoryIdentifier: BlockerNotificationAction.category,
             userInfo: [BlockerNotificationAction.holderKeyInfoKey: holderKey])
     }
@@ -101,29 +104,37 @@ final class Notifier: NSObject {
     /// there's no single "Always Allow" target, so this just points back to
     /// the app to review them individually.
     func notifyNewBlockers(count: Int, sample: String) {
+        let others = count - 1
+        let body =
+            others == 1
+            ? L10n.localized("%@ and 1 other — open Decaffeinate to review them.", sample)
+            : L10n.localized(
+                "%@ and %d others — open Decaffeinate to review them.", sample, others)
         post(
-            title: "\(count) apps started keeping your Mac awake",
-            body: "\(sample) and \(count - 1) other\(count - 1 == 1 ? "" : "s") — open Decaffeinate to review them."
+            title: L10n.localized("%d apps started keeping your Mac awake", count),
+            body: body
         )
     }
 
     func notifyForcedSleep(reason: String) {
         post(
-            title: "Putting your Mac to sleep",
-            body: "Decaffeinate stepped in — \(reason).")
+            title: L10n.localized("Putting your Mac to sleep"),
+            body: L10n.localized("Decaffeinate stepped in \u{2014} %@.", reason))
     }
 
     func notifyAgentFinished(label: String) {
         post(
-            title: "\(label) finished",
-            body: "Decaffeinate is letting your Mac sleep now.")
+            title: L10n.localized("%@ finished", label),
+            body: L10n.localized("Decaffeinate is letting your Mac sleep now."))
     }
 
     func notifyRestartOverdue(uptimeLabel: String) {
         post(
-            title: "A restart is overdue",
+            title: L10n.localized("A restart is overdue"),
             body:
-                "Your Mac has been up \(uptimeLabel). A weekly restart clears what sleep can't.")
+                L10n.localized(
+                    "Your Mac has been up %@. A weekly restart clears what sleep can\u{2019}t.",
+                    uptimeLabel))
     }
 
     // MARK: Private

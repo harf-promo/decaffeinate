@@ -28,11 +28,11 @@ struct SettingsView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 1) {
-            sidebarLabel("Settings")
+            sidebarLabel(L10n.localized("Settings"))
             ForEach([SettingsPane.general, .notifications, .schedule, .automation, .freshness]) {
                 sidebarRow($0)
             }
-            sidebarLabel("Info").padding(.top, Space.s3)
+            sidebarLabel(L10n.localized("Info")).padding(.top, Space.s3)
             ForEach([SettingsPane.history, .about]) { sidebarRow($0) }
             Spacer(minLength: 0)
         }
@@ -57,7 +57,8 @@ struct SettingsView: View {
             HStack(spacing: Space.s2) {
                 Image(systemName: item.icon).frame(width: 18)
                     .foregroundStyle(selected ? Color.onGreen : theme.ink3)
-                Text(item.title).font(.system(size: 13, weight: selected ? .semibold : .regular))
+                Text(L10n.localized(item.title))
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? Color.onGreen : theme.ink1)
                 Spacer(minLength: 0)
             }
@@ -122,43 +123,54 @@ private struct GeneralSettings: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Decaffeinate makes your idle Mac sleep.")
+                    Text(L10n.localized("Decaffeinate makes your idle Mac sleep."))
                         .font(.system(size: 13, weight: .semibold))
                     Text(
-                        "You're in control: it forces sleep when you step away, and shows you exactly what's holding it awake."
+                        L10n.localized(
+                            "You're in control: it forces sleep when you step away, and shows you exactly what's holding it awake."
+                        )
                     )
                     .settingsCaption()
                 }
             }
 
-            Section("Put the Mac to sleep") {
-                Toggle("Auto-sleep when left idle", isOn: s.decaffeinateEnabled)
+            Section(L10n.localized("Put the Mac to sleep")) {
+                Toggle(L10n.localized("Auto-sleep when left idle"), isOn: s.decaffeinateEnabled)
                 LabeledSlider(
-                    "Sleep after", value: s.idleThresholdMinutes, range: 1...60,
-                    unit: "min", enabled: store.settings.decaffeinateEnabled)
+                    L10n.localized("Sleep after"), value: s.idleThresholdMinutes, range: 1...60,
+                    unit: L10n.localized("min"), enabled: store.settings.decaffeinateEnabled)
                 Text(
-                    "When you step away, Decaffeinate forces sleep after this much idle time — even if an app is trying to keep the Mac awake."
+                    L10n.localized(
+                        "When you step away, Decaffeinate forces sleep after this much idle time — even if an app is trying to keep the Mac awake."
+                    )
                 )
                 .settingsCaption()
                 if store.settings.idleThresholdMinutes < 3 {
-                    Text("Very short — your Mac may sleep while you\u{2019}re still reading.")
-                        .font(.caption).foregroundStyle(Color.warning)
+                    Text(
+                        L10n.localized(
+                            "Very short — your Mac may sleep while you\u{2019}re still reading.")
+                    )
+                    .font(.caption).foregroundStyle(Color.warning)
                 }
 
                 Toggle(
-                    "Warn before sleeping, with time to stay awake", isOn: s.showPreSleepWarning
+                    L10n.localized("Warn before sleeping, with time to stay awake"),
+                    isOn: s.showPreSleepWarning
                 )
                 .disabled(!store.settings.decaffeinateEnabled)
                 Text(
-                    "Shows a brief on-screen countdown with a \u{201C}Stay awake\u{201D} button before an idle sleep actually happens. Turn this off to sleep immediately, like before."
+                    L10n.localized(
+                        "Shows a brief on-screen countdown with a \u{201C}Stay awake\u{201D} button before an idle sleep actually happens. Turn this off to sleep immediately, like before."
+                    )
                 )
                 .settingsCaption()
 
-                Toggle("Sleep sooner on battery", isOn: s.sleepSoonerOnBattery)
+                Toggle(L10n.localized("Sleep sooner on battery"), isOn: s.sleepSoonerOnBattery)
                     .disabled(!store.settings.decaffeinateEnabled)
                 LabeledSlider(
-                    "On battery, sleep after", value: s.batteryIdleThresholdMinutes, range: 1...30,
-                    unit: "min",
+                    L10n.localized("On battery, sleep after"),
+                    value: s.batteryIdleThresholdMinutes, range: 1...30,
+                    unit: L10n.localized("min"),
                     enabled: store.settings.decaffeinateEnabled
                         && store.settings.sleepSoonerOnBattery
                 )
@@ -167,68 +179,95 @@ private struct GeneralSettings: View {
                         >= store.settings.idleThresholdMinutes
                 {
                     Text(
-                        "This is at least your normal idle time, so it has no effect — lower it to sleep sooner on battery."
+                        L10n.localized(
+                            "This is at least your normal idle time, so it has no effect — lower it to sleep sooner on battery."
+                        )
                     )
                     .font(.caption).foregroundStyle(Color.warning)
                 }
 
                 KeyboardShortcuts.Recorder(
-                    "Global \u{201C}Sleep Now\u{201D} hotkey", name: .sleepNow)
-                Text("Set a system-wide shortcut to put the Mac to sleep from any app.")
-                    .settingsCaption()
+                    L10n.localized("Global \u{201C}Sleep Now\u{201D} hotkey"), name: .sleepNow)
+                Text(
+                    L10n.localized(
+                        "Set a system-wide shortcut to put the Mac to sleep from any app.")
+                )
+                .settingsCaption()
 
                 KeyboardShortcuts.Recorder(
-                    "Global \u{201C}Toggle keep awake\u{201D} hotkey", name: .toggleKeepAwake)
-                Text("Set a system-wide shortcut to turn keep-awake on or off from any app.")
-                    .settingsCaption()
+                    L10n.localized("Global \u{201C}Toggle keep awake\u{201D} hotkey"),
+                    name: .toggleKeepAwake)
+                Text(
+                    L10n.localized(
+                        "Set a system-wide shortcut to turn keep-awake on or off from any app.")
+                )
+                .settingsCaption()
             }
 
-            Section("Never sleep at a bad moment") {
-                Text("Won't interrupt calls, media, backups, updates, or apps you allowed.")
-                    .settingsCaption()
-                DisclosureGroup("Advanced \u{2014} choose which") {
-                    Toggle("Pause during calls (microphone)", isOn: s.pauseForActiveCall)
-                    Toggle("Pause for active media", isOn: s.pauseForActiveMedia)
-                    Toggle("Pause during Time Machine backups", isOn: s.pauseForTimeMachine)
-                    Toggle("Pause during macOS updates", isOn: s.pauseForSystemUpdate)
+            Section(L10n.localized("Never sleep at a bad moment")) {
+                Text(
+                    L10n.localized(
+                        "Won't interrupt calls, media, backups, updates, or apps you allowed.")
+                )
+                .settingsCaption()
+                DisclosureGroup(L10n.localized("Advanced \u{2014} choose which")) {
                     Toggle(
-                        "Respect apps set to \u{201C}Always allow\u{201D}", isOn: s.respectWhitelist
+                        L10n.localized("Pause during calls (microphone)"),
+                        isOn: s.pauseForActiveCall)
+                    Toggle(L10n.localized("Pause for active media"), isOn: s.pauseForActiveMedia)
+                    Toggle(
+                        L10n.localized("Pause during Time Machine backups"),
+                        isOn: s.pauseForTimeMachine)
+                    Toggle(
+                        L10n.localized("Pause during macOS updates"), isOn: s.pauseForSystemUpdate)
+                    Toggle(
+                        L10n.localized("Respect apps set to \u{201C}Always allow\u{201D}"),
+                        isOn: s.respectWhitelist
                     )
                     Text(
-                        "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
+                        L10n.localized(
+                            "The call guard is never time-limited. Media holds are released after you've been idle well past your sleep delay, so a forgotten background tab can't keep the Mac awake forever."
+                        )
                     )
                     .settingsCaption()
                 }
             }
 
-            Section("Battery & heat") {
+            Section(L10n.localized("Battery & heat")) {
                 LabeledSlider(
-                    "Battery floor",
+                    L10n.localized("Battery floor"),
                     value: Binding(
                         get: { Double(store.settings.batteryFloorPercent) },
                         set: { store.settings.batteryFloorPercent = Int($0) }),
                     range: 0...50, step: 5, unit: "%", width: 44)
                 Text(
-                    "The charge level where keep-awake gives up, so you never wake to a dead laptop."
+                    L10n.localized(
+                        "The charge level where keep-awake gives up, so you never wake to a dead laptop."
+                    )
                 )
                 .settingsCaption()
                 Toggle(
-                    "Sleep if it overheats in a bag (backpack guard)", isOn: s.thermalGuardEnabled)
+                    L10n.localized("Sleep if it overheats in a bag (backpack guard)"),
+                    isOn: s.thermalGuardEnabled)
                 Text(
-                    "Sleeps immediately if the Mac overheats while enclosed (e.g. in a bag) — all keep-awake holds are released."
+                    L10n.localized(
+                        "Sleeps immediately if the Mac overheats while enclosed (e.g. in a bag) — all keep-awake holds are released."
+                    )
                 )
                 .settingsCaption()
             }
 
-            Section("Keep awake (optional)") {
-                Toggle("Hold the Mac awake on purpose", isOn: s.caffeinateEnabled)
-                Toggle("Also keep the display on", isOn: s.caffeinateKeepsDisplayAwake)
-                    .disabled(!store.settings.caffeinateEnabled)
+            Section(L10n.localized("Keep awake (optional)")) {
+                Toggle(L10n.localized("Hold the Mac awake on purpose"), isOn: s.caffeinateEnabled)
+                Toggle(
+                    L10n.localized("Also keep the display on"), isOn: s.caffeinateKeepsDisplayAwake
+                )
+                .disabled(!store.settings.caffeinateEnabled)
             }
 
-            Section("Startup & menu bar") {
+            Section(L10n.localized("Startup & menu bar")) {
                 if LoginItem.isAvailable {
-                    Toggle("Launch at login", isOn: s.launchAtLogin)
+                    Toggle(L10n.localized("Launch at login"), isOn: s.launchAtLogin)
                         .onChange(of: store.settings.launchAtLogin) { _, newValue in
                             // No-op when the OS already matches (the onAppear
                             // reconcile writes the live value back through this
@@ -252,11 +291,16 @@ private struct GeneralSettings: View {
                             }
                         }
                 }
-                Toggle("Show the sleep countdown in the menu bar", isOn: s.showMenuBarCountdown)
                 Toggle(
-                    "Show the holder count in the menu bar", isOn: s.showHolderCountInMenuBar)
+                    L10n.localized("Show the sleep countdown in the menu bar"),
+                    isOn: s.showMenuBarCountdown)
+                Toggle(
+                    L10n.localized("Show the holder count in the menu bar"),
+                    isOn: s.showHolderCountInMenuBar)
                 Text(
-                    "Shows how many apps are currently holding the Mac awake next to the icon."
+                    L10n.localized(
+                        "Shows how many apps are currently holding the Mac awake next to the icon."
+                    )
                 )
                 .settingsCaption()
             }
@@ -277,22 +321,30 @@ private struct NotificationsSettings: View {
             if appState.notificationAuthorization == .denied {
                 Section {
                     HStack {
-                        Label("Notifications: Off", systemImage: "bell.slash.fill")
+                        Label(L10n.localized("Notifications: Off"), systemImage: "bell.slash.fill")
                             .foregroundStyle(Color.warning)
                         Spacer()
-                        Button("Enable\u{2026}") { Notifier.openSystemNotificationSettings() }
+                        Button(L10n.localized("Enable\u{2026}")) {
+                            Notifier.openSystemNotificationSettings()
+                        }
                     }
                     Text(
-                        "Decaffeinate can\u{2019}t notify you until notifications are turned back on in System Settings \u{2014} the toggles below have nothing to post to."
+                        L10n.localized(
+                            "Decaffeinate can\u{2019}t notify you until notifications are turned back on in System Settings \u{2014} the toggles below have nothing to post to."
+                        )
                     )
                     .settingsCaption()
                 }
             }
-            Section("Tell me when\u{2026}") {
-                Toggle("A new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
-                Toggle("Decaffeinate puts the Mac to sleep", isOn: s.notifyOnForcedSleep)
-                Toggle("A watched agent or build finishes", isOn: s.notifyOnAgentFinished)
-                Toggle("A restart is overdue", isOn: s.notifyOnRestartOverdue)
+            Section(L10n.localized("Tell me when\u{2026}")) {
+                Toggle(L10n.localized("A new app keeps the Mac awake"), isOn: s.notifyOnNewBlocker)
+                Toggle(
+                    L10n.localized("Decaffeinate puts the Mac to sleep"),
+                    isOn: s.notifyOnForcedSleep)
+                Toggle(
+                    L10n.localized("A watched agent or build finishes"),
+                    isOn: s.notifyOnAgentFinished)
+                Toggle(L10n.localized("A restart is overdue"), isOn: s.notifyOnRestartOverdue)
             }
         }
         .formStyle(.grouped)
@@ -308,47 +360,55 @@ private struct ScheduleSettings: View {
 
     var body: some View {
         Form {
-            Section("Active hours") {
-                Toggle("Don't force sleep during my active hours", isOn: s.scheduleEnabled)
+            Section(L10n.localized("Active hours")) {
+                Toggle(
+                    L10n.localized("Don't force sleep during my active hours"),
+                    isOn: s.scheduleEnabled)
                 HStack {
-                    Text("From")
+                    Text(L10n.localized("From"))
                     Picker("", selection: s.activeHoursStart) {
                         ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
                     }
-                    .labelsHidden().accessibilityLabel("Active hours start")
-                    Text("to")
+                    .labelsHidden().accessibilityLabel(L10n.localized("Active hours start"))
+                    Text(L10n.localized("to"))
                     Picker("", selection: s.activeHoursEnd) {
                         ForEach(0..<24, id: \.self) { Text(ScheduleEngine.hourLabel($0)).tag($0) }
                     }
-                    .labelsHidden().accessibilityLabel("Active hours end")
+                    .labelsHidden().accessibilityLabel(L10n.localized("Active hours end"))
                 }
                 .disabled(!store.settings.scheduleEnabled)
                 if store.settings.scheduleEnabled { scheduleStatusRow }
                 Text(
-                    "During these hours Decaffeinate stands down — it won't force sleep, so a long task or your own work is never cut off. macOS's own sleep still applies. Set the end earlier than the start for an overnight window."
+                    L10n.localized(
+                        "During these hours Decaffeinate stands down — it won't force sleep, so a long task or your own work is never cut off. macOS's own sleep still applies. Set the end earlier than the start for an overnight window."
+                    )
                 )
                 .settingsCaption()
             }
 
-            Section("Quiet window") {
+            Section(L10n.localized("Quiet window")) {
                 if let until = appState.quietUntil, appState.isQuietWindowActive {
                     HStack {
                         if let paused = appState.quietWindowPausedReason {
                             Label(
-                                "Paused — \(paused)", systemImage: "exclamationmark.triangle.fill"
+                                L10n.localized("Paused — %@", paused),
+                                systemImage: "exclamationmark.triangle.fill"
                             )
                             .foregroundStyle(Color.warning)
                         } else {
                             Label(
-                                "Holding awake until \(ScheduleEngine.timeLabel(until))",
+                                L10n.localized(
+                                    "Holding awake until %@", ScheduleEngine.timeLabel(until)),
                                 systemImage: "clock.fill")
                         }
                         Spacer()
-                        Button("Cancel") { appState.clearQuietWindow() }
+                        Button(L10n.localized("Cancel")) { appState.clearQuietWindow() }
                     }
                 } else {
                     Text(
-                        "No quiet window active. Start one any time from the menu's “Stay awake until…”."
+                        L10n.localized(
+                            "No quiet window active. Start one any time from the menu's “Stay awake until…”."
+                        )
                     )
                     .settingsCaption()
                 }
@@ -361,7 +421,7 @@ private struct ScheduleSettings: View {
         let st = store.settings
         if st.activeHoursStart == st.activeHoursEnd {
             Label(
-                "Start and end are the same — this schedule does nothing.",
+                L10n.localized("Start and end are the same — this schedule does nothing."),
                 systemImage: "exclamationmark.triangle"
             )
             .font(.caption).foregroundStyle(Color.warning)
@@ -369,13 +429,17 @@ private struct ScheduleSettings: View {
             Date(), start: st.activeHoursStart, end: st.activeHoursEnd)
         {
             Label(
-                "Active now — auto-sleep is paused until \(ScheduleEngine.hourLabel(st.activeHoursEnd))",
+                L10n.localized(
+                    "Active now — auto-sleep is paused until %@",
+                    ScheduleEngine.hourLabel(st.activeHoursEnd)),
                 systemImage: "pause.circle.fill"
             )
             .font(.caption).foregroundStyle(Color.positive)
         } else {
             Label(
-                "Outside active hours — auto-sleep is on. Next pause at \(ScheduleEngine.hourLabel(st.activeHoursStart)).",
+                L10n.localized(
+                    "Outside active hours — auto-sleep is on. Next pause at %@.",
+                    ScheduleEngine.hourLabel(st.activeHoursStart)),
                 systemImage: "checkmark.circle"
             )
             .font(.caption).foregroundStyle(.secondary)
@@ -393,10 +457,12 @@ private struct AutomationSettings: View {
 
     var body: some View {
         Form {
-            Section("Keep awake while…") {
+            Section(L10n.localized("Keep awake while…")) {
                 if store.settings.triggers.isEmpty {
                     Text(
-                        "No triggers yet. Add one below to keep the Mac awake whenever a condition holds — the battery floor and backpack guard still override it."
+                        L10n.localized(
+                            "No triggers yet. Add one below to keep the Mac awake whenever a condition holds — the battery floor and backpack guard still override it."
+                        )
                     )
                     .settingsCaption()
                 }
@@ -408,7 +474,8 @@ private struct AutomationSettings: View {
                             .foregroundStyle(rule.enabled ? Color.ink1 : Color.ink4)
                         Spacer()
                         if let reason = appState.activeTriggerReason, rule.enabled, isActive(rule) {
-                            HarfPill(label: "Active", variant: .live, dot: true).help(reason)
+                            HarfPill(label: L10n.localized("Active"), variant: .live, dot: true)
+                                .help(reason)
                         }
                         Button(role: .destructive) {
                             remove(rule)
@@ -416,50 +483,61 @@ private struct AutomationSettings: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
-                        .accessibilityLabel("Remove trigger: \(rule.condition.label)")
+                        .accessibilityLabel(
+                            L10n.localized("Remove trigger: %@", rule.condition.label))
                     }
                 }
             }
 
-            Section("Add a trigger") {
+            Section(L10n.localized("Add a trigger")) {
                 HStack {
-                    TextField("App name (e.g. Zoom, Final Cut Pro)", text: $newAppName)
-                        .onSubmit(addApp)
-                    Button("Add") { addApp() }
+                    TextField(
+                        L10n.localized("App name (e.g. Zoom, Final Cut Pro)"), text: $newAppName
+                    )
+                    .onSubmit(addApp)
+                    Button(L10n.localized("Add")) { addApp() }
                         .disabled(newAppName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-                Button("While on AC power") { add(.onACPower) }
+                Button(L10n.localized("While on AC power")) { add(.onACPower) }
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack {
                         LabeledSlider(
-                            "Keep awake when CPU above",
+                            L10n.localized("Keep awake when CPU above"),
                             value: $cpuThreshold,
                             range: 10...90, step: 5, unit: "%", width: 44)
-                        Button("Add") { add(.cpuAbove(Int(cpuThreshold))) }
+                        Button(L10n.localized("Add")) { add(.cpuAbove(Int(cpuThreshold))) }
                             .buttonStyle(HarfButtonStyle(variant: .ghost, size: .small))
                             .fixedSize()
                             .disabled(hasCpuAboveTrigger)
                     }
                     Text(
                         hasCpuAboveTrigger
-                            ? "A CPU trigger is already active — remove it first to change the threshold."
-                            : "Holds the Mac awake while any process pushes total CPU above this threshold. The battery floor and backpack guard still override it."
+                            ? L10n.localized(
+                                "A CPU trigger is already active — remove it first to change the threshold."
+                            )
+                            : L10n.localized(
+                                "Holds the Mac awake while any process pushes total CPU above this threshold. The battery floor and backpack guard still override it."
+                            )
                     )
                     .settingsCaption()
                 }
             }
 
-            Section("App sleep permissions") {
+            Section(L10n.localized("App sleep permissions")) {
                 Text(
-                    "Choices you\u{2019}ve made from the menu. "
-                        + "\u{201C}Always allow\u{201D} lets an app hold the Mac awake; "
-                        + "\u{201C}Sleep anyway\u{201D} makes Decaffeinate force sleep regardless."
+                    L10n.localized(
+                        "Choices you\u{2019}ve made from the menu. "
+                            + "\u{201C}Always allow\u{201D} lets an app hold the Mac awake; "
+                            + "\u{201C}Sleep anyway\u{201D} makes Decaffeinate force sleep regardless."
+                    )
                 )
                 .settingsCaption()
                 if rules.rules.isEmpty {
                     Text(
-                        "Choose \u{201C}Always allow\u{201D} or \u{201C}Sleep anyway\u{201D} "
-                            + "for an app from the menu and it\u{2019}ll show up here."
+                        L10n.localized(
+                            "Choose \u{201C}Always allow\u{201D} or \u{201C}Sleep anyway\u{201D} "
+                                + "for an app from the menu and it\u{2019}ll show up here."
+                        )
                     )
                     .settingsCaption()
                 } else {
@@ -472,7 +550,7 @@ private struct AutomationSettings: View {
                             }
                             Spacer()
                             HarfPill(
-                                label: rule.policy.shortLabel,
+                                label: L10n.localized(rule.policy.shortLabel),
                                 variant: rule.policy.isCurrentlyAllowing ? .positive : .neutral)
                             Button(role: .destructive) {
                                 rules.remove(rule)
@@ -480,22 +558,26 @@ private struct AutomationSettings: View {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.borderless)
-                            .accessibilityLabel("Remove rule: \(rule.displayName)")
+                            .accessibilityLabel(L10n.localized("Remove rule: %@", rule.displayName))
                         }
                     }
                     ConfirmableDestructiveButton(
-                        title: "Clear all rules", confirmLabel: "Clear all rules",
-                        message: "Remove every app sleep permission? This can\u{2019}t be undone."
+                        title: L10n.localized("Clear all rules"),
+                        confirmLabel: L10n.localized("Clear all rules"),
+                        message: L10n.localized(
+                            "Remove every app sleep permission? This can\u{2019}t be undone.")
                     ) { rules.removeAll() }
                 }
             }
 
-            Section("AI agents") {
+            Section(L10n.localized("AI agents")) {
                 Toggle(
-                    "Auto-sleep when a watched agent finishes",
+                    L10n.localized("Auto-sleep when a watched agent finishes"),
                     isOn: $store.settings.autoSleepWhenAgentFinishes)
                 Text(
-                    "When an AI agent (Claude Code, Cursor…) keeps the Mac awake until its task is done, watch it automatically and sleep once it finishes. Otherwise the menu just offers a one-click watch."
+                    L10n.localized(
+                        "When an AI agent (Claude Code, Cursor…) keeps the Mac awake until its task is done, watch it automatically and sleep once it finishes. Otherwise the menu just offers a one-click watch."
+                    )
                 )
                 .settingsCaption()
             }
@@ -505,15 +587,18 @@ private struct AutomationSettings: View {
             // any other switch on the page.
             Section {
                 Toggle(
-                    "Let Decaffeinate decide every sleep", isOn: $store.settings.strictTakeoverMode)
+                    L10n.localized("Let Decaffeinate decide every sleep"),
+                    isOn: $store.settings.strictTakeoverMode)
                 Text(
-                    "Decaffeinate becomes the only thing that decides when your Mac sleeps — macOS won't idle-sleep on its own. If Decaffeinate ever quits, normal sleep resumes automatically."
+                    L10n.localized(
+                        "Decaffeinate becomes the only thing that decides when your Mac sleeps — macOS won't idle-sleep on its own. If Decaffeinate ever quits, normal sleep resumes automatically."
+                    )
                 )
                 .settingsCaption()
             } header: {
                 HStack(spacing: Space.s2) {
-                    Text("Take full control of sleep")
-                    HarfPill(label: "Advanced", variant: .warning)
+                    Text(L10n.localized("Take full control of sleep"))
+                    HarfPill(label: L10n.localized("Advanced"), variant: .warning)
                 }
             }
         }
@@ -580,7 +665,7 @@ private struct FreshnessSettings: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: Space.s1) {
-                    Text("Up \(appState.uptimeLabel ?? "—") since last restart")
+                    Text(L10n.localized("Up %@ since last restart", appState.uptimeLabel ?? "—"))
                         .font(HarfFont.title).foregroundStyle(Color.ink1)
                     Label {
                         Text(
@@ -595,13 +680,13 @@ private struct FreshnessSettings: View {
                 .padding(.vertical, Space.s1)
             }
 
-            Section("Last rest") {
-                restRow("Last sleep", restHistory.lastSystemSleep?.date)
-                restRow("Last screen rest", restHistory.lastDisplayOff?.date)
-                restRow("Last restart", restHistory.lastRestart?.date)
+            Section(L10n.localized("Last rest")) {
+                restRow(L10n.localized("Last sleep"), restHistory.lastSystemSleep?.date)
+                restRow(L10n.localized("Last screen rest"), restHistory.lastDisplayOff?.date)
+                restRow(L10n.localized("Last restart"), restHistory.lastRestart?.date)
                 if let wake = lastWakeReason {
                     HStack {
-                        Text("Last wake")
+                        Text(L10n.localized("Last wake"))
                         Spacer()
                         Text(wake).foregroundStyle(Color.ink2)
                     }
@@ -609,49 +694,60 @@ private struct FreshnessSettings: View {
             }
 
             if let digest = appState.restDigest {
-                Section("While you were away") {
+                Section(L10n.localized("While you were away")) {
                     Label(digest, systemImage: "moon.stars")
                         .font(HarfFont.body).foregroundStyle(Color.ink2)
                 }
             }
 
-            Section("Recommendation") {
+            Section(L10n.localized("Recommendation")) {
                 LabeledSlider(
-                    "Recommend a restart after",
+                    L10n.localized("Recommend a restart after"),
                     value: Binding(
                         get: { Double(store.settings.restartRecommendationDays) },
                         set: { store.settings.restartRecommendationDays = Int($0) }),
-                    range: 1...30, unit: "days", width: 56)
+                    range: 1...30, unit: L10n.localized("days"), width: 56)
                 Text(
-                    "Most experts suggest restarting about weekly. A hard reminder still appears near macOS's ~49-day uptime limit, where networking can fail."
+                    L10n.localized(
+                        "Most experts suggest restarting about weekly. A hard reminder still appears near macOS's ~49-day uptime limit, where networking can fail."
+                    )
                 )
                 .settingsCaption()
             }
 
-            Section("What each one does") {
+            Section(L10n.localized("What each one does")) {
                 stateCard(
-                    "Display off",
-                    "Only the screen sleeps — everything keeps running. Refreshes nothing.")
+                    L10n.localized("Display off"),
+                    L10n.localized(
+                        "Only the screen sleeps — everything keeps running. Refreshes nothing."))
                 stateCard(
-                    "Sleep",
-                    "Pauses the Mac with your work held in RAM (~0.21 W on Apple silicon). Instant wake — but it doesn't clear memory leaks, caches, or stuck state."
+                    L10n.localized("Sleep"),
+                    L10n.localized(
+                        "Pauses the Mac with your work held in RAM (~0.21 W on Apple silicon). Instant wake — but it doesn't clear memory leaks, caches, or stuck state."
+                    )
                 )
                 stateCard(
-                    "Restart",
-                    "Resets the Mac: clears RAM and caches, resets the kernel, WindowServer and network, and applies pending updates. Sleep can't do this — aim for about weekly."
+                    L10n.localized("Restart"),
+                    L10n.localized(
+                        "Resets the Mac: clears RAM and caches, resets the kernel, WindowServer and network, and applies pending updates. Sleep can't do this — aim for about weekly."
+                    )
                 )
                 stateCard(
-                    "Shut down",
-                    "Clears everything and powers off — best for long storage or travel. For daily use, sleep + a weekly restart keeps a Mac fresh."
+                    L10n.localized("Shut down"),
+                    L10n.localized(
+                        "Clears everything and powers off — best for long storage or travel. For daily use, sleep + a weekly restart keeps a Mac fresh."
+                    )
                 )
                 Text(
-                    "A healthy Mac rests: sleep it daily, restart it about weekly. Sources: Apple Support, Macworld, Intego, Eclectic Light, Tom's Hardware."
+                    L10n.localized(
+                        "A healthy Mac rests: sleep it daily, restart it about weekly. Sources: Apple Support, Macworld, Intego, Eclectic Light, Tom's Hardware."
+                    )
                 )
                 .settingsCaption()
             }
 
             if !restHistory.events.isEmpty {
-                Section("Recent activity") {
+                Section(L10n.localized("Recent activity")) {
                     ForEach(restHistory.events.prefix(12)) { event in
                         HStack(spacing: Space.s2) {
                             Image(systemName: event.kind.symbol)
@@ -663,8 +759,10 @@ private struct FreshnessSettings: View {
                         }
                     }
                     ConfirmableDestructiveButton(
-                        title: "Clear activity", confirmLabel: "Clear activity",
-                        message: "Clear the recent rest activity log? This can\u{2019}t be undone."
+                        title: L10n.localized("Clear activity"),
+                        confirmLabel: L10n.localized("Clear activity"),
+                        message: L10n.localized(
+                            "Clear the recent rest activity log? This can\u{2019}t be undone.")
                     ) { restHistory.clear() }
                 }
             }
@@ -719,26 +817,39 @@ private struct HistorySettings: View {
         VStack(alignment: .leading, spacing: 0) {
             if history.events.isEmpty && weeklyRanking.isEmpty {
                 ContentUnavailableView(
-                    "No history yet",
+                    L10n.localized("No history yet"),
                     systemImage: "moon.zzz",
                     description: Text(
-                        "When Decaffeinate forces your Mac to sleep, or an app holds it awake, it shows up here."
+                        L10n.localized(
+                            "When Decaffeinate forces your Mac to sleep, or an app holds it awake, it shows up here."
+                        )
                     )
                 )
             } else {
                 if !history.events.isEmpty {
                     VStack(alignment: .leading, spacing: Space.s1) {
                         Text(
-                            "\(history.events.count) forced sleep\(history.events.count == 1 ? "" : "s") · \(history.batteryCount) on battery"
+                            history.events.count == 1
+                                ? L10n.localized(
+                                    "1 forced sleep · %d on battery", history.batteryCount)
+                                : L10n.localized(
+                                    "%d forced sleeps · %d on battery", history.events.count,
+                                    history.batteryCount)
                         )
                         .font(HarfFont.title).foregroundStyle(Color.ink1)
                         Text(
-                            "≈ \(history.measuredMinutesAsleep) min of measured sleep started by Decaffeinate."
+                            L10n.localized(
+                                "≈ %d min of measured sleep started by Decaffeinate.",
+                                history.measuredMinutesAsleep)
                         )
                         .font(.caption).foregroundStyle(Color.ink3)
                         if history.unmeasuredSleepCount > 0 {
                             Text(
-                                "\(history.unmeasuredSleepCount) sleep\(history.unmeasuredSleepCount == 1 ? "" : "s") not yet measured."
+                                history.unmeasuredSleepCount == 1
+                                    ? L10n.localized("1 sleep not yet measured.")
+                                    : L10n.localized(
+                                        "%d sleeps not yet measured.",
+                                        history.unmeasuredSleepCount)
                             )
                             .font(.caption).foregroundStyle(Color.ink3)
                         }
@@ -751,7 +862,7 @@ private struct HistorySettings: View {
                 // share the same scrollable area within the fixed-size window.
                 List {
                     if !history.events.isEmpty {
-                        Section("Forced sleeps") {
+                        Section(L10n.localized("Forced sleeps")) {
                             ForEach(history.events) { event in
                                 HStack(spacing: Space.s2) {
                                     Image(systemName: event.onBattery ? "battery.50" : "powerplug")
@@ -770,7 +881,7 @@ private struct HistorySettings: View {
                         }
                     }
                     if !weeklyRanking.isEmpty {
-                        Section("This week \u{2014} longest awake") {
+                        Section(L10n.localized("This week \u{2014} longest awake")) {
                             ForEach(weeklyRanking, id: \.appName) { entry in
                                 HStack(spacing: Space.s2) {
                                     Image(systemName: "hourglass")
@@ -788,15 +899,18 @@ private struct HistorySettings: View {
                     Spacer()
                     if !weeklyRanking.isEmpty {
                         ConfirmableDestructiveButton(
-                            title: "Clear weekly awake time",
-                            confirmLabel: "Clear weekly awake time",
-                            message: "Clear the weekly awake-time tally? This can\u{2019}t be undone."
+                            title: L10n.localized("Clear weekly awake time"),
+                            confirmLabel: L10n.localized("Clear weekly awake time"),
+                            message: L10n.localized(
+                                "Clear the weekly awake-time tally? This can\u{2019}t be undone.")
                         ) { awakeTime.clear() }
                     }
                     if !history.events.isEmpty {
                         ConfirmableDestructiveButton(
-                            title: "Clear history", confirmLabel: "Clear history",
-                            message: "Clear the forced-sleep history? This can\u{2019}t be undone."
+                            title: L10n.localized("Clear history"),
+                            confirmLabel: L10n.localized("Clear history"),
+                            message: L10n.localized(
+                                "Clear the forced-sleep history? This can\u{2019}t be undone.")
                         ) { history.clear() }
                     }
                 }
@@ -866,7 +980,7 @@ private struct AboutView: View {
 
     @ViewBuilder private var softwareUpdate: some View {
         VStack(spacing: Space.s2) {
-            Text("Version \(AppInfo.version)").eyebrow(.ink4)
+            Text(L10n.localized("Version %@", AppInfo.version)).eyebrow(.ink4)
             if updater.isAvailable {
                 updateStatusRow
                 Toggle(
@@ -884,10 +998,10 @@ private struct AboutView: View {
         case .idle:
             VStack(spacing: Space.s1) {
                 if updater.lastCheckedAt == nil {
-                    Text("Not checked yet")
+                    Text(L10n.localized("Not checked yet"))
                         .font(HarfFont.caption).foregroundStyle(Color.ink3)
                 } else {
-                    Text("Last checked: \(lastChecked)")
+                    Text(L10n.localized("Last checked: %@", lastChecked))
                         .font(HarfFont.caption).foregroundStyle(Color.ink3)
                 }
                 Button(L10n.localized("Check for Updates…")) {
@@ -898,14 +1012,14 @@ private struct AboutView: View {
         case .checking:
             HStack(spacing: Space.s2) {
                 ProgressView().scaleEffect(0.7)
-                HarfPill(label: "Checking", variant: .info)
+                HarfPill(label: L10n.localized("Checking"), variant: .info)
             }
             .frame(minHeight: 32)
         case .upToDate:
             VStack(spacing: Space.s1) {
                 HStack(spacing: Space.s2) {
-                    HarfPill(label: "Up to date", variant: .positive, dot: true)
-                    Text("· \(lastChecked)")
+                    HarfPill(label: L10n.localized("Up to date"), variant: .positive, dot: true)
+                    Text(L10n.localized("· %@", lastChecked))
                         .font(HarfFont.caption).foregroundStyle(Color.ink3)
                 }
                 Button(L10n.localized("Check for Updates…")) {
@@ -915,26 +1029,26 @@ private struct AboutView: View {
             }
         case .updateAvailable:
             VStack(spacing: Space.s1) {
-                HarfPill(label: "Update available", variant: .warning, dot: true)
-                Button("Install Update…") { updater.checkForUpdatesUserInitiated() }
+                HarfPill(label: L10n.localized("Update available"), variant: .warning, dot: true)
+                Button(L10n.localized("Install Update…")) { updater.checkForUpdatesUserInitiated() }
                     .padding(.top, 2)
             }
         case .failed(let reason):
             VStack(spacing: Space.s1) {
-                HarfPill(label: "Couldn't check", variant: .critical, dot: true)
+                HarfPill(label: L10n.localized("Couldn't check"), variant: .critical, dot: true)
                     .help(reason)
-                    .accessibilityLabel("Update check failed: \(reason)")
+                    .accessibilityLabel(L10n.localized("Update check failed: %@", reason))
                 Text(reason)
                     .font(HarfFont.caption).foregroundStyle(Color.ink3)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Try Again") { updater.checkForUpdatesUserInitiated() }
+                Button(L10n.localized("Try Again")) { updater.checkForUpdatesUserInitiated() }
                     .padding(.top, 2)
             }
         }
     }
 
     private var lastChecked: String {
-        guard let date = updater.lastCheckedAt else { return "Never" }
+        guard let date = updater.lastCheckedAt else { return L10n.localized("Never") }
         return Format.relative(since: date)
     }
 }

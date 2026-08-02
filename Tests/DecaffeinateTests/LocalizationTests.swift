@@ -56,4 +56,51 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(de.localizedString(forKey: "Skip", value: "␀", table: nil), "Überspringen")
         XCTAssertEqual(de.localizedString(forKey: "Next", value: "␀", table: nil), "Weiter")
     }
+
+    // v1.25 "Fluent": proof that the v1.25 sweep's newly-wired keys — spanning
+    // the menu, Settings, the SleepOutlook verdict source, notifications, and
+    // the CLI — actually resolve to real German values in Bundle.module,
+    // covering both plain keys and the format-string keys used for dynamic
+    // copy (interpolated via `L10n.localized(_:_:)` / `String(format:)`).
+    func testV125NewKeysResolveInGerman() throws {
+        let deURL = try XCTUnwrap(
+            L10n.bundle.url(forResource: "de", withExtension: "lproj"),
+            "de.lproj not found in Bundle.module")
+        let de = try XCTUnwrap(Bundle(url: deURL))
+        func localized(_ key: String) -> String {
+            de.localizedString(forKey: key, value: "␀", table: nil)
+        }
+
+        // Views/MenuRedesign.swift
+        XCTAssertEqual(localized("Sleep Now"), "Jetzt schlafen")
+        XCTAssertEqual(localized("Settings"), "Einstellungen")
+        XCTAssertEqual(localized("Cancel"), "Abbrechen")
+
+        // Views/SettingsView.swift (General + Notifications panes)
+        XCTAssertEqual(localized("Auto-sleep when left idle"), "Automatisch schlafen bei Leerlauf")
+        XCTAssertEqual(localized("General"), "Allgemein")
+
+        // Core/SleepOutlook.swift — plain and format-string keys
+        XCTAssertEqual(localized("Free to sleep"), "Kann schlafen")
+        XCTAssertEqual(
+            String(format: localized("Your Mac will sleep %@"), "in ~10 Min."),
+            "Dein Mac schläft in ~10 Min.")
+
+        // Core/ReasonEngine.swift
+        XCTAssertEqual(localized("Microphone in use"), "Mikrofon in Benutzung")
+
+        // Core/Notifier.swift — a format-string notification template
+        XCTAssertEqual(
+            String(format: localized("%@ is keeping your Mac awake"), "Zoom"),
+            "Zoom hält deinen Mac wach")
+
+        // Core/CLI.swift — human CLI output (never the JSON contract)
+        XCTAssertEqual(localized("USAGE:"), "VERWENDUNG:")
+        XCTAssertEqual(
+            String(format: localized("This Mac is free to sleep. Idle %ds."), 42),
+            "Dieser Mac kann schlafen. Leerlauf 42s.")
+
+        // Views/ClamshellAssistantView.swift
+        XCTAssertEqual(localized("Arm clamshell session"), "Clamshell-Sitzung aktivieren")
+    }
 }

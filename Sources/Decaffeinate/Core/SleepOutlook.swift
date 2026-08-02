@@ -93,8 +93,8 @@ enum SleepBlocker: Equatable, Sendable {
     /// The hero headline when this blocker holds off sleep (state 4).
     var heroHeadline: String {
         switch self {
-        case .activeHours: return "Auto-sleep paused"
-        default: return "Won\u{2019}t sleep yet"
+        case .activeHours: return L10n.localized("Auto-sleep paused")
+        default: return L10n.localized("Won\u{2019}t sleep yet")
         }
     }
 
@@ -102,18 +102,24 @@ enum SleepBlocker: Equatable, Sendable {
     var subline: String {
         switch self {
         case .call:
-            return "You\u{2019}re on a call \u{2014} it\u{2019}ll sleep when your mic frees up"
-        case .media: return "Media is playing \u{2014} it\u{2019}ll sleep once that stops"
-        case .timeMachine: return "Finishing a Time Machine backup first"
-        case .systemUpdate: return "Installing a macOS update first"
-        case .allowedApps(let x): return "You allowed \(x) to keep it awake"
+            return L10n.localized("You\u{2019}re on a call \u{2014} it\u{2019}ll sleep when your mic frees up")
+        case .media: return L10n.localized("Media is playing \u{2014} it\u{2019}ll sleep once that stops")
+        case .timeMachine: return L10n.localized("Finishing a Time Machine backup first")
+        case .systemUpdate: return L10n.localized("Installing a macOS update first")
+        case .allowedApps(let x):
+            return L10n.localized("You allowed %@ to keep it awake", x)
         case .activeHours(let x):
-            let window = x.isEmpty ? "" : " (\(x))"
-            return
-                "Standing down within your active hours\(window) \u{2014} macOS\u{2019}s own sleep still applies"
-        case .batteryFloor: return "Low battery \u{2014} macOS handles sleep from here"
-        case .thermal: return "Cooling down \u{2014} keep-awake dropped"
-        case .lowBattery: return "Battery critically low"
+            if x.isEmpty {
+                return L10n.localized(
+                    "Standing down within your active hours \u{2014} macOS\u{2019}s own sleep still applies"
+                )
+            }
+            return L10n.localized(
+                "Standing down within your active hours (%@) \u{2014} macOS\u{2019}s own sleep still applies",
+                x)
+        case .batteryFloor: return L10n.localized("Low battery \u{2014} macOS handles sleep from here")
+        case .thermal: return L10n.localized("Cooling down \u{2014} keep-awake dropped")
+        case .lowBattery: return L10n.localized("Battery critically low")
         case .other(let s): return s
         }
     }
@@ -121,15 +127,15 @@ enum SleepBlocker: Equatable, Sendable {
     /// A short reason for the compact banner / row ("on a call").
     var rowReason: String {
         switch self {
-        case .call: return "on a call"
-        case .media: return "media playing"
-        case .timeMachine: return "backup running"
-        case .systemUpdate: return "update installing"
-        case .allowedApps: return "you allowed it"
-        case .activeHours: return "your active hours"
-        case .batteryFloor: return "low battery"
-        case .thermal: return "cooling down"
-        case .lowBattery: return "battery critically low"
+        case .call: return L10n.localized("on a call")
+        case .media: return L10n.localized("media playing")
+        case .timeMachine: return L10n.localized("backup running")
+        case .systemUpdate: return L10n.localized("update installing")
+        case .allowedApps: return L10n.localized("you allowed it")
+        case .activeHours: return L10n.localized("your active hours")
+        case .batteryFloor: return L10n.localized("low battery")
+        case .thermal: return L10n.localized("cooling down")
+        case .lowBattery: return L10n.localized("battery critically low")
         case .other(let s): return s
         }
     }
@@ -211,49 +217,58 @@ extension SleepOutlook {
     // MARK: Header projection
 
     private static func idlePhrase(_ minutes: Int, batteryNote: Bool) -> String {
-        "~\(minutes) min after you step away" + (batteryNote ? " (on battery)" : "")
+        batteryNote
+            ? L10n.localized("~%d min after you step away (on battery)", minutes)
+            : L10n.localized("~%d min after you step away", minutes)
     }
 
     private static func holdsPhrase(_ count: Int) -> String {
         count == 1
-            ? "1 app is holding it awake now \u{2014} auto-sleep will override it"
-            : "\(count) apps holding now \u{2014} auto-sleep will override them"
+            ? L10n.localized("1 app is holding it awake now \u{2014} auto-sleep will override it")
+            : L10n.localized("%d apps holding now \u{2014} auto-sleep will override them", count)
     }
 
     var headline: String {
         switch self {
-        case .freeToSleep: return "Free to sleep"
+        case .freeToSleep: return L10n.localized("Free to sleep")
         case .willSleepAfterIdle(let m, let note, _):
-            return "Your Mac will sleep \(Self.idlePhrase(m, batteryNote: note))"
-        case .sleepingSoon(let s, _): return "Sleeping in \(Format.countdown(s))"
+            return L10n.localized("Your Mac will sleep %@", Self.idlePhrase(m, batteryNote: note))
+        case .sleepingSoon(let s, _):
+            return L10n.localized("Sleeping in %@", Format.countdown(s))
         case .heldByBlocker(let b): return b.heroHeadline
-        case .autoSleepOff: return "Auto-sleep is off"
-        case .keepingAwake(.manual): return "Keeping your Mac awake"
+        case .autoSleepOff: return L10n.localized("Auto-sleep is off")
+        case .keepingAwake(.manual): return L10n.localized("Keeping your Mac awake")
         case .keepingAwake(.quietWindow(let until)):
-            return "Awake until \(ScheduleEngine.timeLabel(until))"
-        case .keepingAwake(.trigger): return "Keeping your Mac awake"
-        case .keepAwakePaused: return "Quiet window paused"
-        case .protectiveSleep: return "Sleeping now to protect your Mac"
+            return L10n.localized("Awake until %@", ScheduleEngine.timeLabel(until))
+        case .keepingAwake(.trigger): return L10n.localized("Keeping your Mac awake")
+        case .keepAwakePaused: return L10n.localized("Quiet window paused")
+        case .protectiveSleep: return L10n.localized("Sleeping now to protect your Mac")
         }
     }
 
     var subline: String {
         switch self {
         case .freeToSleep(let m, let note):
-            return "Sleeps \(Self.idlePhrase(m, batteryNote: note))"
+            return L10n.localized("Sleeps %@", Self.idlePhrase(m, batteryNote: note))
         case .willSleepAfterIdle(_, _, let count): return Self.holdsPhrase(count)
         case .sleepingSoon(_, let overriding):
             return overriding == 0
-                ? "You stepped away \u{2014} winding down"
-                : "Overriding \(overriding) sleep block\(overriding == 1 ? "" : "s") \u{2014} sleeping anyway"
+                ? L10n.localized("You stepped away \u{2014} winding down")
+                : (overriding == 1
+                    ? L10n.localized("Overriding %d sleep block \u{2014} sleeping anyway", overriding)
+                    : L10n.localized(
+                        "Overriding %d sleep blocks \u{2014} sleeping anyway", overriding))
         case .heldByBlocker(let b): return b.subline
         case .autoSleepOff:
-            return
+            return L10n.localized(
                 "Your Mac won\u{2019}t sleep on its own \u{2014} overheating & critical-battery guards still apply"
+            )
         case .keepingAwake(.manual(let displayStaysOn)):
-            return displayStaysOn ? "Display stays on too" : "Display can still sleep"
-        case .keepingAwake(.quietWindow): return "Quiet window \u{2014} auto-sleep paused"
-        case .keepingAwake(.trigger(let r)): return "Trigger \u{2014} \(r)"
+            return displayStaysOn
+                ? L10n.localized("Display stays on too") : L10n.localized("Display can still sleep")
+        case .keepingAwake(.quietWindow):
+            return L10n.localized("Quiet window \u{2014} auto-sleep paused")
+        case .keepingAwake(.trigger(let r)): return L10n.localized("Trigger \u{2014} %@", r)
         case .keepAwakePaused(let reason): return reason
         case .protectiveSleep(let reason): return reason
         }
@@ -303,39 +318,46 @@ extension SleepOutlook {
         case .willSleepAfterIdle(let m, let note, _):
             return SleepVerdict(
                 glyph: "checkmark",
-                text:
-                    "Your Mac will sleep \(Self.idlePhrase(m, batteryNote: note)) \u{2014} these holds don\u{2019}t stop it",
+                text: L10n.localized(
+                    "Your Mac will sleep %@ \u{2014} these holds don\u{2019}t stop it",
+                    Self.idlePhrase(m, batteryNote: note)),
                 tone: .calm)
         case .sleepingSoon(let s, _):
             return SleepVerdict(
                 glyph: "moon.zzz.fill",
-                text: "Sleeping in \(Format.countdown(s)) \u{2014} overriding these holds",
+                text: L10n.localized(
+                    "Sleeping in %@ \u{2014} overriding these holds", Format.countdown(s)),
                 tone: .positive)
         case .heldByBlocker(let b):
             return anyIndefinite
                 ? SleepVerdict(
                     glyph: "exclamationmark.triangle",
-                    text: "Won\u{2019}t sleep on its own \u{2014} \(b.rowReason)", tone: .warning)
+                    text: L10n.localized("Won\u{2019}t sleep on its own \u{2014} %@", b.rowReason),
+                    tone: .warning)
                 : SleepVerdict(
-                    glyph: "checkmark", text: "Your Mac will sleep when these finish", tone: .calm)
+                    glyph: "checkmark",
+                    text: L10n.localized("Your Mac will sleep when these finish"), tone: .calm)
         case .autoSleepOff:
             return anyIndefinite
                 ? SleepVerdict(
                     glyph: "exclamationmark.triangle",
-                    text: "Auto-sleep is off \u{2014} these holds will keep your Mac awake",
+                    text: L10n.localized("Auto-sleep is off \u{2014} these holds will keep your Mac awake"),
                     tone: .warning)
                 : SleepVerdict(
                     glyph: "checkmark",
-                    text: "These holds end on their own \u{2014} your Mac will sleep after",
+                    text: L10n.localized(
+                        "These holds end on their own \u{2014} your Mac will sleep after"),
                     tone: .calm)
         case .keepingAwake:
             return SleepVerdict(
                 glyph: "bolt.fill",
-                text: "You\u{2019}re keeping your Mac awake \u{2014} these are allowed to hold on",
+                text: L10n.localized(
+                    "You\u{2019}re keeping your Mac awake \u{2014} these are allowed to hold on"),
                 tone: .positive)
         case .keepAwakePaused:
             return SleepVerdict(
-                glyph: "checkmark", text: "Your Mac will sleep \u{2014} quiet window paused",
+                glyph: "checkmark",
+                text: L10n.localized("Your Mac will sleep \u{2014} quiet window paused"),
                 tone: .calm)
         case .freeToSleep, .protectiveSleep:
             return nil
@@ -366,40 +388,46 @@ extension SleepOutlook {
         switch lifetime {
         case .untilProcess(let name):
             return SleepVerdict(
-                glyph: "checkmark", text: "Will sleep when \(name) finishes", tone: .calm)
+                glyph: "checkmark", text: L10n.localized("Will sleep when %@ finishes", name),
+                tone: .calm)
         case .untilWatchedFinishes:
             return SleepVerdict(
-                glyph: "checkmark", text: "Will sleep when the watched task finishes", tone: .calm)
+                glyph: "checkmark",
+                text: L10n.localized("Will sleep when the watched task finishes"), tone: .calm)
         case .timed(let reArms):
             return SleepVerdict(
                 glyph: "checkmark",
                 text: reArms
-                    ? "Will sleep shortly after your agent finishes" : "Auto-releases on a timer",
+                    ? L10n.localized("Will sleep shortly after your agent finishes")
+                    : L10n.localized("Auto-releases on a timer"),
                 tone: .calm)
         case .indefinite:
             switch self {
             case .heldByBlocker(let b):
                 return SleepVerdict(
                     glyph: "exclamationmark.triangle",
-                    text: "Won\u{2019}t sleep yet \u{2014} \(b.rowReason)",
+                    text: L10n.localized("Won\u{2019}t sleep yet \u{2014} %@", b.rowReason),
                     tone: .warning)
             case .autoSleepOff:
                 return SleepVerdict(
                     glyph: "exclamationmark.triangle",
-                    text: "Won\u{2019}t sleep \u{2014} auto-sleep is off",
+                    text: L10n.localized("Won\u{2019}t sleep \u{2014} auto-sleep is off"),
                     tone: .warning)
             case .keepingAwake:
                 return SleepVerdict(
-                    glyph: "bolt.fill", text: "Held \u{2014} you\u{2019}re keeping the Mac awake",
+                    glyph: "bolt.fill",
+                    text: L10n.localized("Held \u{2014} you\u{2019}re keeping the Mac awake"),
                     tone: .positive)
             case .keepAwakePaused:
                 return SleepVerdict(
-                    glyph: "checkmark", text: "Will sleep \u{2014} quiet window paused", tone: .calm
+                    glyph: "checkmark", text: L10n.localized("Will sleep \u{2014} quiet window paused"),
+                    tone: .calm
                 )
             default:
                 // States 1/2/3/protectiveSleep — the engine overrides after idle.
                 return SleepVerdict(
-                    glyph: "checkmark", text: "Will sleep after you step away", tone: .calm)
+                    glyph: "checkmark", text: L10n.localized("Will sleep after you step away"),
+                    tone: .calm)
             }
         }
     }
