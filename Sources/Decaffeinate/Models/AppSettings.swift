@@ -88,6 +88,12 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// a forced sleep is approaching. Off by default to keep the menu bar quiet.
     var showMenuBarCountdown: Bool = false
 
+    /// Show the live count of distinct apps holding the Mac awake next to the
+    /// menu-bar icon. Off by default, like the countdown above — a preference,
+    /// not part of the icon-legibility fix (unlike the per-state glyph work,
+    /// which is always on).
+    var showHolderCountInMenuBar: Bool = false
+
     /// Show a brief on-screen "Sleeping in Ns — Stay awake" warning before an
     /// *idle* force-sleep actually fires, so it's never a silent surprise. On by
     /// default — the scary moment (v1.22's whole point). Never applies to a
@@ -213,6 +219,9 @@ extension DecaffeinateSettings {
         if let v = try c.decodeIfPresent(Int.self, forKey: .activeHoursEnd) { activeHoursEnd = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarCountdown) {
             showMenuBarCountdown = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .showHolderCountInMenuBar) {
+            showHolderCountInMenuBar = v
         }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .showPreSleepWarning) {
             showPreSleepWarning = v

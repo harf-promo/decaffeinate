@@ -19,6 +19,7 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(s.autoSleepWhenAgentFinishes)
         XCTAssertFalse(s.hasSeenAwakeExplainer)
         XCTAssertEqual(s.restartRecommendationDays, 7)
+        XCTAssertFalse(s.showHolderCountInMenuBar, "a new v1.23 field must default to off, not wipe")
     }
 
     func testSettingsRoundTrip() throws {

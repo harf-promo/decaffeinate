@@ -107,14 +107,34 @@ extension AppState {
         settings.settings.hasSeenAwakeExplainer = true
         let rules = RulesEngine(defaults: defaults)
         let restHistory = RestHistoryStore(defaults: defaults)
+        let history = SleepHistoryStore(defaults: defaults)
+        let awakeTime = AwakeTimeStore(defaults: defaults)
         let now = Date()
         restHistory.record(RestEvent(date: now.addingTimeInterval(-9 * 86_400), kind: .restart))
         restHistory.record(RestEvent(date: now.addingTimeInterval(-3 * 3_600), kind: .systemSleep))
         restHistory.record(RestEvent(date: now.addingTimeInterval(-1_800), kind: .displayOff))
+        // Seed a couple of forced sleeps so the History pane's log isn't empty.
+        history.record(
+            SleepEvent(
+                date: now.addingTimeInterval(-3 * 3_600), reason: "Idle 10 min — putting Mac to sleep",
+                onBattery: true, sleptSeconds: 6 * 3_600))
+        history.record(
+            SleepEvent(
+                date: now.addingTimeInterval(-27 * 3_600), reason: "Sleep Now pressed",
+                onBattery: false))
+        // Seed a week of weekly awake-time so the "This week" ranking isn't empty.
+        for daysAgo in 0..<5 {
+            let day = now.addingTimeInterval(-Double(daysAgo) * 86_400)
+            awakeTime.record(appName: "Zoom", seconds: 5_400, date: day)
+            awakeTime.record(appName: "Google Chrome", seconds: 2_100, date: day)
+        }
+        awakeTime.record(appName: "caffeinate", seconds: 900, date: now)
         let state = AppState(
             settingsStore: settings,
             rulesEngine: rules,
+            history: history,
             restHistory: restHistory,
+            awakeTime: awakeTime,
             telemetry: PreviewSampler(),
             idleMonitor: PreviewIdle(),
             powerReader: PreviewPower(),

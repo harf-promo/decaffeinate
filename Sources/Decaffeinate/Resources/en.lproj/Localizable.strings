@@ -13,6 +13,8 @@
 "Copy settings, rules, and the current scan for a bug report." = "Copy settings, rules, and the current scan for a bug report.";
 "Automatically check for updates" = "Automatically check for updates";
 "Check for Updates…" = "Check for Updates…";
+"Works with Shortcuts & Siri" = "Works with Shortcuts & Siri";
+"Sleep Now, keep-awake, and “what’s keeping it awake” are available as Shortcuts actions and Siri phrases." = "Sleep Now, keep-awake, and “what’s keeping it awake” are available as Shortcuts actions and Siri phrases.";
 
 /* The app name — a brand mark; intentionally identical in every language. */
 "Decaffeinate" = "Decaffeinate";

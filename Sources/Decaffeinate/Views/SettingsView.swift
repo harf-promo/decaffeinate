@@ -176,6 +176,11 @@ private struct GeneralSettings: View {
                     "Global \u{201C}Sleep Now\u{201D} hotkey", name: .sleepNow)
                 Text("Set a system-wide shortcut to put the Mac to sleep from any app.")
                     .settingsCaption()
+
+                KeyboardShortcuts.Recorder(
+                    "Global \u{201C}Toggle keep awake\u{201D} hotkey", name: .toggleKeepAwake)
+                Text("Set a system-wide shortcut to turn keep-awake on or off from any app.")
+                    .settingsCaption()
             }
 
             Section("Never sleep at a bad moment") {
@@ -248,6 +253,12 @@ private struct GeneralSettings: View {
                         }
                 }
                 Toggle("Show the sleep countdown in the menu bar", isOn: s.showMenuBarCountdown)
+                Toggle(
+                    "Show the holder count in the menu bar", isOn: s.showHolderCountInMenuBar)
+                Text(
+                    "Shows how many apps are currently holding the Mac awake next to the icon."
+                )
+                .settingsCaption()
             }
         }
         .formStyle(.grouped)
@@ -693,60 +704,103 @@ private struct FreshnessSettings: View {
     }
 }
 
-// ── History: the forced-sleep log + a rough "wake avoided" estimate ──
+// ── History: the forced-sleep log + a rough "wake avoided" estimate, plus a
+//    "which app held your Mac awake longest this week" ranked list. ──
 private struct HistorySettings: View {
     @EnvironmentObject var history: SleepHistoryStore
+    @EnvironmentObject var awakeTime: AwakeTimeStore
+
+    /// App name → total held seconds over the last 7 days, ranked highest-first.
+    private var weeklyRanking: [(appName: String, seconds: TimeInterval)] {
+        awakeTime.weeklyRanking()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if history.events.isEmpty {
+            if history.events.isEmpty && weeklyRanking.isEmpty {
                 ContentUnavailableView(
-                    "No sleeps yet",
+                    "No history yet",
                     systemImage: "moon.zzz",
                     description: Text(
-                        "When Decaffeinate forces your Mac to sleep, every one shows up here with the reason."
+                        "When Decaffeinate forces your Mac to sleep, or an app holds it awake, it shows up here."
                     )
                 )
             } else {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text(
-                        "\(history.events.count) forced sleep\(history.events.count == 1 ? "" : "s") · \(history.batteryCount) on battery"
-                    )
-                    .font(HarfFont.title).foregroundStyle(Color.ink1)
-                    Text(
-                        "≈ \(history.measuredMinutesAsleep) min of measured sleep started by Decaffeinate."
-                    )
-                    .font(.caption).foregroundStyle(Color.ink3)
-                    if history.unmeasuredSleepCount > 0 {
+                if !history.events.isEmpty {
+                    VStack(alignment: .leading, spacing: Space.s1) {
                         Text(
-                            "\(history.unmeasuredSleepCount) sleep\(history.unmeasuredSleepCount == 1 ? "" : "s") not yet measured."
+                            "\(history.events.count) forced sleep\(history.events.count == 1 ? "" : "s") · \(history.batteryCount) on battery"
+                        )
+                        .font(HarfFont.title).foregroundStyle(Color.ink1)
+                        Text(
+                            "≈ \(history.measuredMinutesAsleep) min of measured sleep started by Decaffeinate."
                         )
                         .font(.caption).foregroundStyle(Color.ink3)
+                        if history.unmeasuredSleepCount > 0 {
+                            Text(
+                                "\(history.unmeasuredSleepCount) sleep\(history.unmeasuredSleepCount == 1 ? "" : "s") not yet measured."
+                            )
+                            .font(.caption).foregroundStyle(Color.ink3)
+                        }
                     }
+                    .padding(Space.s4)
+                    Hairline()
                 }
-                .padding(Space.s4)
-                Hairline()
+                // One List with two Sections (rather than two separate scroll
+                // regions) so both the forced-sleep log and the weekly ranking
+                // share the same scrollable area within the fixed-size window.
                 List {
-                    ForEach(history.events) { event in
-                        HStack(spacing: Space.s2) {
-                            Image(systemName: event.onBattery ? "battery.50" : "powerplug")
-                                .foregroundStyle(Color.ink3).frame(width: 18)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(event.reason).foregroundStyle(Color.ink1).lineLimit(1)
-                                Text(event.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption).foregroundStyle(Color.ink3)
+                    if !history.events.isEmpty {
+                        Section("Forced sleeps") {
+                            ForEach(history.events) { event in
+                                HStack(spacing: Space.s2) {
+                                    Image(systemName: event.onBattery ? "battery.50" : "powerplug")
+                                        .foregroundStyle(Color.ink3).frame(width: 18)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(event.reason).foregroundStyle(Color.ink1).lineLimit(1)
+                                        Text(
+                                            event.date.formatted(
+                                                date: .abbreviated, time: .shortened)
+                                        )
+                                        .font(.caption).foregroundStyle(Color.ink3)
+                                    }
+                                    Spacer()
+                                }
                             }
-                            Spacer()
+                        }
+                    }
+                    if !weeklyRanking.isEmpty {
+                        Section("This week \u{2014} longest awake") {
+                            ForEach(weeklyRanking, id: \.appName) { entry in
+                                HStack(spacing: Space.s2) {
+                                    Image(systemName: "hourglass")
+                                        .foregroundStyle(Color.ink3).frame(width: 18)
+                                    Text(entry.appName).foregroundStyle(Color.ink1).lineLimit(1)
+                                    Spacer()
+                                    Text(Format.duration(entry.seconds))
+                                        .font(.caption).foregroundStyle(Color.ink3)
+                                }
+                            }
                         }
                     }
                 }
-                HStack {
+                HStack(spacing: Space.s3) {
                     Spacer()
-                    ConfirmableDestructiveButton(
-                        title: "Clear history", confirmLabel: "Clear history",
-                        message: "Clear the forced-sleep history? This can\u{2019}t be undone."
-                    ) { history.clear() }.padding(8)
+                    if !weeklyRanking.isEmpty {
+                        ConfirmableDestructiveButton(
+                            title: "Clear weekly awake time",
+                            confirmLabel: "Clear weekly awake time",
+                            message: "Clear the weekly awake-time tally? This can\u{2019}t be undone."
+                        ) { awakeTime.clear() }
+                    }
+                    if !history.events.isEmpty {
+                        ConfirmableDestructiveButton(
+                            title: "Clear history", confirmLabel: "Clear history",
+                            message: "Clear the forced-sleep history? This can\u{2019}t be undone."
+                        ) { history.clear() }
+                    }
                 }
+                .padding(8)
             }
         }
     }
@@ -779,6 +833,24 @@ private struct AboutView: View {
                 destination: URL(string: "https://github.com/harf-promo/decaffeinate")!
             )
             .font(HarfFont.caption).tint(Color.accentText)
+
+            // Quiet discoverability line — the app's 4 Shortcuts/Siri intents
+            // (Sleep Now, what's keeping it awake, keep awake, stop) otherwise
+            // have no in-app mention at all. A fact, not a marketing banner.
+            VStack(spacing: 2) {
+                Text(L10n.localized("Works with Shortcuts & Siri"))
+                    .font(HarfFont.caption).foregroundStyle(Color.ink2)
+                Text(
+                    L10n.localized(
+                        "Sleep Now, keep-awake, and \u{201C}what\u{2019}s keeping it awake\u{201D} are available as Shortcuts actions and Siri phrases."
+                    )
+                )
+                .font(.caption2).foregroundStyle(Color.ink4)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, Space.s5)
+            }
+
             Button(L10n.localized("Show welcome again")) {
                 OnboardingPresenter.shared.present(settingsStore: appState.settingsStore)
             }

@@ -75,6 +75,7 @@ enum ScreenshotRenderer {
                 .environmentObject(state.rulesEngine)
                 .environmentObject(state.history)
                 .environmentObject(state.restHistory)
+                .environmentObject(state.awakeTime)
                 .environmentObject(updater)
             ok =
                 capture(
@@ -89,6 +90,7 @@ enum ScreenshotRenderer {
                 .environmentObject(state.rulesEngine)
                 .environmentObject(state.history)
                 .environmentObject(state.restHistory)
+                .environmentObject(state.awakeTime)
                 .environmentObject(updater)
             ok =
                 capture(
@@ -103,6 +105,7 @@ enum ScreenshotRenderer {
                 .environmentObject(state.rulesEngine)
                 .environmentObject(state.history)
                 .environmentObject(state.restHistory)
+                .environmentObject(state.awakeTime)
                 .environmentObject(updater)
             ok =
                 capture(
@@ -117,11 +120,42 @@ enum ScreenshotRenderer {
                 .environmentObject(state.rulesEngine)
                 .environmentObject(state.history)
                 .environmentObject(state.restHistory)
+                .environmentObject(state.awakeTime)
                 .environmentObject(updater)
             ok =
                 capture(
                     automation, size: NSSize(width: 660, height: 480), appearance: appearance,
                     to: dir.appendingPathComponent("settings-automation-\(suffix).png")) && ok
+
+            // About — shows the "Works with Shortcuts & Siri" discoverability line (v1.23, 2/2).
+            let about = SettingsView(initialPane: .about)
+                .environment(\.theme, theme)
+                .environmentObject(state)
+                .environmentObject(state.settingsStore)
+                .environmentObject(state.rulesEngine)
+                .environmentObject(state.history)
+                .environmentObject(state.restHistory)
+                .environmentObject(state.awakeTime)
+                .environmentObject(updater)
+            ok =
+                capture(
+                    about, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    to: dir.appendingPathComponent("settings-about-\(suffix).png")) && ok
+
+            // History — the forced-sleep log + the new "This week — longest awake" ranking (v1.23, 2/2).
+            let history = SettingsView(initialPane: .history)
+                .environment(\.theme, theme)
+                .environmentObject(state)
+                .environmentObject(state.settingsStore)
+                .environmentObject(state.rulesEngine)
+                .environmentObject(state.history)
+                .environmentObject(state.restHistory)
+                .environmentObject(state.awakeTime)
+                .environmentObject(updater)
+            ok =
+                capture(
+                    history, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    to: dir.appendingPathComponent("settings-history-\(suffix).png")) && ok
         }
         renderMugStrip(to: dir.appendingPathComponent("mug-states.png"))
         renderMenubarStrip(to: dir.appendingPathComponent("menubar-icons.png"))

@@ -13,6 +13,8 @@
 "Copy settings, rules, and the current scan for a bug report." = "Einstellungen, Regeln und den aktuellen Scan für einen Fehlerbericht kopieren.";
 "Automatically check for updates" = "Automatisch nach Updates suchen";
 "Check for Updates…" = "Nach Updates suchen…";
+"Works with Shortcuts & Siri" = "Funktioniert mit Kurzbefehlen & Siri";
+"Sleep Now, keep-awake, and “what’s keeping it awake” are available as Shortcuts actions and Siri phrases." = "„Jetzt schlafen“, „Wach halten“ und „Was hält den Mac wach?“ stehen als Kurzbefehle-Aktionen und Siri-Phrasen zur Verfügung.";
 
 /* The app name — a brand mark; intentionally identical in every language. */
 "Decaffeinate" = "Decaffeinate";

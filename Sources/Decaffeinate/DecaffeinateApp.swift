@@ -6,6 +6,11 @@ extension KeyboardShortcuts.Name {
     /// User-configurable global hotkey that forces the Mac to sleep from anywhere.
     /// No default combo — the user opts in via Settings → General.
     static let sleepNow = Self("sleepNow")
+    /// User-configurable global hotkey that toggles keep-awake (`caffeinateEnabled`)
+    /// on/off from anywhere. Also no default combo: a keep-awake toggle is far
+    /// less destructive than force-sleep, but still shouldn't ship with a
+    /// surprise default combo the user never chose.
+    static let toggleKeepAwake = Self("toggleKeepAwake")
 }
 
 /// Real entry point: dispatch headless CLI commands first, otherwise run the
@@ -40,6 +45,9 @@ struct DecaffeinateApp: App {
                 if let countdown = appState.menuBarCountdownText {
                     Text(countdown).monospacedDigit()
                 }
+                if let holderCount = appState.menuBarHolderCountText {
+                    Text(holderCount).monospacedDigit()
+                }
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(appState.menuBarAccessibilityLabel)
@@ -60,6 +68,7 @@ struct DecaffeinateApp: App {
                 .environmentObject(appState.rulesEngine)
                 .environmentObject(appState.history)
                 .environmentObject(appState.restHistory)
+                .environmentObject(appState.awakeTime)
                 .environmentObject(updater)
         }
     }
@@ -86,6 +95,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // confirmation guard in AppState.sleepNow() applies here too.
             KeyboardShortcuts.onKeyUp(for: .sleepNow) {
                 MainActor.assumeIsolated { AppState.shared.sleepNow() }
+            }
+            // Global "toggle keep-awake" hotkey (opt-in; recorded in Settings →
+            // General). Flips the exact same `caffeinateEnabled` flag the menu's
+            // "Stop keeping awake" row and "Keep awake indefinitely" toggle mutate
+            // directly (see `RDActiveControls`/`RDActionBar` in MenuRedesign.swift)
+            // — no separate AppState method to keep in sync with the menu's.
+            KeyboardShortcuts.onKeyUp(for: .toggleKeepAwake) {
+                MainActor.assumeIsolated {
+                    AppState.shared.settingsStore.settings.caffeinateEnabled.toggle()
+                }
             }
             // First run: welcome the user (and own the notification prompt).
             OnboardingPresenter.shared.showIfNeeded(

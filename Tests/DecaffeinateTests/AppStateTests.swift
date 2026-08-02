@@ -142,6 +142,7 @@ final class AppStateTests: XCTestCase {
         let audio: FakeAudioDeviceResolver
         let system: FakeSystemStateReader
         let restHistory: RestHistoryStore
+        let awakeTime: AwakeTimeStore
         let cleanup: () -> Void
 
         /// Simulate the kernel beginning a real sleep transition
@@ -171,6 +172,7 @@ final class AppStateTests: XCTestCase {
         configure(&settings.settings)
         let rules = RulesEngine(defaults: defaults)
         let restHistory = RestHistoryStore(defaults: defaults)
+        let awakeTime = AwakeTimeStore(defaults: defaults)
         let scanner = FakeScanner()
         let idle = FakeIdle()
         let power = FakePower()
@@ -185,6 +187,7 @@ final class AppStateTests: XCTestCase {
             rulesEngine: rules,
             history: SleepHistoryStore(defaults: defaults),
             restHistory: restHistory,
+            awakeTime: awakeTime,
             telemetry: scanner,
             idleMonitor: idle,
             powerReader: power,
@@ -206,7 +209,7 @@ final class AppStateTests: XCTestCase {
             sleeper: sleeper, caffeine: caffeine, notifier: notifier,
             settings: settings, rules: rules, clock: clock, thermal: thermal,
             triggers: triggers, provenance: provenance, audio: audio,
-            system: system, restHistory: restHistory,
+            system: system, restHistory: restHistory, awakeTime: awakeTime,
             cleanup: { defaults.removePersistentDomain(forName: suite) })
     }
 
@@ -299,6 +302,122 @@ final class AppStateTests: XCTestCase {
 
         h.settings.settings.showMenuBarCountdown = false
         XCTAssertEqual(h.state.menuBarAccessibilityLabel, h.state.mug.accessibilityLabel)
+    }
+
+    // MARK: Menu-bar holder count (v1.23, 2/2)
+
+    func testMenuBarHolderCountShownWhenEnabledAndHolding() {
+        let h = makeHarness { $0.showHolderCountInMenuBar = true }; defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome")]
+        h.state.tick()
+        XCTAssertEqual(h.state.menuBarHolderCountText, "1")
+    }
+
+    func testMenuBarHolderCountHiddenWhenSettingOff() {
+        let h = makeHarness { $0.showHolderCountInMenuBar = false }; defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome")]
+        h.state.tick()
+        XCTAssertNil(h.state.menuBarHolderCountText, "hidden when the user hasn't opted in")
+    }
+
+    func testMenuBarHolderCountHiddenWhenNothingHolding() {
+        let h = makeHarness { $0.showHolderCountInMenuBar = true }; defer { h.cleanup() }
+        h.state.tick()  // nothing holds the Mac awake
+        XCTAssertNil(h.state.menuBarHolderCountText, "an empty count would just be visual noise")
+    }
+
+    func testMenuBarHolderCountReflectsDistinctApps() {
+        let h = makeHarness { $0.showHolderCountInMenuBar = true }; defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome"), systemBlocker("Zoom", bundle: "us.zoom.xos")]
+        h.state.tick()
+        XCTAssertEqual(h.state.menuBarHolderCountText, "2")
+    }
+
+    func testMenuBarAccessibilityLabelFoldsInHolderCount() {
+        let h = makeHarness { $0.showHolderCountInMenuBar = true }; defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome")]
+        h.state.tick()
+        XCTAssertTrue(
+            h.state.menuBarAccessibilityLabel.contains("1 app holding"),
+            "VoiceOver must announce the holder count the user opted into")
+
+        h.settings.settings.showHolderCountInMenuBar = false
+        XCTAssertFalse(h.state.menuBarAccessibilityLabel.contains("holding"))
+    }
+
+    // MARK: Weekly awake-time accounting (v1.23, 2/2) — AppState.tick() feeds AwakeTimeStore
+
+    func testTickDoesNotAccumulateOnTheVeryFirstTick() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome")]
+        h.state.tick()  // no previous sample yet — nothing to attribute elapsed time to
+        XCTAssertTrue(h.awakeTime.entries.isEmpty)
+    }
+
+    func testTickAccumulatesTheMeasuredGapNotAFlatOneSecond() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome")]
+        h.state.tick()  // primes lastAwakeTimeSampleAt
+        h.clock.advance(2.5)  // the repeating Timer's declared interval is 1.0 s, but ticks drift
+        h.state.tick()
+        XCTAssertEqual(h.awakeTime.entries.count, 1)
+        XCTAssertEqual(
+            h.awakeTime.entries[0].seconds, 2.5, accuracy: 0.01,
+            "must record the actual elapsed gap, not an assumed 1 s per tick")
+    }
+
+    func testTickAccumulatesAgainstEachDistinctHolderDisplayName() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // `bundle: nil` on both so `displayName` falls back to the raw process
+        // name rather than resolving a real installed app's localized name
+        // (environment-dependent — would make this test flaky on a machine that
+        // happens to have Chrome/Zoom installed).
+        h.scanner.assertions = [
+            systemBlocker("Chrome", bundle: nil), systemBlocker("Zoom", bundle: nil),
+        ]
+        h.state.tick()
+        h.clock.advance(4)
+        h.state.tick()
+        let names = Set(h.awakeTime.entries.map(\.appName))
+        XCTAssertEqual(names, ["Chrome", "Zoom"])
+        for entry in h.awakeTime.entries {
+            XCTAssertEqual(entry.seconds, 4, accuracy: 0.01)
+        }
+    }
+
+    func testTickDoesNotDoubleCountTwoAssertionsFromTheSameApp() {
+        let h = makeHarness(); defer { h.cleanup() }
+        // Two simultaneous system-sleep holds from the same app (e.g. mic + audio-out).
+        h.scanner.assertions = [
+            Fixtures.assertion(pid: 1, process: "Zoom", bundle: "us.zoom.xos"),
+            Fixtures.assertion(pid: 2, process: "Zoom", bundle: "us.zoom.xos"),
+        ]
+        h.state.tick()
+        h.clock.advance(5)
+        h.state.tick()
+        XCTAssertEqual(h.awakeTime.entries.count, 1, "one app, deduped by display name")
+        XCTAssertEqual(h.awakeTime.entries[0].seconds, 5, accuracy: 0.01)
+    }
+
+    func testTickDoesNotAccumulateWhenNothingIsHolding() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.state.tick()
+        h.clock.advance(3)
+        h.state.tick()
+        XCTAssertTrue(h.awakeTime.entries.isEmpty)
+    }
+
+    func testTickSkipsAccumulationAcrossAnAbnormallyLargeGap() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Chrome")]
+        h.state.tick()
+        // A gap far beyond the Timer's worst-case jitter — e.g. the Mac itself
+        // was asleep between ticks. Must not misattribute hours to Chrome.
+        h.clock.advance(3 * 3_600)
+        h.state.tick()
+        XCTAssertTrue(
+            h.awakeTime.entries.isEmpty,
+            "an abnormally large tick gap must not be attributed as held time")
     }
 
     // MARK: Force sleep

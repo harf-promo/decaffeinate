@@ -53,6 +53,9 @@ final class AppState: ObservableObject {
     let rulesEngine: RulesEngine
     let history: SleepHistoryStore
     let restHistory: RestHistoryStore
+    /// Per-app-per-day cumulative held-time — "which app held your Mac awake
+    /// longest this week." Fed incrementally by `tick()`; see `record(appName:)`.
+    let awakeTime: AwakeTimeStore
     private let telemetry: any PowerAssertionScanning
     private let idleMonitor: any IdleReading
     private let powerReader: any PowerReading
@@ -143,6 +146,18 @@ final class AppState: ObservableObject {
 
     private var timer: Timer?
     private var restObserverTokens: [NSObjectProtocol] = []
+    /// When `tick()` last sampled the weekly awake-time accounting — the anchor
+    /// for measuring the *actual* elapsed gap between ticks (never assumed to be
+    /// exactly 1 s: the repeating `Timer` has a 0.25 s tolerance and can drift
+    /// further under load). `nil` until the first tick, and after a gap so large
+    /// it's cleared by `maxAwakeTimeTickGap` below.
+    private var lastAwakeTimeSampleAt: Date?
+    /// A tick-to-tick gap larger than this is treated as "the app wasn't ticking"
+    /// (e.g. the Mac itself was asleep) rather than real elapsed holding time —
+    /// without this guard, resuming ticks after a real sleep would misattribute
+    /// hours of phantom "held" time to whatever happened to be blocking sleep
+    /// right before it. Generous relative to the Timer's ~1.25 s worst case.
+    private let maxAwakeTimeTickGap: TimeInterval = 30
     /// This process's pid — its own assertions are filtered out of every scan.
     private static let ownPID: pid_t = ProcessInfo.processInfo.processIdentifier
     private static let lastBootKey = "DecaffeinateLastBootTime.v1"
@@ -218,6 +233,7 @@ final class AppState: ObservableObject {
         rulesEngine: RulesEngine = RulesEngine(),
         history: SleepHistoryStore = SleepHistoryStore(),
         restHistory: RestHistoryStore = RestHistoryStore(),
+        awakeTime: AwakeTimeStore = AwakeTimeStore(),
         telemetry: any PowerAssertionScanning = TelemetryEngine(),
         idleMonitor: any IdleReading = IdleMonitor(),
         powerReader: any PowerReading = PowerSourceReader(),
@@ -241,6 +257,7 @@ final class AppState: ObservableObject {
         self.rulesEngine = rulesEngine
         self.history = history
         self.restHistory = restHistory
+        self.awakeTime = awakeTime
         self.telemetry = telemetry
         self.idleMonitor = idleMonitor
         self.powerReader = powerReader
@@ -357,11 +374,27 @@ final class AppState: ObservableObject {
         return Format.countdown(seconds)
     }
 
-    /// VoiceOver label for the whole menu-bar item, folding in the countdown the
-    /// user opted into (a raw "9:05" beside the icon is otherwise never announced).
+    /// The holder count to draw beside the menu-bar icon, or `nil` when the
+    /// setting is off or nothing is currently holding (an empty "0" next to the
+    /// icon would just be visual noise — the icon's own state already says "free").
+    var menuBarHolderCountText: String? {
+        guard settings.showHolderCountInMenuBar, activeHoldingCount > 0 else { return nil }
+        return "\(activeHoldingCount)"
+    }
+
+    /// VoiceOver label for the whole menu-bar item, folding in the countdown and
+    /// holder count the user opted into (either would otherwise never be
+    /// announced — a raw "9:05" or "2" beside the icon means nothing on its own).
     var menuBarAccessibilityLabel: String {
-        guard let countdown = menuBarCountdownText else { return mug.accessibilityLabel }
-        return "\(mug.accessibilityLabel), sleeping in \(countdown)"
+        var label = mug.accessibilityLabel
+        if let countdown = menuBarCountdownText {
+            label += ", sleeping in \(countdown)"
+        }
+        if menuBarHolderCountText != nil {
+            let n = activeHoldingCount
+            label += ", \(n) app\(n == 1 ? "" : "s") holding"
+        }
+        return label
     }
 
     /// Ask for notification permission. Driven by the onboarding "Get started"
@@ -897,6 +930,25 @@ final class AppState: ObservableObject {
         thermalState = thermalProvider()
 
         let systemBlockers = assertions.filter(\.blocksSystemSleep)
+
+        // Weekly awake-time accounting: attribute the real elapsed gap since the
+        // last tick to every distinct app currently blocking system sleep, deduped
+        // by display name so two simultaneous holds from the same app (e.g. two
+        // audio assertions) don't double-count that app's minute. Skipped on the
+        // very first tick (no previous sample yet) and after an abnormally large
+        // gap (see `maxAwakeTimeTickGap`) so a real Mac sleep between ticks can't
+        // misattribute hours of phantom holding.
+        let tickNow = now()
+        if let previousSample = lastAwakeTimeSampleAt {
+            let elapsed = tickNow.timeIntervalSince(previousSample)
+            if elapsed > 0, elapsed <= maxAwakeTimeTickGap {
+                for name in Set(systemBlockers.map(\.displayName)) {
+                    awakeTime.record(appName: name, seconds: elapsed, date: tickNow)
+                }
+            }
+        }
+        lastAwakeTimeSampleAt = tickNow
+
         let whitelistedAwake =
             systemBlockers
             .filter { rulesEngine.isActivelyAllowed($0, now: now()) }
