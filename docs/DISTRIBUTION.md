@@ -51,6 +51,7 @@ Settings → Secrets and variables → Actions:
 | `NOTARY_KEY_P8` | base64 of your App Store Connect API key (`.p8`) |
 | `NOTARY_KEY_ID` | the API key id |
 | `NOTARY_ISSUER_ID` | the API key issuer id |
+| `TAP_REPO_TOKEN` | *(optional)* a fine-grained PAT with `Contents: write` on `harf-promo/homebrew-tap` only — enables the automatic tap-mirror step below. Everything else in the release still works without it. |
 
 ```sh
 # Export the cert from Keychain Access as cert.p12, then:
@@ -75,17 +76,20 @@ brew trust harf-promo/tap        # Homebrew 5+ requires trusting third-party tap
 brew install --cask decaffeinate
 ```
 
-**Per-release tap mirror (REQUIRED — do not skip):**
-1. Bump `version` + `sha256` in **this repo's** `Casks/decaffeinate.rb` — a
-   **manual** commit after the release publishes (the sha is in the release's
-   `SHA256SUMS.txt`; nothing in CI edits the cask). CI runs `brew style` on the
-   cask, but only a human bumps it.
-2. **Also mirror those same two values** into the separate
-   `harf-promo/homebrew-tap` repo's `Casks/decaffeinate.rb` — Homebrew reads
-   the _tap_, not this repo. Without this step, `brew upgrade --cask decaffeinate`
-   never sees the new release. Use the GitHub UI or API to edit the file directly.
-   The `url` line interpolates `#{version}` so it re-resolves automatically — only
-   `version` and `sha256` need changing.
+**Per-release tap mirror — now automated by `release.yml`:**
+1. **This repo's `Casks/decaffeinate.rb`** is bumped and committed to `main`
+   automatically by the `Bump the canonical cask` step, right after the DMG
+   uploads — `version` + `sha256` (read straight from the freshly-built DMG),
+   no manual commit needed anymore.
+2. **The separate `harf-promo/homebrew-tap` repo** is bumped by the `Mirror the
+   cask into the Homebrew tap` step — but only if the **`TAP_REPO_TOKEN`**
+   repository secret is set (a fine-grained GitHub PAT scoped to `Contents:
+   write` on `harf-promo/homebrew-tap` only). Without it, that step logs a
+   warning and skips cleanly — the release still succeeds, but you must then
+   bump the tap's `Casks/decaffeinate.rb` by hand (GitHub UI or API) before
+   `brew upgrade --cask decaffeinate` will see the new version. The `url` line
+   interpolates `#{version}` so it re-resolves automatically — only `version`
+   and `sha256` ever need changing, in either repo.
 
 > **Note:** `SUFeedURL` uses `/releases/latest/download/` which resolves to the
 > latest **non-prerelease, non-draft** GitHub release. Never mark a production

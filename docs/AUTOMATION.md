@@ -5,6 +5,11 @@ headless equivalent, so you can wire it into shell scripts, CI, and AI-agent
 sessions. No daemon, no root: just the CLI (and the `decaffeinate://` URL
 scheme), a one-command hook installer, and an opt-in MCP server.
 
+> Most of this page (`--status`, `--sleep-if-idle`, `--install-hook`, `--mcp`)
+> shipped after the last tagged release (v1.13.0) — it's in `main` and tested,
+> not yet in the Homebrew/DMG build. Build from source to use it today, or
+> check `Decaffeinate --version` after your next update.
+
 ## CLI verbs
 
 ```sh
@@ -27,7 +32,7 @@ Decaffeinate --mcp                  # run an MCP server over stdio (see below)
 
 ```json
 {
-  "version": "1.17.0",
+  "version": "x.y.z",
   "generatedAt": "2026-07-07T08:33:36Z",
   "onBattery": true,
   "batteryPercent": 80,

@@ -22,6 +22,10 @@
 
 ---
 
+> **Release status:** the latest tagged, notarized build is **v1.13.0** (Homebrew, DMG). Everything this README and [`ROADMAP.md`](docs/ROADMAP.md) describe beyond that — the Harf redesign, wake-reason, agent hooks, the MCP server, localization — is merged to `main` and covered by tests, but not yet tagged or in a distributable build. Build from source (`swift build`) to try it early, or watch [Releases](https://github.com/harf-promo/decaffeinate/releases) for the next tag.
+
+---
+
 ## ☕️ → 💤 Why this exists
 
 There are *dozens* of Mac apps that keep your computer awake. Amphetamine, Caffeine, KeepingYouAwake, `caffeinate` — a whole genre dedicated to **fighting sleep**.

@@ -169,3 +169,54 @@ jobs:
           if [ -f build/appcast.xml ]; then
             gh release upload "${GITHUB_REF_NAME}" build/appcast.xml --clobber
           fi
+
+      - name: Bump the canonical cask (this repo)
+        run: |
+          # Keeps Casks/decaffeinate.rb from lagging the tag the way it did
+          # through 1.13.0 → 1.20.0 (7 releases of manual-bump drift). This is
+          # the repo's own mirror copy; the live tap is bumped in the next step.
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA="$(shasum -a 256 build/Decaffeinate-*.dmg | awk '{print $1}')"
+          sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" Casks/decaffeinate.rb
+          sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" Casks/decaffeinate.rb
+          if git diff --quiet -- Casks/decaffeinate.rb; then
+            echo "Cask already at $VERSION — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/decaffeinate.rb
+          git commit -m "chore: bump cask to ${GITHUB_REF_NAME} [skip ci]"
+          # The checkout is at the tag (detached HEAD) — push explicitly to main.
+          git push origin HEAD:main
+
+      - name: Mirror the cask into the Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
+        run: |
+          # Homebrew reads harf-promo/homebrew-tap, not this repo — without this
+          # step `brew upgrade --cask decaffeinate` never sees the new release.
+          # Needs a fine-grained PAT with contents:write on the tap repo, saved
+          # as the TAP_REPO_TOKEN secret (docs/DISTRIBUTION.md). Skips cleanly,
+          # loudly, if that secret isn't configured — it's optional, not required
+          # for this workflow to succeed.
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::TAP_REPO_TOKEN not set — skipping tap mirror. Bump harf-promo/homebrew-tap's Casks/decaffeinate.rb by hand (see docs/DISTRIBUTION.md)."
+            exit 0
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA="$(shasum -a 256 build/Decaffeinate-*.dmg | awk '{print $1}')"
+          TAP_DIR="$(mktemp -d)"
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/harf-promo/homebrew-tap.git" "$TAP_DIR"
+          sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" "$TAP_DIR/Casks/decaffeinate.rb"
+          sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" "$TAP_DIR/Casks/decaffeinate.rb"
+          cd "$TAP_DIR"
+          if git diff --quiet -- Casks/decaffeinate.rb; then
+            echo "Tap cask already at $VERSION — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/decaffeinate.rb
+          git commit -m "chore: bump decaffeinate to ${GITHUB_REF_NAME}"
+          git push origin HEAD

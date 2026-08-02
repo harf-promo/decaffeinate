@@ -4,6 +4,11 @@ Decaffeinate v1 does one thing well: it tells you what's keeping your Mac awake
 and puts it to sleep when it should. Here's where we want to take it — and where
 **you** can jump in. Items tagged 🙋 are especially good for new contributors.
 
+> **"Shipped" below means merged to `main`, not necessarily tagged and
+> distributed.** The latest tagged release is **v1.13.0**; entries through
+> 1.20.0 are in the codebase and covered by tests but await the next tag. See
+> [`docs/PLAN-NEXT.md`](PLAN-NEXT.md) for what's next after that.
+
 ## Shipped
 
 **1.1.0** — agentic completion detection; assertion attribution; custom allow
