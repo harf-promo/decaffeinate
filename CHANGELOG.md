@@ -4,7 +4,137 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.20.0] — Unreleased
+## [1.25.0] — 2026-08-02
+
+A "fluent" round — the app speaks the user's language, and the project speaks
+up for itself.
+
+### Added
+- **App-wide localization.** Extends the v1.20 scaffolding (onboarding + About
+  only) to the whole app: the menu popover, every Settings pane, the sleep
+  verdict copy (`SleepOutlook`), the reason-engine's category labels, the
+  Clamshell Assistant panel, and the CLI's human-readable output (`--scan` /
+  `--status` / `--help`; `--json` output is untouched — a stable machine
+  contract, not display copy). 395 new keys in both `en.lproj` and `de.lproj`.
+  Dynamic copy (idle minutes, hold counts, app names) uses `%@`/`%d`
+  format-string keys via a new `L10n.localized(_:_:)` helper. **The German
+  table was machine-translated and wants a native-speaker review** before
+  being relied on for a release.
+- **Compare pages + a press kit** — head-to-head pages against Amphetamine,
+  KeepingYouAwake, and Juicy (`docs/compare/`), plus `docs/PRESS-KIT.md`
+  with boilerplate, facts, and free-to-use assets.
+
+### Fixed
+- `ReasonEngine`'s category labels are deliberately left un-localized at the
+  source, since that text flows verbatim into `--status --json`'s `reason`
+  field, the MCP status tool, and App Intents' structured return value —
+  localization happens at the UI display call sites instead, so those machine
+  contracts stay stable regardless of the user's language.
+
+## [1.24.0] — 2026-08-02
+
+A "closed" round — the lid-closed question gets an honest, zero-root answer.
+
+### Added
+- **The Clamshell Assistant** (menu → Keep awake… → "Use with lid closed…"):
+  detects and helps you reach Apple's own built-in clamshell mode (external
+  display + AC power + external keyboard/mouse) — the only lid-closed mode a
+  Mac supports without root. New `LidStateReader`, `DisplayTopologyReader`,
+  and a best-effort `ExternalInputProbe`, all public IOKit/CoreGraphics reads
+  — no root, no private APIs. A pure `ClamshellAdvisor` classifies readiness;
+  "Arm clamshell session" and the no-display "screens off" fallback both
+  reuse the existing keep-awake mechanism and its existing safety rails.
+- **`SleepDisabledReader`** — read-only observability for the systemwide
+  `SleepDisabled` `pmset` flag, so a foreign `sudo pmset disablesleep` from
+  elsewhere surfaces honestly instead of silently confusing the app's own
+  verdicts.
+- `--clamshell-status [--json]`, the read-only `clamshell_status` MCP tool,
+  and `ClamshellStatusIntent` for Shortcuts/Siri. Deliberately no way for an
+  agent or a voice command to *arm* a session — only to ask about readiness.
+- A new transparency page, [`docs/LID-CLOSED.md`](docs/LID-CLOSED.md),
+  explaining plainly what the assistant does and does not do, and why true
+  lid-closed-with-no-display still needs root (which Decaffeinate still
+  doesn't touch — see `docs/ARCHITECTURE.md`'s non-goals).
+
+## [1.23.0] — 2026-08-02
+
+A "glanceable" round — the answer to "will my Mac sleep?" is readable from the
+menu bar in one second, and the menu itself protects that one answer.
+
+### Added
+- **Weekly awake-time history** — a new `AwakeTimeStore` tracks per-app-per-day
+  held seconds (fed a *measured* elapsed gap each tick, not an assumed
+  interval) and surfaces a "This week — longest awake" ranked list in
+  Settings → History.
+- An optional holder count next to the menu-bar icon (`showHolderCountInMenuBar`,
+  off by default), a keep-awake toggle hotkey, and a quiet "Works with
+  Shortcuts & Siri" line in About.
+- A Control Center / widget feasibility spike concluded **defer** — SwiftPM
+  has no app-extension product type and the hand-assembled `build-app.sh`
+  pipeline has no `.appex` embedding step (see `docs/WIDGET-SPIKE.md`).
+
+### Changed
+- **Menu-bar icon states are now visually distinct at real menu-bar size** —
+  each state varies the crescent's own fullness and modifier weight, not just
+  a tiny corner mark.
+- Shortcuts' `KeepAwakeIntent` now matches the app's moon/sleep metaphor
+  instead of a leftover "cup and saucer / Caffeinate my Mac" phrasing.
+- The popover's top third is now protected for the sleep verdict; the
+  restart/uptime hint moved to the footer, the screen-only section collapsed
+  behind a disclosure, the ALL-CAPS status eyebrow became a readable
+  sentence-case line, "More…" is now "Keep awake…", rows past 6 fold behind
+  "Show N more," rows gained a persistent disclosure chevron, and the popover
+  now scales with Dynamic Type instead of using fixed point sizes throughout.
+- Settings: Notifications split into its own pane; "Battery floor" and
+  "backpack guard" gained plain-language glosses; "Let Decaffeinate decide
+  every sleep" is now marked Advanced; the idle-threshold slider warns below
+  3 minutes.
+
+## [1.22.0] — 2026-08-02
+
+A "calm" round — every interruption earns its place, and a forced sleep is
+never a surprise.
+
+### Added
+- **A pre-sleep countdown HUD**, on by default: idle force-sleep now arms a
+  cancelable 20-second warning ("Sleeping in Ns — Stay awake") before it
+  fires. Safety-rail sleeps (battery floor / thermal) and user-initiated
+  Sleep Now are exempt by design.
+- **A Sleep Now call guard** — reuses the existing microphone-active signal
+  to hold off an immediate sleep and ask "You appear to be on a call — sleep
+  anyway?" (menu button + hotkey only; CLI/URL-scheme/App Intents/MCP entry
+  points stay immediate, since there's no one to confirm a non-interactive
+  call).
+- **Actionable notifications** — "Always Allow" / "Sleep Anyway" buttons on
+  new-blocker alerts, a burst-of-new-blockers digest instead of one
+  notification per app, and an on-demand notification-permission check that
+  surfaces a "Notifications: Off — Enable" nudge instead of the firewall
+  going silently dead on a denial.
+
+### Fixed
+- A failed Sleep Now now names the actual culprit ("…— Docker is holding
+  system sleep open") instead of a generic message.
+- Onboarding trimmed from 4 panels to 2; "Skip"/"Not now" no longer fires the
+  OS notification-permission prompt cold — it's deferred to the firewall's
+  first real blocker. Launch-at-login is now offered (defaulted on) during
+  onboarding instead of silently defaulting off forever.
+
+## [1.21.0] — 2026-08-02
+
+A "public" round — closing the gap between what's merged and what's
+distributed, so the next release can't silently fall behind again.
+
+### Fixed
+- README/`ROADMAP.md`/`AUTOMATION.md` no longer describe unreleased,
+  in-`main`-only work as generally available; dropped a stale hardcoded
+  version example in `AUTOMATION.md`'s `--status --json` sample.
+- `release.yml` now bumps this repo's `Casks/decaffeinate.rb` automatically
+  after each tagged release (version + sha256 read from the built DMG), and
+  optionally mirrors it into `harf-promo/homebrew-tap` when a
+  `TAP_REPO_TOKEN` secret is present — closing the manual-bump-in-two-places
+  gap that let distribution drift seven releases behind `main`.
+
+## [1.20.0] — 2026-08-02
 
 A "global" round — the plumbing for translations, with German seeded, so the app
 is no longer English-only by construction.
@@ -27,7 +157,7 @@ is no longer English-only by construction.
   compile catalogs — only Xcode's build system does; `.strings` load everywhere
   the project builds. +4 tests.
 
-## [1.19.0] — Unreleased
+## [1.19.0] — 2026-08-02
 
 An "integrated" round — Decaffeinate now installs its own agent hooks and speaks
 MCP, so wiring it into an agent takes one command instead of hand-edited config.
@@ -55,7 +185,7 @@ MCP, so wiring it into an agent takes one command instead of hand-edited config.
   on in-memory config) and `MCPServer`'s `parseAction`/`toolList`. New dependency
   on the official MCP Swift SDK (`modelcontextprotocol/swift-sdk`). +33 tests.
 
-## [1.18.0] — Unreleased
+## [1.18.0] — 2026-08-02
 
 An "evidence" round — the app doesn't just *classify* a hold anymore; for the
 holds that matter it *measures* whether the process is actually doing anything.
@@ -83,7 +213,7 @@ holds that matter it *measures* whether the process is actually doing anything.
   factored into `ProcessTable` so the macOS-26 `proc_listallpids` handling stays
   single-sourced. +10 tests.
 
-## [1.17.0] — Unreleased
+## [1.17.0] — 2026-08-02
 
 A "connected" round — Decaffeinate is now scriptable and hookable, the
 foundation for the agentic era.
@@ -106,7 +236,7 @@ foundation for the agentic era.
   (tracked in ROADMAP): a first-class hook installer + MCP server, and
   localization scaffolding (needs the SwiftPM String-Catalog resource plumbing).
 
-## [1.16.0] — Unreleased
+## [1.16.0] — 2026-08-02
 
 An "evidence & insight" round — the app already explains what holds your Mac
 awake; now it also tells you when it slept, why it woke, and gives you something
@@ -136,7 +266,7 @@ to hand a maintainer.
   likely stale) — it needs continuous multi-PID sampling infrastructure and is
   tracked for a follow-up.
 
-## [1.15.0] — Unreleased
+## [1.15.0] — 2026-08-02
 
 A brand + polish round: a new logo, and a sweep of the small rough edges that
 erode trust on first run.
@@ -183,7 +313,7 @@ erode trust on first run.
   test guards that the carve reaches well past the rim so the ring can never
   return, plus regeneration of every brand asset. +1 UI regression test.
 
-## [1.14.0] — Unreleased
+## [1.14.0] — 2026-08-02
 
 A correctness and pipeline-hardening round driven by a full adversarial audit
 (every finding below was independently verified against the code before fixing).
