@@ -24,7 +24,7 @@
 "Handoff / Continuity" = "Handoff / Continuity";
 "Installing an update" = "Update wird installiert";
 "Backing up (Time Machine)" = "Sicherung läuft (Time Machine)";
-"Keeping the display on" = "Hält den Bildschirm an";
+"Keeping the display on" = "Hält den Bildschirm wach";
 "Using your location" = "Nutzt deinen Standort";
 "Delivering notifications" = "Stellt Mitteilungen zu";
 "Keeping awake on purpose" = "Wird absichtlich wach gehalten";
@@ -232,8 +232,8 @@
 "Screen-only / background, %d" = "Nur Bildschirm / Hintergrund, %d";
 "Double-tap to collapse" = "Doppeltippen zum Einklappen";
 "Double-tap to expand" = "Doppeltippen zum Ausklappen";
-"Double-tap to hide details" = "Doppeltippen, um Details auszublenden";
-"Double-tap to show details" = "Doppeltippen, um Details anzuzeigen";
+"Double-tap to hide details" = "Doppeltippen zum Ausblenden der Details";
+"Double-tap to show details" = "Doppeltippen zum Anzeigen der Details";
 "Nothing is holding your Mac awake." = "Nichts hält deinen Mac wach.";
 "held %@" = "%@ gehalten";
 "%d live" = "%d aktiv";
