@@ -25,6 +25,23 @@ enum MugState: Equatable {
     }
 }
 
+/// An armed, cancelable warning ahead of a *routine idle* force-sleep — never
+/// a user-initiated Sleep Now (immediate) or a safety-rail sleep (battery
+/// floor / thermal — unconditional backstops, no warning). `Views/SleepWarningHUD.swift`
+/// renders this; `AppState.cancelPendingIdleSleep()` is the "Stay awake" action.
+struct PendingSleepWarning: Equatable, Sendable {
+    /// When the warning armed.
+    let armedAt: Date
+    /// When, absent a cancel, `forceSleep` actually fires.
+    let fireAt: Date
+    /// The reason to hand to `forceSleep` once the warning elapses.
+    let reason: String
+    /// Whether this warning is for the one-shot "watched agent finished" sleep
+    /// (needs the post-sleep watch-clearing/notify housekeeping) rather than
+    /// the routine idle-timeout sleep.
+    let agentFinished: Bool
+}
+
 /// The single source of truth for the UI. Polls the system once a second,
 /// evaluates the rules + safety rails, reconciles keep-awake holds, and — the
 /// whole point — forces the Mac to sleep when it has been left running idle.
@@ -76,6 +93,20 @@ final class AppState: ObservableObject {
     @Published private(set) var lastSleepReason: String?
     @Published private(set) var lastError: String?
 
+    /// An armed, cancelable pre-sleep warning ahead of a routine idle
+    /// force-sleep, or nil. See `PendingSleepWarning`.
+    @Published private(set) var pendingIdleSleepWarning: PendingSleepWarning?
+
+    /// True while **Sleep Now** is waiting on the user to confirm sleeping
+    /// during what looks like an active call (microphone in use) — see
+    /// `sleepNow()`.
+    @Published private(set) var pendingCallSleepConfirmation: Bool = false
+
+    /// The live OS notification-permission status, refreshed on demand (menu-
+    /// open, Settings-open — see `refreshNotificationAuthorization()`), not
+    /// polled every tick. `.unknown` until the first refresh.
+    @Published private(set) var notificationAuthorization: NotificationAuthorization = .unknown
+
     /// Newly-seen, still-unclassified apps holding the Mac awake — the firewall's
     /// "decide what to do" queue, surfaced in the menu.
     @Published private(set) var pendingClassification: [PowerAssertion] = []
@@ -121,6 +152,13 @@ final class AppState: ObservableObject {
     /// Persisted keep-awake window end, so an intent/URL-scheme "keep awake" hold
     /// survives a background relaunch (see `start()` restore, `persistQuietUntil`).
     private static let quietUntilKey = "Decaffeinate.quietUntil.v1"
+    /// Design principle: fire once per state change per holder. A blocker only
+    /// ever notifies once while it continuously holds; it must fully clear
+    /// (drop out of `systemBlockers`) and reappear — or have its rule lapse —
+    /// before it can notify again. `updateFirewallQueue` enforces this as the
+    /// gate on *which* blockers qualify each tick; the burst digest it can also
+    /// send only changes how many notifications a qualifying set produces, and
+    /// never bypasses this dedup.
     private var notifiedBlockers: Set<String> = []
 
     /// First time each live session key was observed — the anchor for a stable
@@ -164,6 +202,10 @@ final class AppState: ObservableObject {
     private let idleCooldownSeconds: TimeInterval = 60
     private let immediateCooldownSeconds: TimeInterval = 15
     private let failureCooldownSeconds: TimeInterval = 10
+    /// How long the pre-sleep warning HUD counts down before an idle
+    /// force-sleep actually fires — long enough to notice and react, short
+    /// enough to still feel prompt.
+    private let idleSleepWarningSeconds: TimeInterval = 20
     /// A transient error auto-clears after this long so a one-off can't linger.
     private var lastErrorAt: Date?
     private let errorVisibilitySeconds: TimeInterval = 30
@@ -329,13 +371,34 @@ final class AppState: ObservableObject {
         notifier.requestAuthorizationIfNeeded()
     }
 
+    /// Wire the concrete `Notifier`'s notification actions ("Always Allow" /
+    /// "Sleep Anyway") back to this app's policy engine. Called once at launch
+    /// with the real `Notifier` — a no-op with the test/fake notifier, which
+    /// never routes an action back here.
+    func wireNotificationActions() {
+        (notifier as? Notifier)?.actionHandler = self
+    }
+
+    /// Re-check the live OS notification-permission status — cheap and safe to
+    /// call often (menu-open, Settings-open); `Notifier` only hits
+    /// `UNUserNotificationCenter` once per call, no polling loop.
+    func refreshNotificationAuthorization() {
+        notifier.refreshAuthorizationStatus { [weak self] status in
+            self?.notificationAuthorization = status
+        }
+    }
+
     // MARK: Lifecycle
 
     func start() {
         timer?.invalidate()
         // On first run, defer the notification prompt to the onboarding flow so it
-        // arrives with context instead of cold at launch.
-        if settings.hasCompletedOnboarding {
+        // arrives with context instead of cold at launch. If onboarding finished
+        // WITHOUT the user enabling notifications (Skip / "Not now"), also skip
+        // the request here — it's deferred further still, to the moment the
+        // firewall has a real first blocker to show (see `updateFirewallQueue`),
+        // rather than asking cold on the very next launch instead.
+        if settings.hasCompletedOnboarding, !settings.declinedNotificationsAtOnboarding {
             notifier.requestAuthorizationIfNeeded()
         }
         readBootTimeAndInferRestart()
@@ -438,10 +501,46 @@ final class AppState: ObservableObject {
 
     // MARK: User actions
 
-    /// Sleep the Mac right now, from the menu's primary button. Always fires,
-    /// bypassing the post-sleep cooldown.
-    func sleepNow() {
+    /// Sleep the Mac right now, from the menu's primary button or the global
+    /// hotkey. Always bypasses the post-sleep cooldown — UNLESS the microphone
+    /// looks active (likely a call): forcing sleep mid-call would break the
+    /// app's "never cuts off calls" promise, so this surfaces a confirmation
+    /// (`pendingCallSleepConfirmation`) instead and waits for
+    /// `confirmSleepDuringCall()`. `requireCallConfirmation` is false only for
+    /// the `decaffeinate://sleep-now` URL scheme (see `DecaffeinateApp`'s
+    /// `application(_:open:)`) — a fire-and-forget automation call with no one
+    /// to answer a confirmation dialog, mirroring the CLI / App Intents / MCP
+    /// `sleep_now` entry points, which bypass `AppState` entirely and stay
+    /// immediate for the same reason (see the comments at each).
+    func sleepNow(requireCallConfirmation: Bool = true) {
+        if requireCallConfirmation, SafetyRails.isMicrophoneActive(assertions) {
+            pendingCallSleepConfirmation = true
+            return
+        }
         forceSleep(reason: "Sleep Now pressed", bypassCooldown: true, userInitiated: true)
+    }
+
+    /// Force the sleep the call guard held back, after the user confirms
+    /// "Sleep anyway" on the "You appear to be on a call" dialog.
+    func confirmSleepDuringCall() {
+        pendingCallSleepConfirmation = false
+        forceSleep(
+            reason: "Sleep Now pressed (confirmed during a call)", bypassCooldown: true,
+            userInitiated: true)
+    }
+
+    /// Dismiss the call-sleep confirmation without sleeping.
+    func cancelSleepDuringCall() {
+        pendingCallSleepConfirmation = false
+    }
+
+    /// Cancel a pending idle-sleep warning — the HUD's "Stay awake" button.
+    /// Also arms the same cooldown a successful forced sleep would (reusing
+    /// `suppressForceSleepUntil`), so `tick()` gives the user a real grace
+    /// period instead of re-arming the warning on the very next tick.
+    func cancelPendingIdleSleep() {
+        pendingIdleSleepWarning = nil
+        suppressForceSleepUntil = now().addingTimeInterval(idleCooldownSeconds)
     }
 
     /// Turn the display off now (system keeps running) — the menu's "Turn display
@@ -754,6 +853,21 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Housekeeping after a successful idle force-sleep that was triggered by
+    /// a finished watched agent/build: notify (while the label is still
+    /// readable) and clear the watch. The agent-completion sleep is one-shot —
+    /// clearing here stops it turning into a permanent 60s-idle aggressive-
+    /// sleep mode after the user wakes the Mac. A no-op when `agentFinished`
+    /// is false (the routine idle-timeout path).
+    private func finishAgentWatchIfNeeded(_ agentFinished: Bool) {
+        guard agentFinished else { return }
+        if settings.notifyOnAgentFinished, case .completed(let label, _) = watchStatus {
+            notifier.notifyAgentFinished(label: label)
+        }
+        agentWatcher.setTarget(nil)
+        watchStatus = agentWatcher.status
+    }
+
     /// When the auto-sleep-on-agent-finish setting is on and nothing is watched
     /// yet, arm the watcher on a recognized agentic `caffeinate -w <pid>`.
     private func autoArmAgentWatchIfNeeded() {
@@ -906,6 +1020,14 @@ final class AppState: ObservableObject {
         //    battery floor / thermal rail drops the hold, force-sleep must
         //    re-engage rather than leave the Mac awake and draining until the
         //    3%-critical emergency guard.
+        //
+        //    Reaching the threshold doesn't force-sleep immediately: when
+        //    `showPreSleepWarning` is on (the default), it arms a short,
+        //    cancelable `pendingIdleSleepWarning` first (the HUD's "Stay
+        //    awake" cancels it) and only force-sleeps once that elapses —
+        //    never a silent surprise. This never applies to the immediate
+        //    safety guards above (section 3, already returned by now) or to
+        //    a user-initiated Sleep Now (`sleepNow()`, its own code path).
         let caffeinateHolding = s.caffeinateEnabled && !decision.shouldDropKeepAwake
         var remaining: TimeInterval?
         if s.decaffeinateEnabled, !caffeinateHolding, !quietWindowHoldingAwake, !triggerHolding {
@@ -918,23 +1040,38 @@ final class AppState: ObservableObject {
                     agentFinished
                     ? "Watched work finished — putting Mac to sleep"
                     : "Idle \(Int(threshold / 60)) min — putting Mac to sleep"
-                if forceSleep(reason: reason, bypassCooldown: false) {
-                    // The agent-completion sleep is one-shot: clear the watch so
-                    // it doesn't turn into a permanent 60s-idle aggressive-sleep
-                    // mode after the user wakes the Mac.
-                    if agentFinished {
-                        // Notify before clearing the target so we can still read the label.
-                        if settings.notifyOnAgentFinished,
-                            case .completed(let label, _) = watchStatus
-                        {
-                            notifier.notifyAgentFinished(label: label)
-                        }
-                        agentWatcher.setTarget(nil)
-                        watchStatus = agentWatcher.status
+                if s.showPreSleepWarning, !isForceSleepSuppressed {
+                    // Arm once; keep re-using the same fire time on later ticks
+                    // so cancelling (which sets the suppression above) is the
+                    // only thing that resets it.
+                    let warning =
+                        pendingIdleSleepWarning
+                        ?? PendingSleepWarning(
+                            armedAt: now(), fireAt: now().addingTimeInterval(idleSleepWarningSeconds),
+                            reason: reason, agentFinished: agentFinished)
+                    pendingIdleSleepWarning = warning
+                    remaining = warning.fireAt.timeIntervalSince(now())
+                    if now() >= warning.fireAt, forceSleep(reason: warning.reason, bypassCooldown: false)
+                    {
+                        pendingIdleSleepWarning = nil
+                        finishAgentWatchIfNeeded(warning.agentFinished)
+                        return
                     }
-                    return
+                } else {
+                    pendingIdleSleepWarning = nil
+                    if forceSleep(reason: reason, bypassCooldown: false) {
+                        finishAgentWatchIfNeeded(agentFinished)
+                        return
+                    }
                 }
+            } else {
+                // No longer past the threshold (the user came back) — an armed
+                // warning must not silently keep counting toward a sleep the
+                // fresh activity already invalidated.
+                pendingIdleSleepWarning = nil
             }
+        } else {
+            pendingIdleSleepWarning = nil
         }
 
         updateDerivedState(
@@ -1067,11 +1204,32 @@ final class AppState: ObservableObject {
         if let pending = pendingForcedSleep, pending.userInitiated,
             now().timeIntervalSince(pending.requestedAt) > userSleepFeedbackSeconds
         {
-            setError("The Mac didn\u{2019}t sleep \u{2014} an app is holding system sleep open.")
+            // `assertions` was refreshed at the top of this same tick, so this
+            // names whoever is holding system sleep open *right now* — the app
+            // already knows; the old message just never said so.
+            setError(failedSleepMessage())
             pendingForcedSleep = nil
         }
         if let at = lastErrorAt, now().timeIntervalSince(at) > errorVisibilitySeconds {
             clearError()
+        }
+    }
+
+    /// "The Mac didn't sleep — Docker is holding system sleep open." (one
+    /// culprit) / "…— Docker and 2 others are holding system sleep open."
+    /// (several) / a generic fallback if, by the time this reads, nothing is
+    /// actually holding system sleep anymore.
+    private func failedSleepMessage() -> String {
+        let names = assertions.filter(\.blocksSystemSleep).map(\.displayName).removingDuplicates()
+        switch names.count {
+        case 0:
+            return "The Mac didn\u{2019}t sleep \u{2014} an app is holding system sleep open."
+        case 1:
+            return "The Mac didn\u{2019}t sleep \u{2014} \(names[0]) is holding system sleep open."
+        default:
+            let others = names.count - 1
+            return
+                "The Mac didn\u{2019}t sleep \u{2014} \(names[0]) and \(others) other\(others == 1 ? "" : "s") are holding system sleep open."
         }
     }
 
@@ -1122,6 +1280,14 @@ final class AppState: ObservableObject {
 
         guard enabled else { return }
 
+        // Collect this tick's genuinely-new blockers first, rather than
+        // notifying inline as the loop finds them, so a burst of several apps
+        // starting together (same tick) can fold into one digest notification
+        // instead of a one-per-app drip. `notifiedBlockers` still governs
+        // *which* blockers qualify (the fire-once gate below) — this only
+        // changes how many notifications a qualifying set produces.
+        var newlySurfaced: [(blocker: PowerAssertion, key: String)] = []
+
         for blocker in systemBlockers {
             let k = key(blocker)
             // Apps with a currently-effective decision (Allow / Block / live
@@ -1141,8 +1307,28 @@ final class AppState: ObservableObject {
             if !pendingClassification.contains(where: { key($0) == k }) {
                 pendingClassification.append(blocker)
             }
+            newlySurfaced.append((blocker, k))
+        }
+        guard !newlySurfaced.isEmpty else { return }
+
+        // A real, brand-new blocker is exactly the in-context moment to ask
+        // for notification permission if the user deferred it at onboarding
+        // (Skip / "Not now") — see `OnboardingPresenter.finish` and
+        // `AppState.start()`. One-shot: the flag clears once this fires, so a
+        // later blocker doesn't ask again. `requestAuthorizationIfNeeded` is
+        // itself idempotent (no-ops once already requested this run).
+        if settings.declinedNotificationsAtOnboarding {
+            notifier.requestAuthorizationIfNeeded()
+            settingsStore.settings.declinedNotificationsAtOnboarding = false
+        }
+
+        let names = newlySurfaced.map(\.blocker.displayName).removingDuplicates()
+        if names.count <= 1, let first = newlySurfaced.first {
             notifier.notifyNewBlocker(
-                appName: blocker.displayName, reason: blocker.reason.category.label)
+                appName: first.blocker.displayName, reason: first.blocker.reason.category.label,
+                holderKey: first.key)
+        } else {
+            notifier.notifyNewBlockers(count: names.count, sample: names[0])
         }
     }
 
@@ -1153,6 +1339,14 @@ final class AppState: ObservableObject {
             return (owner.bundleIdentifier ?? owner.name).lowercased()
         }
         return assertion.bundleIdentifier?.lowercased() ?? assertion.processName.lowercased()
+    }
+
+    /// Resolve a firewall key (see `key(_:)`) back to a live matching
+    /// assertion — the seam a notification action's "Always Allow" / "Sleep
+    /// Anyway" needs to turn a lock-screen tap into a policy change, even if
+    /// the pid that triggered the original notification has since changed.
+    func liveAssertion(forFirewallKey k: String) -> PowerAssertion? {
+        assertions.first { key($0) == k }
     }
 
     // MARK: Session identity & coalescing (stable across `caffeinate -t` respawns)
@@ -1385,5 +1579,14 @@ final class AppState: ObservableObject {
     func heldDuration(_ assertion: PowerAssertion) -> String? {
         guard let created = assertion.createdAt else { return nil }
         return "for " + Format.duration(now().timeIntervalSince(created))
+    }
+}
+
+/// Lets a tapped notification action ("Always Allow" / "Sleep Anyway") resolve
+/// back to a live assertion and apply a policy — `setPolicy(_:for:)` is
+/// already exactly the shape `NotifierActionHandling` needs.
+extension AppState: NotifierActionHandling {
+    func resolveAssertion(forFirewallKey key: String) -> PowerAssertion? {
+        liveAssertion(forFirewallKey: key)
     }
 }

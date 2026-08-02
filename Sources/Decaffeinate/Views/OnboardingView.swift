@@ -1,15 +1,40 @@
 import AppKit
 import SwiftUI
 
-/// First-run welcome: four short panels — what Decaffeinate does, the safety
-/// promise, the keep-awake extras, and staying informed — ending in "Get started".
+/// First-run welcome: two short panels — what Decaffeinate does + its safety
+/// promise, then an explicit notification choice — ending in either "Enable
+/// notifications" or "Not now". (Trimmed from four marketing panels in earlier
+/// versions: the old flow made the user sit through everything before any
+/// value, and its vague final sentence about notifications masked what was
+/// actually an unconditional OS permission request — see `OnboardingPresenter`.)
 struct OnboardingView: View {
-    /// Called when the user finishes (or skips) onboarding.
-    let onFinish: () -> Void
-    /// Called when the user opts into notifications on the final panel.
-    let onEnableNotifications: () -> Void
+    /// Called exactly once when onboarding completes, from any exit (the
+    /// top-level Skip, or panel 2's "Not now" / "Enable notifications").
+    /// `notificationsRequested` is true only for "Enable notifications" — the
+    /// one path that still asks for OS permission in-context; every other
+    /// exit defers the ask to the moment the firewall first actually needs it
+    /// (see `OnboardingPresenter.finish`). `launchAtLoginEnabled` is panel 2's
+    /// toggle value, applied only if the user actually reached that panel —
+    /// nil from an earlier Skip, so the underlying setting is left untouched.
+    let onFinish: (_ notificationsRequested: Bool, _ launchAtLoginEnabled: Bool?) -> Void
+    /// Which panel to open on — defaults to the first; the screenshot harness
+    /// uses this to also capture the notification-choice panel.
+    var initialPage: Int = 0
 
-    @State private var page = 0
+    @State private var page: Int
+    /// Defaults to on: a background utility that isn't offered launch-at-login
+    /// up front silently stops working after the next restart. The user can
+    /// uncheck it right here before finishing.
+    @State private var launchAtLoginEnabled = true
+
+    init(
+        onFinish: @escaping (Bool, Bool?) -> Void,
+        initialPage: Int = 0
+    ) {
+        self.onFinish = onFinish
+        self.initialPage = initialPage
+        _page = State(initialValue: initialPage)
+    }
 
     private let panels = OnboardingPanel.all
 
@@ -27,23 +52,36 @@ struct OnboardingView: View {
 
             Hairline()
 
-            OnboardingPanelView(panel: panels[page])
-                .id(page)
-                .transition(
-                    .asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity))
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .clipped()
-                .accessibilityValue("Step \(page + 1) of \(panels.count)")
+            Group {
+                if isLastPage {
+                    NotificationChoicePanel(
+                        panel: panels[page],
+                        launchAtLoginEnabled: $launchAtLoginEnabled,
+                        onEnableNotifications: { onFinish(true, launchAtLoginEnabled) },
+                        onNotNow: { onFinish(false, launchAtLoginEnabled) }
+                    )
+                } else {
+                    OnboardingPanelView(panel: panels[page])
+                }
+            }
+            .id(page)
+            .transition(
+                .asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity))
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
+            .accessibilityValue("Step \(page + 1) of \(panels.count)")
 
             Hairline()
 
             HStack(spacing: Space.s3) {
-                Button(L10n.localized("Skip")) { onFinish() }
-                    .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
-                    .fixedSize()
+                Button(L10n.localized("Skip")) {
+                    onFinish(false, isLastPage ? launchAtLoginEnabled : nil)
+                }
+                .buttonStyle(HarfButtonStyle(variant: .text, size: .small))
+                .fixedSize()
 
                 Spacer()
 
@@ -51,7 +89,7 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                if page < panels.count - 1 {
+                if !isLastPage {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) { page += 1 }
                     } label: {
@@ -63,20 +101,9 @@ struct OnboardingView: View {
                     .buttonStyle(HarfButtonStyle(variant: .primary, size: .regular))
                     .keyboardShortcut(.defaultAction)
                     .fixedSize()
-                } else {
-                    Button {
-                        onEnableNotifications()
-                        onFinish()
-                    } label: {
-                        HStack(spacing: Space.s2) {
-                            Text(L10n.localized("Get started"))
-                            Text("→").font(HarfFont.code)
-                        }
-                    }
-                    .buttonStyle(HarfButtonStyle(variant: .primary, size: .regular))
-                    .keyboardShortcut(.defaultAction)
-                    .fixedSize()
                 }
+                // Panel 2 supplies its own two finishing actions ("Enable
+                // notifications" / "Not now") — no redundant primary button here.
             }
             .padding(.horizontal, Space.s5)
             .padding(.vertical, Space.s4)
@@ -84,9 +111,11 @@ struct OnboardingView: View {
         .frame(width: 480, height: 420)
         .background(Color.paper)
     }
+
+    private var isLastPage: Bool { page == panels.count - 1 }
 }
 
-/// 01 · 02 · 03 — Harf uses numerals (not dots) as step indicators.
+/// 01 · 02 — Harf uses numerals (not dots) as step indicators.
 private struct StepNumerals: View {
     let count: Int
     let current: Int
@@ -115,12 +144,7 @@ private struct OnboardingPanel: Identifiable {
             step: "01 — What it does",
             title: "Your Mac, finally asleep",
             body:
-                "Running Claude Code, a build, or a long download? These hold your Mac awake until they\u{2019}re done — and sometimes after. Decaffeinate watches what\u{2019}s keeping your Mac up and puts it to sleep the moment it\u{2019}s safe, even when a rogue process disagrees."
-        ),
-        OnboardingPanel(
-            step: "02 — Safe by default",
-            title: "It never cuts off what matters",
-            body: "Decaffeinate quietly stands down during:",
+                "Running Claude Code, a build, or a long download? These hold your Mac awake until they\u{2019}re done — and sometimes after. Decaffeinate watches what\u{2019}s keeping your Mac up and puts it to sleep the moment it\u{2019}s safe, even when a rogue process disagrees.\n\nAnd it never cuts off what matters — it quietly stands down during:",
             bullets: [
                 "Calls, screen sharing and active media",
                 "Time Machine backups and macOS updates",
@@ -128,20 +152,10 @@ private struct OnboardingPanel: Identifiable {
             ]
         ),
         OnboardingPanel(
-            step: "03 — More than sleep",
-            title: "It can keep you awake, too",
-            body: "Sometimes you want the opposite. Decaffeinate also knows how to:",
-            bullets: [
-                "Hold the Mac awake on demand — calls, downloads, a presentation",
-                "Watch a build or AI agent and sleep the moment it finishes",
-                "Nudge you to restart when your Mac has been up too long",
-            ]
-        ),
-        OnboardingPanel(
-            step: "04 — Stay informed",
+            step: "02 — Stay informed",
             title: "Know what\u{2019}s keeping you up",
             body:
-                "Decaffeinate tells you the moment a new app starts holding your Mac awake — with the real reason, like \u{201c}microphone in use\u{201d} or \u{201c}playing media\u{201d} — so you decide what to allow. Turn on notifications to get the heads-up."
+                "Decaffeinate can tell you the moment a new app starts holding your Mac awake — with the real reason, like \u{201c}microphone in use\u{201d} or \u{201c}playing media\u{201d} — so you decide what to allow."
         ),
     ]
 }
@@ -192,6 +206,72 @@ private struct OnboardingPanelContent: View {
     }
 }
 
+/// Panel 2: the explicit notification choice + trust line + (when available)
+/// the launch-at-login checkbox — replaces the old vague "turn on
+/// notifications" sentence with two real buttons, per the v1.22 audit.
+private struct NotificationChoicePanel: View {
+    let panel: OnboardingPanel
+    @Binding var launchAtLoginEnabled: Bool
+    let onEnableNotifications: () -> Void
+    let onNotNow: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.s4) {
+                Text(panel.step).eyebrow()
+                Text(panel.title)
+                    .scaledFont(30, weight: .semibold, relativeTo: .largeTitle)
+                    .foregroundStyle(Color.ink1)
+                    .tracking(-0.5)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(panel.body)
+                    .scaledFont(15)
+                    .foregroundStyle(Color.ink2)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: Space.s3) {
+                    Button(action: onEnableNotifications) {
+                        Text(L10n.localized("Enable notifications"))
+                    }
+                    .buttonStyle(HarfButtonStyle(variant: .primary, size: .regular))
+                    .keyboardShortcut(.defaultAction)
+                    .fixedSize()
+
+                    Button(action: onNotNow) {
+                        Text(L10n.localized("Not now"))
+                    }
+                    .buttonStyle(HarfButtonStyle(variant: .ghost, size: .regular))
+                    .fixedSize()
+                }
+                .padding(.top, Space.s1)
+
+                Text(
+                    "No screen recording, no accessibility access \u{2014} everything stays on your Mac."
+                )
+                .scaledFont(12)
+                .foregroundStyle(Color.ink3)
+                .fixedSize(horizontal: false, vertical: true)
+
+                if LoginItem.isAvailable {
+                    Toggle(isOn: $launchAtLoginEnabled) {
+                        Text(L10n.localized("Launch Decaffeinate at login"))
+                            .scaledFont(13)
+                            .foregroundStyle(Color.ink1)
+                    }
+                    .toggleStyle(.checkbox)
+                    .padding(.top, Space.s2)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Space.s6)
+            .padding(.vertical, Space.s5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 /// Owns the first-run window for an accessory (menu-bar) app: flips the
 /// activation policy to `.regular` while it's up so the window can take focus,
 /// and back to `.accessory` when it closes.
@@ -217,10 +297,11 @@ final class OnboardingPresenter: NSObject, NSWindowDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let view = OnboardingView(
-            onFinish: { [weak self] in self?.finish() },
-            onEnableNotifications: { AppState.shared.requestNotificationAuthorization() }
-        )
+        let view = OnboardingView(onFinish: { [weak self] notificationsRequested, launchAtLogin in
+            self?.finish(
+                notificationsRequested: notificationsRequested,
+                applyingLaunchAtLogin: launchAtLogin)
+        })
         let hosting = NSHostingController(rootView: view)
         let window = NSWindow(contentViewController: hosting)
         window.title = "Welcome to Decaffeinate"
@@ -239,21 +320,41 @@ final class OnboardingPresenter: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func finish() {
+    /// `notificationsRequested` is true only when the user tapped "Enable
+    /// notifications" — that path requests OS permission immediately, in
+    /// context. Every other exit (Skip, "Not now") must NOT request it here:
+    /// doing so unconditionally, on every exit, was the bug — it fired the OS
+    /// prompt cold at the exact moment a user chose to skip. Instead it's
+    /// deferred (`declinedNotificationsAtOnboarding`) to the moment the
+    /// firewall first actually needs it (see `AppState.updateFirewallQueue`).
+    private func finish(notificationsRequested: Bool, applyingLaunchAtLogin launchAtLogin: Bool?) {
         settingsStore?.settings.hasCompletedOnboarding = true
-        // Both exits (Skip and "Get started") request notification permission:
-        // start() only asks once onboarding is complete, so skipping used to
-        // forfeit the prompt — and with it every notification — for the whole
-        // session. The request is idempotent; the OS prompt shows at most once.
-        AppState.shared.requestNotificationAuthorization()
+        if notificationsRequested {
+            AppState.shared.requestNotificationAuthorization()
+            settingsStore?.settings.declinedNotificationsAtOnboarding = false
+        } else {
+            settingsStore?.settings.declinedNotificationsAtOnboarding = true
+        }
+        // Only when the user actually reached panel 2 (launchAtLogin != nil) —
+        // an early Skip on panel 1 never saw the checkbox, so it must leave
+        // `AppSettings.launchAtLogin`'s default untouched for headless/CLI-only
+        // launches and any pre-v1.22 users who already made their own choice.
+        if let launchAtLogin, LoginItem.isAvailable {
+            if LoginItem.setEnabled(launchAtLogin) {
+                settingsStore?.settings.launchAtLogin = launchAtLogin
+            }
+            // If SMAppService registration fails, leave the setting as-is —
+            // never claim a login-item state the OS didn't actually adopt.
+        }
         window?.close()
     }
 
     func windowWillClose(_ notification: Notification) {
         // Restores the accessory-app activation policy now that the window is gone.
-        // Do NOT mark onboarding complete here — only the Skip and "Get started"
-        // buttons should do that. A plain red-button close means the user just
-        // dismissed it temporarily, so it should reappear next launch.
+        // Do NOT mark onboarding complete here — only the Skip / "Not now" /
+        // "Enable notifications" exits should do that. A plain red-button close
+        // means the user just dismissed it temporarily, so it should reappear
+        // next launch.
         window = nil
         NSApp.setActivationPolicy(.accessory)
     }

@@ -54,17 +54,26 @@ private final class ThermalBox: @unchecked Sendable {
 }
 
 @MainActor private final class FakeNotifier: BlockerNotifying {
-    private(set) var notifications: [(app: String, reason: String)] = []
+    private(set) var notifications: [(app: String, reason: String, holderKey: String)] = []
+    private(set) var digestNotifications: [(count: Int, sample: String)] = []
     private(set) var forcedSleeps: [String] = []
     private(set) var agentFinishes: [String] = []
     private(set) var restartOverdues: [String] = []
-    func requestAuthorizationIfNeeded() {}
-    func notifyNewBlocker(appName: String, reason: String) {
-        notifications.append((appName, reason))
+    private(set) var authorizationRequests = 0
+    var authorizationStatusToReport: NotificationAuthorization = .unknown
+    func requestAuthorizationIfNeeded() { authorizationRequests += 1 }
+    func notifyNewBlocker(appName: String, reason: String, holderKey: String) {
+        notifications.append((appName, reason, holderKey))
+    }
+    func notifyNewBlockers(count: Int, sample: String) {
+        digestNotifications.append((count, sample))
     }
     func notifyForcedSleep(reason: String) { forcedSleeps.append(reason) }
     func notifyAgentFinished(label: String) { agentFinishes.append(label) }
     func notifyRestartOverdue(uptimeLabel: String) { restartOverdues.append(uptimeLabel) }
+    func refreshAuthorizationStatus(_ completion: @escaping @MainActor (NotificationAuthorization) -> Void) {
+        completion(authorizationStatusToReport)
+    }
 }
 
 /// Reports a fixed, idle (zero-CPU) subtree forever — drives AgentWatcher to
@@ -154,6 +163,11 @@ final class AppStateTests: XCTestCase {
         let suite = "decaf.appstate.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         let settings = SettingsStore(defaults: defaults)
+        // Most of this suite exercises the direct idle→forceSleep transition and
+        // predates the pre-sleep warning HUD (v1.22) — default it off here so
+        // those tests stay exactly as deterministic (one tick, one sleep) as
+        // before. The warning-specific tests opt back in explicitly via `configure`.
+        settings.settings.showPreSleepWarning = false
         configure(&settings.settings)
         let rules = RulesEngine(defaults: defaults)
         let restHistory = RestHistoryStore(defaults: defaults)
@@ -1591,5 +1605,283 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(h.state.staleEvidence(for: media), "media/audio holds are exempt")
         XCTAssertNil(h.state.staleLabel(for: media))
         XCTAssertFalse(h.state.rowVerdict(for: media).text.lowercased().contains("stale"))
+    }
+
+    // MARK: Pre-sleep countdown HUD (v1.22)
+
+    func testPreSleepWarningArmsAtIdleThresholdThenFiresAfterItElapses() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = true }
+        defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "warning arms first — no immediate sleep")
+        XCTAssertNotNil(h.state.pendingIdleSleepWarning, "the HUD needs something to show")
+
+        h.clock.advance(21)  // past idleSleepWarningSeconds (20s)
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "sleep fires once the warning elapses")
+        XCTAssertNil(h.state.pendingIdleSleepWarning, "cleared once it fires")
+    }
+
+    func testCancelPendingIdleSleepPreventsSleepAndReArmsOnlyAfterFreshGrace() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = true }
+        defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertNotNil(h.state.pendingIdleSleepWarning, "warning armed at the threshold")
+
+        h.state.cancelPendingIdleSleep()
+        XCTAssertNil(h.state.pendingIdleSleepWarning)
+
+        // Past what would have been the original fire time — cancel must hold.
+        h.clock.advance(21)
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 0, "cancel prevents the sleep")
+        XCTAssertNil(
+            h.state.pendingIdleSleepWarning, "must not immediately re-arm on the very next tick")
+
+        // Still inside the cancel's grace cooldown — idle never dropped, but it
+        // must still not re-arm.
+        h.clock.advance(30)  // 51s since the cancel; grace is 60s
+        h.state.tick()
+        XCTAssertNil(h.state.pendingIdleSleepWarning, "still inside the grace period")
+        XCTAssertEqual(h.sleeper.callCount, 0)
+
+        // Past the grace period — a fresh idle period re-arms the warning, and
+        // it fires normally after its own countdown.
+        h.clock.advance(15)  // 66s since the cancel — past the 60s grace
+        h.state.tick()
+        XCTAssertNotNil(h.state.pendingIdleSleepWarning, "re-arms after the grace elapses")
+        h.clock.advance(21)
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "the re-armed warning fires normally")
+    }
+
+    func testPreSleepWarningDisabledSkipsStraightToSleep() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = false }
+        defer { h.cleanup() }
+        h.idle.seconds = 120
+        h.state.tick()
+        XCTAssertEqual(h.sleeper.callCount, 1, "warning off — sleeps immediately, like before")
+        XCTAssertNil(h.state.pendingIdleSleepWarning, "never armed when the setting is off")
+    }
+
+    func testSafetyRailForceSleepsBypassTheWarningEntirely() {
+        let thermal = makeHarness { $0.showPreSleepWarning = true }
+        defer { thermal.cleanup() }
+        thermal.thermal.state = .critical
+        thermal.state.tick()
+        XCTAssertEqual(thermal.sleeper.callCount, 1, "the backpack guard sleeps immediately")
+        XCTAssertNil(
+            thermal.state.pendingIdleSleepWarning,
+            "an immediate safety guard must never go through the idle warning")
+
+        let battery = makeHarness { $0.showPreSleepWarning = true }
+        defer { battery.cleanup() }
+        battery.power.snap = PowerSnapshot(onBattery: true, charge: 0.02, isCharging: false)
+        battery.state.tick()
+        XCTAssertEqual(battery.sleeper.callCount, 1, "critical battery sleeps immediately")
+        XCTAssertNil(battery.state.pendingIdleSleepWarning)
+    }
+
+    // MARK: Sleep Now call-in-progress guard (v1.22)
+
+    private func micHold(pid: pid_t = 900) -> PowerAssertion {
+        Fixtures.assertion(
+            pid: pid, process: "coreaudiod", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, resources: ["audio-in"])
+    }
+
+    func testSleepNowDuringCallDoesNotSleepAndSetsPendingFlag() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [micHold()]
+        h.state.tick()  // refresh appState.assertions with the live mic hold
+        h.state.sleepNow()
+        XCTAssertEqual(h.sleeper.callCount, 0, "must not sleep mid-call without confirmation")
+        XCTAssertTrue(h.state.pendingCallSleepConfirmation)
+    }
+
+    func testConfirmSleepDuringCallSleeps() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [micHold()]
+        h.state.tick()
+        h.state.sleepNow()
+        XCTAssertTrue(h.state.pendingCallSleepConfirmation)
+        h.state.confirmSleepDuringCall()
+        XCTAssertEqual(h.sleeper.callCount, 1, "confirming sleeps despite the call")
+        XCTAssertFalse(h.state.pendingCallSleepConfirmation, "cleared after confirming")
+    }
+
+    func testCancelSleepDuringCallClearsWithoutSleeping() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [micHold()]
+        h.state.tick()
+        h.state.sleepNow()
+        h.state.cancelSleepDuringCall()
+        XCTAssertFalse(h.state.pendingCallSleepConfirmation)
+        XCTAssertEqual(h.sleeper.callCount, 0)
+    }
+
+    func testSleepNowWithNoCallSleepsImmediatelyAsBefore() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.state.sleepNow()
+        XCTAssertEqual(h.sleeper.callCount, 1, "no call in progress — sleeps immediately, unchanged")
+        XCTAssertFalse(h.state.pendingCallSleepConfirmation)
+    }
+
+    func testSleepNowSkipsCallConfirmationWhenNotRequired() {
+        // The non-interactive automation entry point (URL scheme) — no one is
+        // present to answer a confirmation dialog, so it bypasses the guard.
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [micHold()]
+        h.state.tick()
+        h.state.sleepNow(requireCallConfirmation: false)
+        XCTAssertEqual(h.sleeper.callCount, 1, "non-interactive callers bypass the call guard")
+        XCTAssertFalse(h.state.pendingCallSleepConfirmation)
+    }
+
+    // MARK: Failed-sleep culprit naming (v1.22)
+
+    func testFailedSleepNamesTheSingleCulprit() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [
+            Fixtures.assertion(
+                pid: 501, process: "Docker", bundle: "com.docker.docker",
+                type: AssertionType.preventUserIdleSystemSleep)
+        ]
+        h.state.tick()  // refreshes appState.assertions with the live Docker hold
+        h.state.sleepNow()
+        h.clock.advance(11)  // past userSleepFeedbackSeconds
+        h.state.tick()
+        XCTAssertEqual(
+            h.state.lastError,
+            "The Mac didn\u{2019}t sleep \u{2014} Docker is holding system sleep open.")
+    }
+
+    func testFailedSleepNamesMultipleCulprits() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [
+            Fixtures.assertion(
+                pid: 501, process: "Docker", bundle: "com.docker.docker",
+                type: AssertionType.preventUserIdleSystemSleep),
+            Fixtures.assertion(
+                pid: 502, process: "Chrome", bundle: "com.google.Chrome",
+                type: AssertionType.preventUserIdleSystemSleep),
+            Fixtures.assertion(
+                pid: 503, process: "Slack", bundle: "com.tinyspeck.slackmacgap",
+                type: AssertionType.preventUserIdleSystemSleep),
+        ]
+        h.state.tick()
+        h.state.sleepNow()
+        h.clock.advance(11)
+        h.state.tick()
+        let error = h.state.lastError ?? ""
+        XCTAssertTrue(
+            error.contains("Docker and 2 others"), "got: \(error)")
+    }
+
+    // MARK: Actionable / burst-digest firewall notifications (v1.22)
+
+    func testSingleNewBlockerFiresSingularNotificationCarryingAHolderKey() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let zoom = systemBlocker("Zoom", bundle: "us.zoom.xos")
+        h.scanner.assertions = [zoom]
+        h.state.tick()
+        XCTAssertEqual(h.notifier.notifications.count, 1)
+        XCTAssertTrue(h.notifier.digestNotifications.isEmpty)
+        XCTAssertFalse(
+            h.notifier.notifications.first!.holderKey.isEmpty,
+            "carries a key so a notification action can resolve back to this assertion")
+    }
+
+    func testBurstOfNewBlockersFiresOneDigestNotification() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [
+            systemBlocker("Zoom", bundle: "us.zoom.xos"),
+            systemBlocker("Slack", bundle: "com.tinyspeck.slackmacgap"),
+        ]
+        h.state.tick()
+        XCTAssertEqual(h.notifier.digestNotifications.count, 1, "a burst folds into one digest")
+        XCTAssertEqual(h.notifier.digestNotifications.first?.count, 2)
+        XCTAssertTrue(h.notifier.notifications.isEmpty, "no separate per-app notification")
+        XCTAssertEqual(h.state.pendingClassification.count, 2, "both still need a decision")
+    }
+
+    func testBurstDigestRespectsFireOncePerHolderDedup() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [
+            systemBlocker("Zoom", bundle: "us.zoom.xos"),
+            systemBlocker("Slack", bundle: "com.tinyspeck.slackmacgap"),
+        ]
+        h.state.tick()
+        XCTAssertEqual(h.notifier.digestNotifications.count, 1)
+
+        // Same two blockers, still un-decided — must not re-notify.
+        h.state.tick()
+        XCTAssertEqual(
+            h.notifier.digestNotifications.count, 1, "already-notified holders don't re-fire")
+
+        // A fresh third blocker appears alongside them — only it is new, so it
+        // takes the singular path, not another digest.
+        h.scanner.assertions = [
+            systemBlocker("Zoom", bundle: "us.zoom.xos"),
+            systemBlocker("Slack", bundle: "com.tinyspeck.slackmacgap"),
+            systemBlocker("Chrome", bundle: "com.google.Chrome"),
+        ]
+        h.state.tick()
+        XCTAssertEqual(h.notifier.notifications.count, 1, "the one new blocker uses the singular path")
+        XCTAssertEqual(h.notifier.digestNotifications.count, 1, "no new digest for a single new blocker")
+    }
+
+    func testLiveAssertionResolvesByFirewallKey() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let zoom = systemBlocker("Zoom", bundle: "us.zoom.xos")
+        h.scanner.assertions = [zoom]
+        h.state.tick()
+        let k = h.notifier.notifications.first?.holderKey ?? ""
+        XCTAssertFalse(k.isEmpty)
+        XCTAssertEqual(h.state.liveAssertion(forFirewallKey: k)?.id, zoom.id)
+        XCTAssertNil(h.state.liveAssertion(forFirewallKey: "not-a-real-key"))
+    }
+
+    // MARK: Notification-permission repair path (v1.22)
+
+    func testRefreshNotificationAuthorizationUpdatesPublishedStatus() {
+        let h = makeHarness(); defer { h.cleanup() }
+        XCTAssertEqual(h.state.notificationAuthorization, .unknown)
+        h.notifier.authorizationStatusToReport = .denied
+        h.state.refreshNotificationAuthorization()
+        XCTAssertEqual(h.state.notificationAuthorization, .denied)
+    }
+
+    // MARK: Deferred notification permission ask (v1.22 onboarding rework)
+
+    func testDeferredNotificationRequestFiresOnFirstRealBlockerAfterDecline() {
+        let h = makeHarness { $0.declinedNotificationsAtOnboarding = true }
+        defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Zoom", bundle: "us.zoom.xos")]
+        h.state.tick()
+        XCTAssertEqual(
+            h.notifier.authorizationRequests, 1, "deferred ask fires on the first real blocker")
+        XCTAssertFalse(
+            h.settings.settings.declinedNotificationsAtOnboarding,
+            "one-shot — clears once it fires")
+
+        // A later, different blocker must not re-request.
+        h.scanner.assertions = [
+            systemBlocker("Zoom", bundle: "us.zoom.xos"),
+            systemBlocker("Slack", bundle: "com.tinyspeck.slackmacgap"),
+        ]
+        h.state.tick()
+        XCTAssertEqual(
+            h.notifier.authorizationRequests, 1, "must not re-request after the first firing")
+    }
+
+    func testNoDeferredRequestWhenNotificationsWereNeverDeclined() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Zoom", bundle: "us.zoom.xos")]
+        h.state.tick()
+        XCTAssertEqual(
+            h.notifier.authorizationRequests, 0, "no deferred flag set — nothing to fire")
     }
 }

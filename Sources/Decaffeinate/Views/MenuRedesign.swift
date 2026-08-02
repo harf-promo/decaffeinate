@@ -16,6 +16,7 @@ import SwiftUI
 // =====================================================================
 struct RedesignMenuView: View {
     @Environment(\.theme) private var theme
+    @EnvironmentObject var appState: AppState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +37,10 @@ struct RedesignMenuView: View {
         }
         .frame(width: theme.popoverWidth, height: Self.menuHeight)
         .background(theme.paper)
+        // Refresh the live notification-permission status each time the menu
+        // opens, so a denial/revocation the app wasn't told about at request
+        // time is caught promptly rather than only at the next Settings visit.
+        .onAppear { appState.refreshNotificationAuthorization() }
     }
 
     private var themedHairline: some View {
@@ -190,6 +195,24 @@ private struct RDActionBar: View {
         .padding(.horizontal, theme.contentInset)
         .padding(.top, Space.s5)
         .padding(.bottom, theme.usesCards ? Space.s2 : Space.s4)
+        // Sleep Now bypasses the app's own "never cuts off calls" promise
+        // unless we ask first — this is that ask. The mic-active check that
+        // arms it lives in `AppState.sleepNow()`.
+        .alert(
+            "You appear to be on a call",
+            isPresented: Binding(
+                get: { appState.pendingCallSleepConfirmation },
+                set: { presented in
+                    if !presented { appState.cancelSleepDuringCall() }
+                })
+        ) {
+            Button("Cancel", role: .cancel) { appState.cancelSleepDuringCall() }
+            Button("Sleep anyway", role: .destructive) { appState.confirmSleepDuringCall() }
+        } message: {
+            Text(
+                "The microphone is in use, which usually means a call. Sleep anyway?"
+            )
+        }
     }
 
     /// Label for the "end of work day" quiet-window option — respects the user's
@@ -258,6 +281,26 @@ private struct RDActiveControls: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            // The firewall goes silently dead without this: if notifications
+            // are denied (or later revoked in System Settings), say so instead
+            // of just never notifying again with no explanation.
+            if appState.notificationAuthorization == .denied {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "bell.slash.fill")
+                        .font(.caption2).foregroundStyle(Color.warning).accessibilityHidden(true)
+                    Text("Notifications: Off")
+                        .font(.system(size: 12)).foregroundStyle(theme.ink2)
+                    Button("Enable") { Notifier.openSystemNotificationSettings() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(theme.accent)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Notifications are off")
+                .accessibilityHint("Activate to open System Settings and enable them")
             }
         }
     }

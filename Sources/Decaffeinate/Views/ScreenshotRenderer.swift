@@ -48,11 +48,25 @@ enum ScreenshotRenderer {
                         to: dir.appendingPathComponent("detail-\(suffix).png")) && ok
             }
 
-            let onboarding = OnboardingView(onFinish: {}, onEnableNotifications: {})
+            let onboarding = OnboardingView(onFinish: { _, _ in })
             ok =
                 capture(
                     onboarding, size: NSSize(width: 480, height: 420), appearance: appearance,
                     to: dir.appendingPathComponent("onboarding-\(suffix).png")) && ok
+
+            // Panel 2 — the explicit notification-choice + launch-at-login panel.
+            let onboardingChoice = OnboardingView(onFinish: { _, _ in }, initialPage: 1)
+            ok =
+                capture(
+                    onboardingChoice, size: NSSize(width: 480, height: 420), appearance: appearance,
+                    to: dir.appendingPathComponent("onboarding-notifications-\(suffix).png")) && ok
+
+            // The pre-sleep warning HUD (v1.22) — a fixed sample countdown.
+            let sleepWarningHUD = SleepWarningHUD(secondsRemaining: 14, onStayAwake: {})
+            ok =
+                capture(
+                    sleepWarningHUD, size: NSSize(width: 400, height: 130), appearance: appearance,
+                    to: dir.appendingPathComponent("sleep-warning-hud-\(suffix).png")) && ok
 
             let settings = SettingsView()
                 .environment(\.theme, theme)

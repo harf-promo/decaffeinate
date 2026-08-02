@@ -73,8 +73,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             NSApp.setActivationPolicy(.accessory)
             AppState.shared.start()
+            // Hand the real Notifier's "Always Allow" / "Sleep Anyway"
+            // notification actions back to AppState's policy engine.
+            AppState.shared.wireNotificationActions()
+            // Watches AppState.pendingIdleSleepWarning and shows/hides the
+            // pre-sleep countdown HUD — the idle force-sleep warning, never a
+            // user-initiated Sleep Now.
+            SleepWarningPresenter.shared.start(appState: AppState.shared)
             // Global "Sleep Now" hotkey (opt-in; recorded in Settings → General).
-            // KeyboardShortcuts invokes the handler on the main thread.
+            // KeyboardShortcuts invokes the handler on the main thread. Same
+            // interactive path as the menu button — the call-in-progress
+            // confirmation guard in AppState.sleepNow() applies here too.
             KeyboardShortcuts.onKeyUp(for: .sleepNow) {
                 MainActor.assumeIsolated { AppState.shared.sleepNow() }
             }
@@ -96,7 +105,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             for url in urls {
                 switch AutomationURL.parse(url) {
-                case .sleepNow: AppState.shared.sleepNow()
+                case .sleepNow:
+                    // Non-interactive automation call (Shortcuts, a script) —
+                    // no one is present to answer a "you appear to be on a
+                    // call" confirmation, so this skips that guard and stays
+                    // immediate, like the CLI / App Intents / MCP sleep_now.
+                    AppState.shared.sleepNow(requireCallConfirmation: false)
                 case .keepAwake(let minutes): AppState.shared.stayAwake(forMinutes: minutes)
                 case .stopAwake: AppState.shared.clearQuietWindow()
                 case .none: break

@@ -183,6 +183,9 @@ enum CLI {
 
     /// Put the Mac to sleep now — the same headless `pmset sleepnow` path the app
     /// uses. Exits non-zero if the launch fails, so scripts can react.
+    /// Deliberately bypasses `AppState.sleepNow()`'s call-in-progress
+    /// confirmation guard (menu button / hotkey only) — a non-interactive CLI
+    /// invocation has no one to answer a confirmation dialog.
     @MainActor
     private static func runSleepNow() {
         switch SleepController().sleepNow() {

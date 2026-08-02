@@ -38,19 +38,57 @@ protocol KeepAwakeControlling {
     func releaseAll()
 }
 
+/// A notifier-agnostic view of whether the user can currently receive
+/// notifications — the seam `AppState` reads instead of a raw
+/// `UNAuthorizationStatus`, so tests can drive it without UserNotifications.
+enum NotificationAuthorization: Equatable, Sendable {
+    /// Not yet checked (or unbundled/headless — notifications never apply).
+    case unknown
+    case authorized
+    /// Denied, or later revoked in System Settings — the firewall's
+    /// notifications are silently dead until the user re-enables them there.
+    case denied
+}
+
 @MainActor
 protocol BlockerNotifying {
     func requestAuthorizationIfNeeded()
     /// `reason` must be a non-identifying, classified label (e.g. "Playing
     /// media"), never raw app-supplied assertion text — notifications surface on
-    /// the lock screen.
-    func notifyNewBlocker(appName: String, reason: String)
+    /// the lock screen. `holderKey` (the same firewall key `AppState.key(_:)`
+    /// computes) rides in `userInfo` — never shown, just enough to resolve the
+    /// "Always Allow" / "Sleep Anyway" notification actions back to a live
+    /// assertion later.
+    func notifyNewBlocker(appName: String, reason: String, holderKey: String)
+    /// A single digest notification for a burst of ≥2 new blockers surfacing in
+    /// the same tick, so the user gets one notification, not a one-per-app drip.
+    /// `sample` names the first blocker for a concrete lead-in.
+    func notifyNewBlockers(count: Int, sample: String)
     /// Posted when a confirmed forced sleep actually happens.
     func notifyForcedSleep(reason: String)
     /// Posted when a watched build/agent finishes and the Mac is sleeping now.
     func notifyAgentFinished(label: String)
     /// Posted once when uptime crosses into the overdue/urgent band.
     func notifyRestartOverdue(uptimeLabel: String)
+    /// Re-check the live OS notification-permission status on demand (menu-open,
+    /// Settings-open) — unlike `requestAuthorizationIfNeeded()`, which only ever
+    /// asks once per process launch, this notices a denial or a later revoke in
+    /// System Settings. The completion always runs on the main actor.
+    func refreshAuthorizationStatus(_ completion: @escaping @MainActor (NotificationAuthorization) -> Void)
+}
+
+/// The seam a notification action ("Always Allow" / "Sleep Anyway") needs to
+/// turn a tap back into a policy change — implemented by `AppState`. Kept
+/// separate from `BlockerNotifying` (which flows the other way, AppState →
+/// Notifier) so `Notifier` never needs a concrete `AppState` reference, just
+/// this narrow callback surface.
+@MainActor
+protocol NotifierActionHandling: AnyObject {
+    /// Resolve a firewall key back to a currently-live matching assertion, or
+    /// nil if it's no longer holding (the notification arrived, but the app
+    /// already quit/settled by the time the user tapped it).
+    func resolveAssertion(forFirewallKey key: String) -> PowerAssertion?
+    func setPolicy(_ policy: RulePolicy, for assertion: PowerAssertion)
 }
 
 @MainActor

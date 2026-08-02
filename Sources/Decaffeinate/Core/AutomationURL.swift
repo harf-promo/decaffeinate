@@ -8,6 +8,11 @@ import Foundation
 ///     decaffeinate://sleep-now
 ///     decaffeinate://keep-awake?minutes=30
 ///     decaffeinate://stop-awake
+///
+/// `sleep-now` is applied via `AppState.sleepNow(requireCallConfirmation:
+/// false)` in `DecaffeinateApp`'s `application(_:open:)` — a fire-and-forget
+/// automation call has no one to answer a "you appear to be on a call"
+/// confirmation, so it deliberately skips that guard and stays immediate.
 enum AutomationURL {
     static let scheme = "decaffeinate"
 

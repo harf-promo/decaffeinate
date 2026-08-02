@@ -154,6 +154,10 @@ final class MCPServer {
             return .init(
                 content: [MCPServer.contentText("Released the keep-awake hold.")], isError: false)
         case .sleepNow:
+            // Calls SleepController directly, not AppState.sleepNow() — an MCP
+            // tool call is a non-interactive automation invocation with no one
+            // to answer the "you appear to be on a call" confirmation the menu
+            // button / hotkey path shows, so this stays immediate.
             switch SleepController().sleepNow() {
             case .success:
                 return .init(

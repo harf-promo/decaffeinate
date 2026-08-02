@@ -79,6 +79,10 @@ struct SleepNowIntent: AppIntent {
         "Force your Mac to sleep immediately, overriding whatever is holding it awake.")
     static let openAppWhenRun = false
 
+    // Calls SleepController directly, not AppState.sleepNow() — so it never
+    // sees that method's call-in-progress confirmation guard (menu button /
+    // hotkey only). A Shortcuts/Siri invocation is non-interactive; there's no
+    // one to answer a "you appear to be on a call" dialog.
     func perform() async throws -> some IntentResult & ProvidesDialog {
         switch SleepController().sleepNow() {
         case .success:

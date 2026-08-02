@@ -111,6 +111,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 // ── General: auto-sleep + battery + keep-awake + safety guards + startup ──
 private struct GeneralSettings: View {
     @EnvironmentObject var store: SettingsStore
+    @EnvironmentObject var appState: AppState
     private var s: Binding<DecaffeinateSettings> { $store.settings }
 
     var body: some View {
@@ -133,6 +134,15 @@ private struct GeneralSettings: View {
                     unit: "min", enabled: store.settings.decaffeinateEnabled)
                 Text(
                     "When you step away, Decaffeinate forces sleep after this much idle time — even if an app is trying to keep the Mac awake."
+                )
+                .settingsCaption()
+
+                Toggle(
+                    "Warn before sleeping, with time to stay awake", isOn: s.showPreSleepWarning
+                )
+                .disabled(!store.settings.decaffeinateEnabled)
+                Text(
+                    "Shows a brief on-screen countdown with a \u{201C}Stay awake\u{201D} button before an idle sleep actually happens. Turn this off to sleep immediately, like before."
                 )
                 .settingsCaption()
 
@@ -231,6 +241,18 @@ private struct GeneralSettings: View {
             }
 
             Section("Notifications") {
+                if appState.notificationAuthorization == .denied {
+                    HStack {
+                        Label("Notifications: Off", systemImage: "bell.slash.fill")
+                            .foregroundStyle(Color.warning)
+                        Spacer()
+                        Button("Enable\u{2026}") { Notifier.openSystemNotificationSettings() }
+                    }
+                    Text(
+                        "Decaffeinate can\u{2019}t notify you until notifications are turned back on in System Settings \u{2014} the toggles below have nothing to post to."
+                    )
+                    .settingsCaption()
+                }
                 Toggle("Tell me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
                 Toggle(
                     "Tell me when Decaffeinate puts the Mac to sleep", isOn: s.notifyOnForcedSleep)
@@ -240,6 +262,7 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { appState.refreshNotificationAuthorization() }
     }
 }
 

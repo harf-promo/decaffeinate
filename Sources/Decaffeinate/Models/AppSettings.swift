@@ -88,6 +88,13 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// a forced sleep is approaching. Off by default to keep the menu bar quiet.
     var showMenuBarCountdown: Bool = false
 
+    /// Show a brief on-screen "Sleeping in Ns — Stay awake" warning before an
+    /// *idle* force-sleep actually fires, so it's never a silent surprise. On by
+    /// default — the scary moment (v1.22's whole point). Never applies to a
+    /// user-initiated Sleep Now (already immediate) or a safety-rail sleep
+    /// (battery floor / thermal — those stay unconditional backstops).
+    var showPreSleepWarning: Bool = true
+
     // MARK: Rest & restart
 
     /// Recommend a restart once the Mac has been up this many days. Consensus
@@ -123,6 +130,15 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// Set once the user has seen the inline "what's keeping it awake?" explainer,
     /// so it auto-expands only the first time.
     var hasSeenAwakeExplainer: Bool = false
+
+    /// Set when onboarding finished WITHOUT the user tapping "Enable
+    /// notifications" (Skip, or "Not now" on the notification-choice panel).
+    /// Lets the firewall defer the OS permission prompt to the moment it's
+    /// actually needed — the first real blocker — instead of asking cold at
+    /// launch. Cleared the moment that deferred ask fires (see
+    /// `AppState.updateFirewallQueue`), so it's a one-shot signal, not a
+    /// permanent "never ask" flag.
+    var declinedNotificationsAtOnboarding: Bool = false
 
     // MARK: Advanced
 
@@ -198,6 +214,9 @@ extension DecaffeinateSettings {
         if let v = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarCountdown) {
             showMenuBarCountdown = v
         }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .showPreSleepWarning) {
+            showPreSleepWarning = v
+        }
         if let v = try c.decodeIfPresent(Int.self, forKey: .restartRecommendationDays) {
             restartRecommendationDays = v
         }
@@ -218,6 +237,9 @@ extension DecaffeinateSettings {
         }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .hasSeenAwakeExplainer) {
             hasSeenAwakeExplainer = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .declinedNotificationsAtOnboarding) {
+            declinedNotificationsAtOnboarding = v
         }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .strictTakeoverMode) {
             strictTakeoverMode = v
