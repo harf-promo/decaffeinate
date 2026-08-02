@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Phase B spike only — see docs/PHASE-B-SPIKE.md. A STATIC RESOURCE: nothing
+  in Scripts/build-app.sh copies this file anywhere, and no code in this
+  repository calls SMAppService.daemon(plistName:) to register it. It exists
+  so the concrete shape of the LaunchDaemon this design would need is
+  reviewable, not so it can be embedded by a build step today.
+
+  Where this would need to live if it were ever actually embedded: research
+  during this spike (see docs/PHASE-B-SPIKE.md) confirms SMAppService.daemon
+  expects the plist inside the app bundle at exactly
+  Contents/Library/LaunchDaemons/<this file's name>, with the daemon
+  executable itself conventionally placed alongside the main app binary at
+  Contents/MacOS/DecaffeinateLidHelper.
+
+  ProgramArguments (rather than the SMAppService-specific `BundleProgram`
+  key) is used here deliberately: per an Apple DTS engineer's forum guidance
+  found during this spike's research (see docs/PHASE-B-SPIKE.md's sources),
+  `BundleProgram` — a bundle-relative path — is only honored when the daemon
+  is registered interactively via `SMAppService.daemon(...)` itself;
+  `Program`/`ProgramArguments` (an absolute path) is the portable key that
+  also works for a script/pkg-driven install. The absolute path below is
+  illustrative only — it would need to match wherever this app is actually
+  installed, which a static plist can't express generically; this is exactly
+  the kind of detail a real (non-spike) implementation would need to get
+  right, likely by generating this file at build time instead of shipping it
+  as a static resource.
+-->
+<dict>
+    <key>Label</key>
+    <string>com.harfpromo.Decaffeinate.LidHelper</string>
+
+    <!-- Matches the Mach service name `LidHelperXPCProtocol`'s listener
+         registers under in DecaffeinateLidHelper's main.swift, and the name
+         Sources/Decaffeinate/Core/LidHelperClient.swift's NSXPCConnection
+         would dial. -->
+    <key>MachServices</key>
+    <dict>
+        <key>com.harfpromo.Decaffeinate.lidhelper</key>
+        <true/>
+    </dict>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/Decaffeinate.app/Contents/MacOS/DecaffeinateLidHelper</string>
+    </array>
+
+    <!-- The reboot antidote: launchd starts this daemon automatically at
+         boot/registration rather than waiting for the app to launch first —
+         LidHelperService.clearOnLaunch() depends on RunAtLoad to guarantee a
+         fresh, known-clear start after every reboot, never just after the
+         app itself relaunches. -->
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

@@ -120,6 +120,27 @@ protocol ProcessProvenanceResolving {
     func provenance(for pid: pid_t) -> ProcessProvenance?
 }
 
+// MARK: - Phase B spike (docs/PHASE-B-SPIKE.md) — not wired into the app
+
+/// The seam a lid-closed session coordinator would call against the
+/// privileged Phase B helper's XPC surface (`DecaffeinateLidHelper` — a
+/// separate, unintegrated SwiftPM target this app does not depend on; see
+/// that target's own doc comments and `docs/PHASE-B-SPIKE.md`).
+/// `LidHelperClient` (`Core/LidHelperClient.swift`) is the real, XPC-calling
+/// implementation and satisfies this protocol so the seam compiles — but
+/// deliberately: **nothing in `AppState.swift` or any View holds a reference
+/// to this protocol or to `LidHelperClient`.** It exists, compiles, and is
+/// exercised in tests only via a fake; it is not part of the shipped app's
+/// engine roster below.
+@MainActor
+protocol LidClosedControlling {
+    func acquireLease(ttlSeconds: Int) async -> LidHelperReply
+    func renewLease(ttlSeconds: Int) async -> LidHelperReply
+    func releaseLease() async -> LidHelperReply
+    func currentState() async -> LidHelperReply
+    func helperVersion() async -> String?
+}
+
 // MARK: - Real engines conform
 
 extension TelemetryEngine: PowerAssertionScanning {}
