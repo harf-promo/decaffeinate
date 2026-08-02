@@ -35,7 +35,8 @@ struct RedesignMenuView: View {
             themedHairline
             RDFooter()
         }
-        .frame(width: theme.popoverWidth, height: Self.menuHeight)
+        .frame(width: theme.popoverWidth)
+        .frame(minHeight: Self.menuHeight, maxHeight: Self.maxMenuHeight)
         .background(theme.paper)
         // Refresh the live notification-permission status each time the menu
         // opens, so a denial/revocation the app wasn't told about at request
@@ -47,16 +48,27 @@ struct RedesignMenuView: View {
         Rectangle().fill(theme.hairline).frame(height: 1)
     }
 
-    /// A fixed-but-screen-aware height: tall enough for the list to breathe, but
-    /// never taller than the space below the menu bar — so the footer (Settings /
-    /// quit / update) can't be pushed off-screen on a small display.
+    /// A screen-aware **minimum** height: tall enough for the list to breathe
+    /// at the default text size. `maxMenuHeight` caps growth so the footer
+    /// (Settings / quit / update) can't be pushed off-screen on a small
+    /// display — but between the two, the popover is free to grow with larger
+    /// Dynamic Type sizes instead of clipping its content.
     static var menuHeight: CGFloat {
         let available = NSScreen.main?.visibleFrame.height ?? 720
         return min(460, max(360, available * 0.8))
     }
+
+    /// The hard ceiling — never taller than the visible screen under the menu
+    /// bar, regardless of how large the content grows at big Dynamic Type sizes.
+    static var maxMenuHeight: CGFloat {
+        (NSScreen.main?.visibleFrame.height ?? 720) * 0.92
+    }
 }
 
 // ── Header: mark + outcome headline + one quiet meta-line, hugging its content ──
+// The protected top third — the single answer to "will it sleep?" — so the
+// restart/uptime nudge (a much lower-priority, occasional signal) has moved
+// to the footer, where it can't compete with the verdict for attention.
 private struct RDHeader: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject var appState: AppState
@@ -68,13 +80,13 @@ private struct RDHeader: View {
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(appState.headline)
-                        .font(theme.headlineFont)
+                        .scaledFont(theme.headlineSize, weight: .semibold, relativeTo: .title2)
                         .foregroundStyle(theme.ink1)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                     if !appState.detail.isEmpty {
                         Text(appState.detail)
-                            .font(.system(size: 13))
+                            .scaledFont(13, relativeTo: .callout)
                             .foregroundStyle(theme.ink3)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -83,39 +95,33 @@ private struct RDHeader: View {
                 Spacer(minLength: 0)
             }
 
+            // Sentence case at a readable size — this is the most scannable
+            // status on the whole surface (what's the power source, what's
+            // holding it, how long idle), so it gets real body-text treatment
+            // instead of a decorative tracked eyebrow.
             Text(metaLine)
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.8)
-                .foregroundStyle(theme.ink4)
+                .scaledFont(12, weight: .medium, relativeTo: .footnote)
+                .foregroundStyle(theme.ink3)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, Space.s2)
-
-            // A calm uptime/restart nudge when the Mac has been up a while.
-            if let hint = appState.restartHint {
-                HStack(spacing: Space.s1) {
-                    Image(systemName: "arrow.clockwise").font(.system(size: 10))
-                    Text(hint).fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.system(size: 12))
-                .foregroundStyle(appState.restartAdvice == .urgent ? Color.warning : theme.ink3)
-                .padding(.top, Space.s2)
-            }
         }
         .padding(.horizontal, theme.contentInset)
         .padding(.top, Space.s4)
     }
 
-    /// "BATTERY 82% · 2 APPS HOLDING · IDLE 4M" — neutral, never amber.
+    /// "Battery 82% · 2 apps holding · Idle 4m" — neutral, never amber.
     private var metaLine: String {
         var parts: [String] = []
         if appState.power.onBattery, let pct = appState.power.chargePercent {
-            parts.append("BATTERY \(pct)%")
+            parts.append("Battery \(pct)%")
         } else {
-            parts.append("AC POWER")
+            parts.append("AC power")
         }
         let n = appState.activeHoldingCount
-        if n > 0 { parts.append("\(n) APP\(n == 1 ? "" : "S") HOLDING") }
+        if n > 0 { parts.append("\(n) app\(n == 1 ? "" : "s") holding") }
         if appState.idleSeconds >= 60 {
-            parts.append("IDLE " + Format.duration(appState.idleSeconds).uppercased())
+            parts.append("Idle " + Format.duration(appState.idleSeconds))
         }
         return parts.joined(separator: " · ")
     }
@@ -141,8 +147,8 @@ private struct RDActionBar: View {
                 .buttonStyle(RDPrimaryButton())
                 .help("Put the Mac to sleep now, overriding every sleep block.")
 
-                // "More…" folds in Keep-awake durations and Sleep-when-done
-                // watch targets so they're accessible but not shouting.
+                // "Keep awake…" folds in the durations and Sleep-when-done watch
+                // targets so they're accessible but not shouting.
                 Menu {
                     Section("Keep awake") {
                         // Timed holds are the first-class, self-releasing path —
@@ -171,7 +177,7 @@ private struct RDActionBar: View {
                         }
                     }
                 } label: {
-                    Label("More\u{2026}", systemImage: "ellipsis.circle")
+                    Label("Keep awake\u{2026}", systemImage: "ellipsis.circle")
                 }
                 .menuStyle(.button)
                 .buttonStyle(RDSecondaryButton())
@@ -187,7 +193,7 @@ private struct RDActionBar: View {
 
             if let error = appState.lastError {
                 Text(error)
-                    .font(.system(size: 11))
+                    .scaledFont(11, relativeTo: .caption2)
                     .foregroundStyle(Color.critical)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -225,13 +231,13 @@ private struct RDActionBar: View {
     }
 
     /// Auto-sleep toggle row — surfaces the master on/off without extra clutter.
-    /// Keep-awake and Sleep-when-done controls have moved to the More… menu above.
+    /// Keep-awake and Sleep-when-done controls live in the Keep awake… menu above.
     private var autoSleepRow: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: "moon.zzz").font(.system(size: 12))
+            Image(systemName: "moon.zzz").scaledFont(12, relativeTo: .caption)
                 .foregroundStyle(theme.ink3).accessibilityHidden(true)
             Text("Auto-sleep when idle")
-                .font(.system(size: 13)).foregroundStyle(theme.ink2)
+                .scaledFont(13, relativeTo: .callout).foregroundStyle(theme.ink2)
             Spacer()
             Toggle("", isOn: settings.decaffeinateEnabled)
                 .labelsHidden()
@@ -277,7 +283,7 @@ private struct RDActiveControls: View {
                     Image(systemName: "bolt.horizontal.circle.fill")
                         .font(.caption2).foregroundStyle(theme.accent).accessibilityHidden(true)
                     Text("Kept awake — \(reason)")
-                        .font(.system(size: 12)).foregroundStyle(theme.ink2).lineLimit(1)
+                        .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink2).lineLimit(1)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -290,10 +296,10 @@ private struct RDActiveControls: View {
                     Image(systemName: "bell.slash.fill")
                         .font(.caption2).foregroundStyle(Color.warning).accessibilityHidden(true)
                     Text("Notifications: Off")
-                        .font(.system(size: 12)).foregroundStyle(theme.ink2)
+                        .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink2)
                     Button("Enable") { Notifier.openSystemNotificationSettings() }
                         .buttonStyle(.plain)
-                        .font(.system(size: 12, weight: .semibold))
+                        .scaledFont(12, weight: .semibold, relativeTo: .caption)
                         .foregroundStyle(theme.accent)
                     Spacer()
                 }
@@ -310,7 +316,7 @@ private struct RDActiveControls: View {
             Image(systemName: icon).font(.caption2).foregroundStyle(theme.ink3)
                 .accessibilityHidden(true)
             Button(label, action: action).buttonStyle(.plain).foregroundStyle(theme.ink2)
-                .font(.system(size: 12, weight: .medium))
+                .scaledFont(12, weight: .medium, relativeTo: .caption)
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -323,6 +329,15 @@ private struct RDList: View {
     @EnvironmentObject var appState: AppState
     @State private var showExplainer = false
     @State private var didAutoShow = false
+    @State private var showAllHolders = false
+    // The non-system section defaults collapsed — it's meaningfully lower
+    // priority than "what's keeping your Mac awake" (it can't stop a sleep),
+    // so it shouldn't compete with the primary section for visual weight.
+    @State private var showOthers = false
+
+    /// Beyond this many rows in the primary section, fold the rest behind a
+    /// "show N more" row instead of an ever-growing unbounded list.
+    private let foldThreshold = 6
 
     private var others: [PowerAssertion] { appState.sortedOtherBlockers }
     private func isPending(_ a: PowerAssertion) -> Bool { appState.isPendingDecision(a) }
@@ -341,9 +356,8 @@ private struct RDList: View {
                 if let verdict = appState.sleepBanner { verdictBanner(verdict) }
                 groupRows(appState.groupedSystemBlockers)
                 if !others.isEmpty {
-                    RDSectionLabel(text: "Screen-only / background", trailing: nil)
-                        .padding(.top, theme.usesCards ? 0 : Space.s2)
-                    rows(others)
+                    othersDisclosure
+                    if showOthers { rows(others) }
                 }
             }
         }
@@ -361,13 +375,14 @@ private struct RDList: View {
     private var sectionHeader: some View {
         HStack {
             Text("Keeping your Mac awake").textCase(.uppercase)
-                .font(.system(size: 11, weight: .semibold)).tracking(0.8)
+                .scaledFont(11, weight: .semibold, relativeTo: .caption2).tracking(0.8)
                 .foregroundStyle(theme.ink3)
+                .lineLimit(1)
             Spacer()
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) { showExplainer.toggle() }
             } label: {
-                Image(systemName: "info.circle").font(.system(size: 12))
+                Image(systemName: "info.circle").scaledFont(12, relativeTo: .caption)
             }
             .buttonStyle(.plain).foregroundStyle(showExplainer ? theme.accent : theme.ink4)
             .help("What does this mean?")
@@ -380,14 +395,14 @@ private struct RDList: View {
     private var explainerCard: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             Text("What\u{2019}s keeping your Mac awake?")
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.ink1)
+                .scaledFont(12, weight: .semibold, relativeTo: .caption).foregroundStyle(theme.ink1)
             Text(
                 "Each row shows something that asked macOS to stay awake. "
                     + "\u{2713} rows end on their own \u{2014} your Mac will sleep when the job is done. "
                     + "\u{26A0} rows hold indefinitely \u{2014} tap \u{22EF} for options. "
                     + "Tap a row for the full detail."
             )
-            .font(.system(size: 12)).foregroundStyle(theme.ink3)
+            .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink3)
             .fixedSize(horizontal: false, vertical: true)
         }
         .padding(Space.s3)
@@ -402,11 +417,11 @@ private struct RDList: View {
     private func verdictBanner(_ verdict: SleepVerdict) -> some View {
         HStack(spacing: Space.s2) {
             Image(systemName: verdict.glyph)
-                .font(.system(size: 11, weight: .semibold))
+                .scaledFont(11, weight: .semibold, relativeTo: .caption2)
                 .foregroundStyle(verdict.tone.color(theme))
                 .accessibilityHidden(true)
             Text(verdict.text)
-                .font(.system(size: 12, weight: .medium))
+                .scaledFont(12, weight: .medium, relativeTo: .caption)
                 .foregroundStyle(verdict.tone.color(theme))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -417,17 +432,32 @@ private struct RDList: View {
         .accessibilityLabel(verdict.text)
     }
 
+    /// The primary rows, folded beyond `foldThreshold` — many-holder scaling
+    /// (e.g. 15 agent sessions) shouldn't turn the menu into an unbounded
+    /// scroll of full rows; the rest hide behind a "show N more" row. A group
+    /// still awaiting an allow/ignore decision is never folded away, even
+    /// past the threshold — the fold is a density fix, not a way to hide a
+    /// pending approval the user hasn't seen yet.
     @ViewBuilder private func groupRows(_ list: [HoldGroup]) -> some View {
-        ForEach(Array(list.enumerated()), id: \.element.id) { idx, group in
+        let mustExpand =
+            showAllHolders
+            || (list.count > foldThreshold && list[foldThreshold...].contains(where: isPending))
+        let visible = mustExpand ? list : Array(list.prefix(foldThreshold))
+        ForEach(Array(visible.enumerated()), id: \.element.id) { idx, group in
             RDRow(group: group, pending: isPending(group))
-            if !theme.usesCards && idx < list.count - 1 {
+            if !theme.usesCards && idx < visible.count - 1 {
                 Rectangle().fill(theme.hairline).frame(height: 1)
                     .padding(.leading, theme.contentInset + Metrics.rowIcon + Space.s3)
             }
         }
+        let folded = list.count - visible.count
+        if folded > 0 {
+            foldRow(count: folded) { withAnimation(.easeInOut(duration: 0.15)) { showAllHolders = true } }
+        }
     }
 
-    /// Non-system holds (screen-only / background) — always singleton rows.
+    /// Non-system holds (screen-only / background) — always singleton rows,
+    /// hidden behind `othersDisclosure` by default.
     @ViewBuilder private func rows(_ list: [PowerAssertion]) -> some View {
         ForEach(Array(list.enumerated()), id: \.element.id) { idx, a in
             RDRow(
@@ -442,11 +472,59 @@ private struct RDList: View {
         }
     }
 
+    /// A "show N more" row — same visual grammar as `RDSectionLabel`, but
+    /// tappable, so it reads as a natural continuation of the list rather than
+    /// a new control.
+    private func foldRow(count: Int, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Space.s2) {
+                Image(systemName: "chevron.down.circle").scaledFont(13, relativeTo: .callout)
+                Text("Show \(count) more").scaledFont(12, weight: .medium, relativeTo: .caption)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(theme.ink3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, theme.contentInset)
+        .padding(.vertical, Space.s2)
+        .accessibilityLabel("Show \(count) more blockers")
+    }
+
+    /// The "screen-only / background" section header, as a disclosure toggle —
+    /// these holds can't keep the system from sleeping, so they default
+    /// collapsed instead of matching the primary section's visual weight.
+    private var othersDisclosure: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { showOthers.toggle() }
+        } label: {
+            HStack {
+                Image(systemName: showOthers ? "chevron.down" : "chevron.right")
+                    .scaledFont(9, weight: .semibold, relativeTo: .caption2)
+                Text("Screen-only / background").textCase(.uppercase)
+                    .scaledFont(11, weight: .semibold, relativeTo: .caption2).tracking(0.8)
+                    .lineLimit(1)
+                Spacer()
+                Text("\(others.count)")
+                    .scaledFont(11, weight: .semibold, relativeTo: .caption2)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(theme.ink4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, theme.contentInset)
+        .padding(.top, theme.usesCards ? 0 : Space.s2)
+        .padding(.bottom, Space.s1)
+        .accessibilityLabel("Screen-only / background, \(others.count)")
+        .accessibilityHint(showOthers ? "Double-tap to collapse" : "Double-tap to expand")
+    }
+
     private var emptyState: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: "checkmark.seal.fill").foregroundStyle(theme.teal)
             Text("Nothing is holding your Mac awake.")
-                .font(.system(size: 14)).foregroundStyle(theme.ink2)
+                .scaledFont(14, relativeTo: .body).foregroundStyle(theme.ink2)
         }
         .padding(.horizontal, theme.contentInset)
         .padding(.vertical, Space.s3)
@@ -460,12 +538,13 @@ private struct RDSectionLabel: View {
 
     var body: some View {
         HStack {
-            Text(text).textCase(.uppercase).font(.system(size: 11, weight: .semibold))
-                .tracking(0.8).foregroundStyle(theme.ink3)
+            Text(text).textCase(.uppercase).scaledFont(11, weight: .semibold, relativeTo: .caption2)
+                .tracking(0.8).foregroundStyle(theme.ink3).lineLimit(1)
             Spacer()
             if let trailing {
-                Text(trailing).textCase(.uppercase).font(.system(size: 11, weight: .semibold))
-                    .tracking(0.8).foregroundStyle(theme.ink4)
+                Text(trailing).textCase(.uppercase)
+                    .scaledFont(11, weight: .semibold, relativeTo: .caption2)
+                    .tracking(0.8).foregroundStyle(theme.ink4).lineLimit(1)
             }
         }
         .padding(.horizontal, theme.contentInset)
@@ -495,7 +574,7 @@ private struct RDRow: View {
             let symbol = appState.audioDeviceSymbol(for: assertion)
         {
             Image(systemName: symbol)
-                .font(.system(size: 15))
+                .scaledFont(15, relativeTo: .body)
                 .foregroundStyle(theme.ink2)
                 .frame(width: Metrics.rowIcon, height: Metrics.rowIcon)
         } else {
@@ -532,7 +611,7 @@ private struct RDRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: Space.s2) {
                     Text(titleText)
-                        .font(.system(size: 14, weight: .semibold))
+                        .scaledFont(14, weight: .semibold, relativeTo: .callout)
                         .foregroundStyle(theme.ink1).lineLimit(1)
                     if !pending { tag }
                 }
@@ -545,11 +624,11 @@ private struct RDRow: View {
                     let v = appState.rowVerdict(for: assertion)
                     HStack(spacing: 4) {
                         Image(systemName: v.glyph)
-                            .font(.system(size: 11, weight: .medium))
+                            .scaledFont(11, weight: .medium, relativeTo: .caption2)
                             .foregroundStyle(v.tone.color(theme))
                             .accessibilityHidden(true)
                         Text(v.text)
-                            .font(.system(size: 12))
+                            .scaledFont(12, relativeTo: .caption)
                             .foregroundStyle(v.tone.color(theme))
                     }
                     .accessibilityElement(children: .combine)
@@ -561,7 +640,17 @@ private struct RDRow: View {
             }
 
             Spacer(minLength: Space.s1)
-            if !pending { rowMenu }
+            if !pending {
+                // A persistent disclosure chevron — the only signal today that a
+                // row is expandable was the one-time explainer card, gated behind
+                // `hasSeenAwakeExplainer`. This is always visible and flips to
+                // reflect the row's actual expanded state.
+                Image(systemName: showDetails ? "chevron.down" : "chevron.right")
+                    .scaledFont(10, weight: .semibold, relativeTo: .caption2)
+                    .foregroundStyle(theme.ink4)
+                    .accessibilityHidden(true)
+                rowMenu
+            }
         }
         .padding(.horizontal, theme.usesCards ? Space.s3 : theme.contentInset)
         .padding(.vertical, theme.usesCards ? Space.s3 : Space.s2)
@@ -570,9 +659,10 @@ private struct RDRow: View {
         .onTapGesture {
             if !pending { withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() } }
         }
+        .accessibilityHint(pending ? "" : (showDetails ? "Double-tap to hide details" : "Double-tap to show details"))
     }
 
-    private var contextText: Text {
+    private var contextText: some View {
         var t = Text(appState.displayReason(for: assertion)).foregroundStyle(theme.ink2)
         var tail: [String] = []
         if group.isAgentSession {
@@ -605,7 +695,7 @@ private struct RDRow: View {
         if !tail.isEmpty {
             t = t + Text(" · " + tail.joined(separator: " · ")).foregroundStyle(theme.ink4)
         }
-        return t.font(.system(size: 12))
+        return t.scaledFont(12, relativeTo: .caption)
     }
 
     /// One-click "Sleep when it finishes" for an agentic `caffeinate -w` hold,
@@ -645,13 +735,13 @@ private struct RDRow: View {
             HStack(spacing: Space.s1) {
                 Circle().fill(theme.teal).frame(width: 5, height: 5)
                 Text(label)
-                    .textCase(.uppercase).font(.system(size: 10, weight: .semibold))
-                    .tracking(0.7).foregroundStyle(theme.ink3)
+                    .textCase(.uppercase).scaledFont(10, weight: .semibold, relativeTo: .caption2)
+                    .tracking(0.7).foregroundStyle(theme.ink3).lineLimit(1)
             }
         case .ignore:
             Text(RulePolicy.ignore.shortLabel)
-                .textCase(.uppercase).font(.system(size: 10, weight: .semibold))
-                .tracking(0.7).foregroundStyle(theme.ink4)
+                .textCase(.uppercase).scaledFont(10, weight: .semibold, relativeTo: .caption2)
+                .tracking(0.7).foregroundStyle(theme.ink4).lineLimit(1)
         case .none:
             EmptyView()
         }
@@ -741,7 +831,7 @@ private struct RDRow: View {
     }
 }
 
-// ── Footer: slept-ago / update · Settings · quit ──
+// ── Footer: restart nudge · slept-ago / update · Settings · quit ──
 private struct RDFooter: View {
     @Environment(\.theme) private var theme
     @Environment(\.openSettings) private var openSettings
@@ -749,36 +839,56 @@ private struct RDFooter: View {
     @EnvironmentObject var updater: UpdaterController
 
     var body: some View {
-        HStack(spacing: Space.s3) {
-            if updater.updateAvailable {
-                Button {
-                    updater.checkForUpdatesUserInitiated()
-                } label: {
-                    Label("Update available", systemImage: "arrow.down.circle.fill")
+        VStack(spacing: 0) {
+            // The uptime/restart nudge lives here, not the header — it's a much
+            // lower-priority, occasional signal than "will it sleep?" and
+            // shouldn't compete with the verdict for the top third's attention.
+            if let hint = appState.restartHint {
+                HStack(spacing: Space.s1) {
+                    Image(systemName: "arrow.clockwise").scaledFont(10, relativeTo: .caption2)
+                    Text(hint).lineLimit(1).truncationMode(.tail)
                 }
-                .buttonStyle(RDPrimaryButton(compact: true))
-                .fixedSize()
-                .help("A new version of Decaffeinate is ready — click to install.")
-            } else if let last = appState.lastSleepAt {
-                Label(
-                    "Slept \(Format.relative(since: last))", systemImage: "clock.arrow.circlepath"
-                )
-                .font(.system(size: 11)).foregroundStyle(theme.ink3)
+                .scaledFont(11, relativeTo: .caption2)
+                .foregroundStyle(appState.restartAdvice == .urgent ? Color.warning : theme.ink4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, theme.contentInset)
+                .padding(.top, Space.s2)
             }
-            Spacer()
-            // Routine "Check for Updates…" lives in Settings → About now; the menu
-            // only surfaces the green button above when there's genuinely an update.
-            Button {
-                SettingsWindowOpener.open(openSettings)
-            } label: {
-                Label("Settings", systemImage: "gearshape").font(.system(size: 12, weight: .medium))
+
+            HStack(spacing: Space.s3) {
+                if updater.updateAvailable {
+                    Button {
+                        updater.checkForUpdatesUserInitiated()
+                    } label: {
+                        Label("Update available", systemImage: "arrow.down.circle.fill")
+                    }
+                    .buttonStyle(RDPrimaryButton(compact: true))
+                    .fixedSize()
+                    .help("A new version of Decaffeinate is ready — click to install.")
+                } else if let last = appState.lastSleepAt {
+                    Label(
+                        "Slept \(Format.relative(since: last))",
+                        systemImage: "clock.arrow.circlepath"
+                    )
+                    .scaledFont(11, relativeTo: .caption2).foregroundStyle(theme.ink3)
+                }
+                Spacer()
+                // Routine "Check for Updates…" lives in Settings → About now; the
+                // menu only surfaces the green button above when there's
+                // genuinely an update.
+                Button {
+                    SettingsWindowOpener.open(openSettings)
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                        .scaledFont(12, weight: .medium, relativeTo: .caption)
+                }
+                .buttonStyle(.plain).foregroundStyle(theme.ink2)
+                .help("Open Settings").accessibilityLabel("Settings")
+                iconButton("power", "Quit Decaffeinate") { NSApp.terminate(nil) }
             }
-            .buttonStyle(.plain).foregroundStyle(theme.ink2)
-            .help("Open Settings").accessibilityLabel("Settings")
-            iconButton("power", "Quit Decaffeinate") { NSApp.terminate(nil) }
+            .padding(.horizontal, theme.contentInset)
+            .padding(.vertical, Space.s2)
         }
-        .padding(.horizontal, theme.contentInset)
-        .padding(.vertical, Space.s2)
     }
 
     private func iconButton(_ icon: String, _ label: String, action: @escaping () -> Void)
@@ -854,7 +964,7 @@ private struct RDButtonBody: View {
 
     var body: some View {
         configuration.label
-            .font(.system(size: compact ? 12 : 14, weight: .medium))
+            .scaledFont(compact ? 12 : 14, weight: .medium, relativeTo: compact ? .caption : .callout)
             .lineLimit(1)
             .padding(.horizontal, compact ? Space.s3 : Space.s4)
             .padding(.vertical, compact ? 6 : 9)

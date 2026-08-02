@@ -82,8 +82,16 @@ enum BrandMark {
 
     /// Menu-bar glyph for `state`, scaled into `rect`. All elements fill solid
     /// black in a template `NSImage` (tinted automatically by the menu bar).
-    /// The crescent is the constant brand anchor; a modifier distinguishes state.
-    /// Y-down coordinate system; AppKit must flip the CTM.
+    ///
+    /// Two things distinguish each state, not one tiny corner mark: the
+    /// **moon's own fullness** (how much of the disc the crescent carve keeps —
+    /// a thin new-moon sliver reads calm, a near-solid gibbous moon reads
+    /// heavy/urgent) plus a bold modifier glyph. At real menu-bar size (16–18pt)
+    /// a lone ~0.19×-height corner mark washes out; varying the base silhouette's
+    /// own ink weight survives that shrink because it's the largest shape on the
+    /// glyph, not the smallest. Template images can't use colour — only shape,
+    /// weight and fill carry state here. Y-down coordinate system; AppKit must
+    /// flip the CTM.
     static func menuGlyph(for state: MugState, in rect: CGRect) -> [Element] {
         let s = min(rect.width, rect.height)
         let ox = rect.minX + (rect.width - s) / 2
@@ -93,16 +101,20 @@ enum BrandMark {
         func py(_ n: CGFloat) -> CGFloat { oy + n * s }
         func pr(_ n: CGFloat) -> CGFloat { n * s }
 
-        // The crescent is constant across every state.
-        let moon = Element(
-            path: crescent(cx: px(0.40), cy: py(0.55), r: pr(0.27)),
-            ink: .moon, evenOdd: false)
+        func moon(carveRadiusRatio: CGFloat, carveOffsetRatio: CGFloat) -> Element {
+            Element(
+                path: crescent(
+                    cx: px(0.40), cy: py(0.55), r: pr(0.27),
+                    carveRadiusRatio: carveRadiusRatio, carveOffsetRatio: carveOffsetRatio),
+                ink: .moon, evenOdd: false)
+        }
 
         switch state {
         case .free:
-            // A z rises from the crescent's open side — the hero resting state.
+            // A thin new-moon sliver — the lightest possible ink, the calmest
+            // state — plus a small z rising from its open side.
             return [
-                moon,
+                moon(carveRadiusRatio: 1.08, carveOffsetRatio: 0.66),
                 Element(
                     path: zGlyph(
                         x: px(0.69), y: py(0.26), w: pr(0.22), h: pr(0.19)),
@@ -110,34 +122,38 @@ enum BrandMark {
             ]
 
         case .counting:
-            // Filled downward chevron — winding down toward sleep.
+            // The standard crescent (same fullness the in-app logo uses) plus a
+            // bold filled downward chevron — winding down toward sleep.
             return [
-                moon,
+                moon(carveRadiusRatio: crescentCarveRadiusRatio, carveOffsetRatio: crescentCarveOffsetRatio),
                 Element(
                     path: chevronDown(
                         cx: px(0.76), topY: py(0.22),
-                        halfSpan: pr(0.17), height: pr(0.16), barW: pr(0.08)),
+                        halfSpan: pr(0.21), height: pr(0.20), barW: pr(0.10)),
                     ink: .zzz, evenOdd: false),
             ]
 
         case .blocked:
-            // Exclamation mark — something is keeping the Mac awake.
+            // A near-full, near-solid moon — deliberately the heaviest silhouette
+            // in the set, reading "something is holding this" even before the
+            // exclamation mark is legible — plus a bold exclamation mark.
             let (body, dot) = exclamation(
-                cx: px(0.78), topY: py(0.22),
-                bodyH: pr(0.19), bodyW: pr(0.11),
-                gap: pr(0.04), dotR: pr(0.07))
+                cx: px(0.78), topY: py(0.20),
+                bodyH: pr(0.23), bodyW: pr(0.135),
+                gap: pr(0.045), dotR: pr(0.09))
             return [
-                moon,
+                moon(carveRadiusRatio: 0.82, carveOffsetRatio: 0.26),
                 Element(path: body, ink: .zzz, evenOdd: false),
                 Element(path: dot, ink: .zzz, evenOdd: false),
             ]
 
         case .caffeinated:
-            // Lightning bolt — intentionally wired awake.
+            // The standard crescent plus a large lightning bolt — intentionally
+            // wired awake, a deliberate choice rather than an unwanted block.
             return [
-                moon,
+                moon(carveRadiusRatio: crescentCarveRadiusRatio, carveOffsetRatio: crescentCarveOffsetRatio),
                 Element(
-                    path: bolt(cx: px(0.77), cy: py(0.36), size: s),
+                    path: bolt(cx: px(0.77), cy: py(0.36), size: s, scale: 1.3),
                     ink: .zzz, evenOdd: false),
             ]
         }
@@ -164,9 +180,21 @@ enum BrandMark {
     /// *both* opposing lunes, reading as a ring/"eye", not a moon — the bug the
     /// old mark had.) Fill with non-zero winding. Y-down; concave mouth faces
     /// upper-right, toward the rising z / steam.
-    static func crescent(cx: CGFloat, cy: CGFloat, r: CGFloat) -> CGPath {
-        let r2 = r * crescentCarveRadiusRatio
-        let d = r * crescentCarveOffsetRatio
+    ///
+    /// `carveRadiusRatio`/`carveOffsetRatio` default to the brand's standard
+    /// crescent, but callers may override them to change the moon's
+    /// **fullness** — a smaller offset/radius keeps more of the disc (a fat,
+    /// near-solid gibbous moon); a larger one cuts deeper (a thin sliver). Both
+    /// stay a homothety of the same lune about `(cx, cy)`, so the menu-bar
+    /// states can vary ink weight on the *same* brand shape instead of only on
+    /// a secondary modifier. See `BrandMark.menuGlyph(for:in:)`.
+    static func crescent(
+        cx: CGFloat, cy: CGFloat, r: CGFloat,
+        carveRadiusRatio: CGFloat = crescentCarveRadiusRatio,
+        carveOffsetRatio: CGFloat = crescentCarveOffsetRatio
+    ) -> CGPath {
+        let r2 = r * carveRadiusRatio
+        let d = r * carveOffsetRatio
         let dir = CGPoint(x: 0.94, y: -0.34)  // ≈ unit, 20° above +x (upper-right)
         let cxCarve = cx + d * dir.x
         let cyCarve = cy + d * dir.y
@@ -296,15 +324,17 @@ enum BrandMark {
         return (body, dot)
     }
 
-    private static func bolt(cx: CGFloat, cy: CGFloat, size s: CGFloat) -> CGPath {
-        // Lightning-bolt polygon, y-down.
+    private static func bolt(cx: CGFloat, cy: CGFloat, size s: CGFloat, scale: CGFloat = 1.0) -> CGPath {
+        // Lightning-bolt polygon, y-down. `scale` grows the bolt around its own
+        // (cx, cy) without moving its anchor point.
+        let k = s * scale
         let path = CGMutablePath()
-        path.move(to: CGPoint(x: cx + s * 0.06, y: cy - s * 0.15))
-        path.addLine(to: CGPoint(x: cx - s * 0.09, y: cy + s * 0.02))
-        path.addLine(to: CGPoint(x: cx - s * 0.005, y: cy + s * 0.02))
-        path.addLine(to: CGPoint(x: cx - s * 0.06, y: cy + s * 0.15))
-        path.addLine(to: CGPoint(x: cx + s * 0.11, y: cy - s * 0.03))
-        path.addLine(to: CGPoint(x: cx + s * 0.02, y: cy - s * 0.03))
+        path.move(to: CGPoint(x: cx + k * 0.06, y: cy - k * 0.15))
+        path.addLine(to: CGPoint(x: cx - k * 0.09, y: cy + k * 0.02))
+        path.addLine(to: CGPoint(x: cx - k * 0.005, y: cy + k * 0.02))
+        path.addLine(to: CGPoint(x: cx - k * 0.06, y: cy + k * 0.15))
+        path.addLine(to: CGPoint(x: cx + k * 0.11, y: cy - k * 0.03))
+        path.addLine(to: CGPoint(x: cx + k * 0.02, y: cy - k * 0.03))
         path.closeSubpath()
         return path
     }

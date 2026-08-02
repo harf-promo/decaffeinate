@@ -29,7 +29,9 @@ struct SettingsView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 1) {
             sidebarLabel("Settings")
-            ForEach([SettingsPane.general, .schedule, .automation, .freshness]) { sidebarRow($0) }
+            ForEach([SettingsPane.general, .notifications, .schedule, .automation, .freshness]) {
+                sidebarRow($0)
+            }
             sidebarLabel("Info").padding(.top, Space.s3)
             ForEach([SettingsPane.history, .about]) { sidebarRow($0) }
             Spacer(minLength: 0)
@@ -73,6 +75,7 @@ struct SettingsView: View {
     @ViewBuilder private var detail: some View {
         switch pane {
         case .general: GeneralSettings()
+        case .notifications: NotificationsSettings()
         case .schedule: ScheduleSettings()
         case .automation: AutomationSettings()
         case .freshness: FreshnessSettings()
@@ -83,12 +86,13 @@ struct SettingsView: View {
 }
 
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case general, schedule, automation, freshness, history, about
+    case general, notifications, schedule, automation, freshness, history, about
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .general: return "General"
+        case .notifications: return "Notifications"
         case .schedule: return "Schedule"
         case .automation: return "Automation"
         case .freshness: return "Rest & Restart"
@@ -99,6 +103,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .general: return "zzz"
+        case .notifications: return "bell"
         case .schedule: return "calendar"
         case .automation: return "bolt.horizontal.circle"
         case .freshness: return "arrow.clockwise.circle"
@@ -111,7 +116,6 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 // ── General: auto-sleep + battery + keep-awake + safety guards + startup ──
 private struct GeneralSettings: View {
     @EnvironmentObject var store: SettingsStore
-    @EnvironmentObject var appState: AppState
     private var s: Binding<DecaffeinateSettings> { $store.settings }
 
     var body: some View {
@@ -136,6 +140,10 @@ private struct GeneralSettings: View {
                     "When you step away, Decaffeinate forces sleep after this much idle time — even if an app is trying to keep the Mac awake."
                 )
                 .settingsCaption()
+                if store.settings.idleThresholdMinutes < 3 {
+                    Text("Very short — your Mac may sleep while you\u{2019}re still reading.")
+                        .font(.caption).foregroundStyle(Color.warning)
+                }
 
                 Toggle(
                     "Warn before sleeping, with time to stay awake", isOn: s.showPreSleepWarning
@@ -195,12 +203,14 @@ private struct GeneralSettings: View {
                         get: { Double(store.settings.batteryFloorPercent) },
                         set: { store.settings.batteryFloorPercent = Int($0) }),
                     range: 0...50, step: 5, unit: "%", width: 44)
-                Text("On battery, keep-awake holds are dropped below this charge.")
-                    .settingsCaption()
+                Text(
+                    "The charge level where keep-awake gives up, so you never wake to a dead laptop."
+                )
+                .settingsCaption()
                 Toggle(
                     "Sleep if it overheats in a bag (backpack guard)", isOn: s.thermalGuardEnabled)
                 Text(
-                    "If the Mac gets thermally stressed — e.g. lid closed in a bag — all keep-awake holds are released and it sleeps immediately."
+                    "Sleeps immediately if the Mac overheats while enclosed (e.g. in a bag) — all keep-awake holds are released."
                 )
                 .settingsCaption()
             }
@@ -239,9 +249,22 @@ private struct GeneralSettings: View {
                 }
                 Toggle("Show the sleep countdown in the menu bar", isOn: s.showMenuBarCountdown)
             }
+        }
+        .formStyle(.grouped)
+    }
+}
 
-            Section("Notifications") {
-                if appState.notificationAuthorization == .denied {
+// ── Notifications: its own pane (split out of General — it earned the room:
+//    4 toggles plus the live permission-repair status row post-v1.22). ──
+private struct NotificationsSettings: View {
+    @EnvironmentObject var store: SettingsStore
+    @EnvironmentObject var appState: AppState
+    private var s: Binding<DecaffeinateSettings> { $store.settings }
+
+    var body: some View {
+        Form {
+            if appState.notificationAuthorization == .denied {
+                Section {
                     HStack {
                         Label("Notifications: Off", systemImage: "bell.slash.fill")
                             .foregroundStyle(Color.warning)
@@ -253,12 +276,12 @@ private struct GeneralSettings: View {
                     )
                     .settingsCaption()
                 }
-                Toggle("Tell me when a new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
-                Toggle(
-                    "Tell me when Decaffeinate puts the Mac to sleep", isOn: s.notifyOnForcedSleep)
-                Toggle(
-                    "Tell me when a watched agent or build finishes", isOn: s.notifyOnAgentFinished)
-                Toggle("Remind me when a restart is overdue", isOn: s.notifyOnRestartOverdue)
+            }
+            Section("Tell me when\u{2026}") {
+                Toggle("A new app keeps the Mac awake", isOn: s.notifyOnNewBlocker)
+                Toggle("Decaffeinate puts the Mac to sleep", isOn: s.notifyOnForcedSleep)
+                Toggle("A watched agent or build finishes", isOn: s.notifyOnAgentFinished)
+                Toggle("A restart is overdue", isOn: s.notifyOnRestartOverdue)
             }
         }
         .formStyle(.grouped)
@@ -466,13 +489,21 @@ private struct AutomationSettings: View {
                 .settingsCaption()
             }
 
-            Section("Take full control of sleep") {
+            // Marked "Advanced" — the audit called this the single most
+            // behavior-altering toggle in the app, and it used to look like
+            // any other switch on the page.
+            Section {
                 Toggle(
                     "Let Decaffeinate decide every sleep", isOn: $store.settings.strictTakeoverMode)
                 Text(
                     "Decaffeinate becomes the only thing that decides when your Mac sleeps — macOS won't idle-sleep on its own. If Decaffeinate ever quits, normal sleep resumes automatically."
                 )
                 .settingsCaption()
+            } header: {
+                HStack(spacing: Space.s2) {
+                    Text("Take full control of sleep")
+                    HarfPill(label: "Advanced", variant: .warning)
+                }
             }
         }
         .formStyle(.grouped)

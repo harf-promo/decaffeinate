@@ -81,6 +81,20 @@ enum ScreenshotRenderer {
                     settings, size: NSSize(width: 660, height: 480), appearance: appearance,
                     to: dir.appendingPathComponent("settings-\(suffix).png")) && ok
 
+            // The Notifications pane (v1.23) — split out of General.
+            let notifications = SettingsView(initialPane: .notifications)
+                .environment(\.theme, theme)
+                .environmentObject(state)
+                .environmentObject(state.settingsStore)
+                .environmentObject(state.rulesEngine)
+                .environmentObject(state.history)
+                .environmentObject(state.restHistory)
+                .environmentObject(updater)
+            ok =
+                capture(
+                    notifications, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    to: dir.appendingPathComponent("settings-notifications-\(suffix).png")) && ok
+
             // The new Rest & Restart pillar pane, opened directly.
             let freshness = SettingsView(initialPane: .freshness)
                 .environment(\.theme, theme)
@@ -94,6 +108,20 @@ enum ScreenshotRenderer {
                 capture(
                     freshness, size: NSSize(width: 660, height: 480), appearance: appearance,
                     to: dir.appendingPathComponent("rest-restart-\(suffix).png")) && ok
+
+            // Automation — shows the "Advanced" badge on strict takeover (v1.23).
+            let automation = SettingsView(initialPane: .automation)
+                .environment(\.theme, theme)
+                .environmentObject(state)
+                .environmentObject(state.settingsStore)
+                .environmentObject(state.rulesEngine)
+                .environmentObject(state.history)
+                .environmentObject(state.restHistory)
+                .environmentObject(updater)
+            ok =
+                capture(
+                    automation, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    to: dir.appendingPathComponent("settings-automation-\(suffix).png")) && ok
         }
         renderMugStrip(to: dir.appendingPathComponent("mug-states.png"))
         renderMenubarStrip(to: dir.appendingPathComponent("menubar-icons.png"))

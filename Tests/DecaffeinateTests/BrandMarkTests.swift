@@ -93,6 +93,97 @@ final class BrandMarkTests: XCTestCase {
             "each MugState must produce a unique composite bounding box")
     }
 
+    /// Regression guard for the pre-v1.23 design: all four states shared the
+    /// exact same crescent (only a small secondary modifier differed), so at
+    /// real menu-bar size the states were barely tellable apart. `.free`
+    /// (thin sliver) and `.blocked` (near-full moon) must each render a
+    /// genuinely different moon shape from the standard crescent that
+    /// `.counting`/`.caffeinated` share — the base silhouette itself must
+    /// carry state, not only the corner modifier.
+    func testFreeAndBlockedMoonsDifferFromTheStandardCrescent() {
+        let rect = CGRect(x: 0, y: 0, width: 18, height: 18)
+        func moonPath(_ state: MugState) -> CGPath {
+            BrandMark.menuGlyph(for: state, in: rect).first { $0.ink == .moon }!.path
+        }
+        let free = moonPath(.free)
+        let counting = moonPath(.counting)
+        let blocked = moonPath(.blocked)
+        let caffeinated = moonPath(.caffeinated)
+
+        XCTAssertFalse(free == counting, ".free's thin sliver must differ from the standard moon")
+        XCTAssertFalse(blocked == counting, ".blocked's full moon must differ from the standard moon")
+        XCTAssertFalse(free == blocked, ".free and .blocked must not share a moon shape")
+        // .counting and .caffeinated deliberately share the standard crescent —
+        // they're differentiated by their modifier (chevron vs. bolt) instead.
+        XCTAssertTrue(
+            counting == caffeinated,
+            ".counting and .caffeinated intentionally share the standard crescent")
+    }
+
+    /// `.blocked` is the one state the audit called out as needing to read as
+    /// heaviest at a glance — "something is holding this Mac awake" — so its
+    /// moon must be visibly fuller (more filled area) than `.free`'s calm,
+    /// thin sliver, not merely a different but equally-light shape.
+    func testBlockedMoonIsFullerThanFreeMoon() {
+        let rect = CGRect(x: 0, y: 0, width: 18, height: 18)
+        let freeMoon = BrandMark.menuGlyph(for: .free, in: rect).first { $0.ink == .moon }!
+        let blockedMoon = BrandMark.menuGlyph(for: .blocked, in: rect).first { $0.ink == .moon }!
+        let freeArea = freeMoon.path.boundingBox.width * freeMoon.path.boundingBox.height
+        let blockedArea = blockedMoon.path.boundingBox.width * blockedMoon.path.boundingBox.height
+        XCTAssertGreaterThan(
+            blockedArea, freeArea * 1.2,
+            "blocked's moon must read visibly heavier/fuller than free's thin sliver")
+    }
+
+    /// Every state's *total* ink (moon + modifier) must differ from every
+    /// other state's by a real margin — the differentiation must survive
+    /// looking at the glyph as a whole silhouette, the way it's actually seen
+    /// in the menu bar, not just at the level of individual sub-paths.
+    func testAllFourStatesHaveDistinctTotalInkWeight() {
+        let rect = CGRect(x: 0, y: 0, width: 18, height: 18)
+        let states: [MugState] = [.free, .counting, .blocked, .caffeinated]
+        let totalAreas = states.map { state in
+            BrandMark.menuGlyph(for: state, in: rect).reduce(CGFloat(0)) { total, element in
+                let bb = element.path.boundingBox
+                return total + bb.width * bb.height
+            }
+        }
+        for i in 0..<totalAreas.count {
+            for j in (i + 1)..<totalAreas.count {
+                let diff = abs(totalAreas[i] - totalAreas[j])
+                XCTAssertGreaterThan(
+                    diff, 0.5,
+                    "\(states[i]) (\(totalAreas[i])) and \(states[j]) (\(totalAreas[j])) "
+                        + "must have visibly different total ink weight")
+            }
+        }
+    }
+
+    /// `crescent(carveRadiusRatio:carveOffsetRatio:)` must stay a single valid
+    /// closed lune (not two disjoint shapes, not degenerate) across the full
+    /// range of fullness used by the menu-bar states — the moon's ink weight
+    /// changes, but it must always still read as one moon.
+    func testCrescentRemainsOneClosedLuneAcrossFullnessRange() {
+        let fullnessRange:
+            [(radius: CGFloat, offset: CGFloat)] = [
+                (1.08, 0.66),  // .free — thin sliver
+                (BrandMark.crescentCarveRadiusRatio, BrandMark.crescentCarveOffsetRatio),  // standard
+                (0.82, 0.26),  // .blocked — near-full
+            ]
+        for (radius, offset) in fullnessRange {
+            let path = BrandMark.crescent(
+                cx: 32, cy: 32, r: 18, carveRadiusRatio: radius, carveOffsetRatio: offset)
+            XCTAssertFalse(path.isEmpty, "crescent(\(radius), \(offset)) must not be empty")
+            var closeCount = 0
+            path.applyWithBlock { el in
+                if el.pointee.type == .closeSubpath { closeCount += 1 }
+            }
+            XCTAssertEqual(
+                closeCount, 1,
+                "crescent(\(radius), \(offset)) must remain a single closed sub-path")
+        }
+    }
+
     // ── Primitive: crescent ──────────────────────────────────────────────────
 
     func testCrescentPathIsNotEmpty() {

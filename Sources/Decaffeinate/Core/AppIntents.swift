@@ -179,11 +179,11 @@ struct DecaffeinateShortcuts: AppShortcutsProvider {
             intent: KeepAwakeIntent(),
             phrases: [
                 "Keep my Mac awake with \(.applicationName)",
-                "Caffeinate my Mac with \(.applicationName)",
+                "Hold my Mac awake with \(.applicationName)",
                 "\(.applicationName) keep awake",
             ],
             shortTitle: "Keep Awake",
-            systemImageName: "cup.and.saucer.fill")
+            systemImageName: "bolt.fill")
 
         AppShortcut(
             intent: StopKeepingAwakeIntent(),

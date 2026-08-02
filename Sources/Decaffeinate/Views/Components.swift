@@ -15,7 +15,7 @@ struct Chip: View {
             }
             Text(text)
         }
-        .font(HarfFont.micro)
+        .scaledFont(11, relativeTo: .caption2)
         .foregroundStyle(tint)
         .padding(.horizontal, Space.s2)
         .padding(.vertical, 2)
@@ -113,7 +113,7 @@ struct AssertionDetailView: View {
             technicalToggle
             if showTechnical { technicalRows(provenance: provenance) }
         }
-        .font(HarfFont.caption)
+        .scaledFont(12, relativeTo: .caption)
         // Align under the row text, indented past the icon.
         .padding(.leading, Space.s3 + Metrics.rowIcon + Space.s2)
         .padding(.trailing, Space.s3)
@@ -128,10 +128,10 @@ struct AssertionDetailView: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: showTechnical ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
+                    .scaledFont(9, weight: .semibold, relativeTo: .caption2)
                 Text("Technical details")
             }
-            .font(HarfFont.caption)
+            .scaledFont(12, relativeTo: .caption)
             .foregroundStyle(Color.ink3)
         }
         .buttonStyle(.plain)
