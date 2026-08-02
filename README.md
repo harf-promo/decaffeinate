@@ -266,9 +266,16 @@ Open areas where you can make a dent today:
 
 ## Roadmap
 
-**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · **the Rest & Restart pillar (uptime tracking + a weekly-restart recommendation)** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the crescent-moon "Zzz" mark unified across all renderers · universal (Intel + Apple Silicon) build.
+**Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · **the Rest & Restart pillar (uptime tracking + a weekly-restart recommendation)** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the crescent-moon "Zzz" mark unified across all renderers · universal (Intel + Apple Silicon) build · a pre-sleep warning + call-aware Sleep Now · a zero-root **Clamshell Assistant** for lid-closed mode · localization across the whole app (English + a machine-drafted German seed).
 
-**Next:** localization · homebrew/cask-core submission · SMC temperature sensors. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Next:** homebrew/cask-core submission · SMC temperature sensors · more languages · a native-speaker pass on the German translation. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md) and the milestone plan in [`docs/PLAN-NEXT.md`](docs/PLAN-NEXT.md).
+
+---
+
+## In the press, or comparing tools?
+
+See the [press kit](docs/PRESS-KIT.md) for boilerplate, facts, and free-to-use
+assets, and head-to-head pages against specific tools: [Amphetamine](docs/compare/decaffeinate-vs-amphetamine.md), [KeepingYouAwake](docs/compare/decaffeinate-vs-keepingyouawake.md), [Juicy](docs/compare/decaffeinate-vs-juicy.md).
 
 ---
 

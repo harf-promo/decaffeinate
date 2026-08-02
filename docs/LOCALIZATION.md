@@ -51,12 +51,22 @@ Interpolation uses printf specifiers: `Text("Version \(x)")` becomes the key
 
 ## Current scope
 
-Seeded: the onboarding chrome (`OnboardingView`) and the About pane
-(`SettingsView` → `AboutView`). Everything else is still English and is the
-extension path — route each call site through `L10n.localized` and add its key.
-Plain-`String` UI text in `Core/` (`ReasonEngine`, `Formatting`, `Notifier`,
-`Diagnostics`, `CLI`) needs `L10n.localized` / `String(localized:bundle:.module)`
-too; it's a larger, separate effort.
+As of v1.25 "Fluent," coverage is broad: the onboarding chrome, the full menu
+popover (`MenuRedesign.swift`), every Settings pane, the sleep-verdict copy
+(`SleepOutlook`), notification templates (`Notifier`), the reason-engine
+labels (`ReasonEngine`), and the human-readable CLI output (`--scan`,
+`--status`, `--help`, etc. — **not** `--json` output, which is a machine
+contract and stays in English by design). Remaining gaps: `Formatting.swift`'s
+relative-time shorthand ("3m ago"), `Diagnostics.swift`'s report text, and a
+few compound strings that stitch a localized template around an
+un-localized fragment from a Model-layer type (`TriggerCondition.label` and
+similar) — a smaller, well-scoped follow-up rather than the original
+larger effort.
+
+> **Translation quality note:** the German table was machine-translated (by an
+> AI agent) in the v1.25 sweep — natural and grammatically checked, but it
+> hasn't had a native-speaker pass. Treat it as a solid first draft; a
+> native-German review is a genuinely useful, low-effort contribution.
 
 > The tables are `.lproj/*.strings` rather than a `.xcstrings` String Catalog
 > because the plain `swift build` used here (and in CI / `build-app.sh`) doesn't
