@@ -164,6 +164,14 @@ private struct RDActionBar: View {
                         Toggle("Keep awake indefinitely", isOn: settings.caffeinateEnabled)
                     }
                     Section {
+                        Button {
+                            ClamshellAssistantPresenter.shared.present(appState: appState)
+                        } label: {
+                            Label("Use with lid closed\u{2026}", systemImage: "laptopcomputer")
+                        }
+                        .help(
+                            "Check whether this Mac is ready for Apple's own lid-closed clamshell mode."
+                        )
                         Button("Turn display off") { appState.displayOff() }
                     }
                     Section("Sleep when done") {

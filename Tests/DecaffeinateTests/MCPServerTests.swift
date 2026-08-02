@@ -7,14 +7,22 @@ import XCTest
 /// stdio transport.
 final class MCPServerTests: XCTestCase {
 
-    func testToolListExposesTheFiveTools() {
+    func testToolListExposesTheSixTools() {
         let names = Set(MCPServer.toolList().map(\.name))
         XCTAssertEqual(
             names,
             [
                 "whats_keeping_awake", "keep_awake", "release_keep_awake", "sleep_now",
-                "sleep_if_idle",
+                "sleep_if_idle", "clamshell_status",
             ])
+    }
+
+    func testClamshellStatusIsReadOnlyWithNoArguments() {
+        // No case exists to ARM a clamshell session over MCP — read-only status
+        // only, deliberately (see the doc comment on `clamshell_status`'s
+        // registration).
+        XCTAssertEqual(
+            MCPServer.parseAction(name: "clamshell_status", arguments: nil), .clamshellStatus)
     }
 
     func testEveryToolHasAnObjectSchema() {

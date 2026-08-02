@@ -161,10 +161,61 @@ tag-triggered release workflow. Dependencies are pinned via a committed
   to block clamshell sleep on real hardware; only `disablesleep` works, and it
   then needs multiple safety layers (clear-on-start/SIGTERM, dead-man switch)
   against stranding the Mac awake. Decaffeinate stays root-free; don't re-spend
-  time here.
+  time here. **This is about forcing lid-closed-with-no-display — it hasn't
+  changed.** What v1.24 adds is narrower and still entirely root-free:
+  detecting and assisting with the lid-closed mode macOS itself already
+  supports (external display + AC power + external input) — see "Lid-closed:
+  the zero-root Clamshell Assistant" below.
 - **Releasing other apps' assertions.** Not possible from user space, and not
   needed — `pmset sleepnow` overrides them cleanly (see above).
 - **App Store distribution** — incompatible with spawning `pmset` and reading
   system-wide telemetry.
 - **Camera-in-use detection** — unlike the microphone (`audio-in` resource),
   there is no public assertion signal for the camera; not pursuing.
+
+## Lid-closed: the zero-root Clamshell Assistant
+
+v1.24 adds a **Clamshell Assistant** — the Keep-awake menu's **Use with lid
+closed…** panel. It is entirely zero-root and changes nothing about the
+non-goal above: it doesn't call `disablesleep`, doesn't add a privileged
+helper or daemon, and cannot force a Mac to stay awake with the lid closed
+and no external display.
+
+What it actually does is *detect* whether this Mac already meets Apple's own
+requirements for clamshell mode — external display connected, on AC power,
+external keyboard/mouse present — and, when it does, offer to arm
+Decaffeinate's existing keep-awake hold (the same `CaffeineEngine` assertion
+the "Keep awake indefinitely" toggle already creates) so the user can close
+the lid with confidence. macOS's own clamshell support does the actual work;
+Decaffeinate is a readiness check and an honest explanation, not a new
+capability.
+
+New sensing components, mirroring the existing reader pattern (a `Snapshot`
+struct + a `Reader` producing it from one live system call, injectable for
+tests — see `PowerSourceReader`/`PowerSnapshot`):
+
+| Type | Reads | API |
+| --- | --- | --- |
+| `LidStateReader` → `LidSnapshot` | Whether this Mac has a lid, and whether it's closed | `IOPMrootDomain`'s `AppleClamshellState` IORegistry property — a public read, the same technique lid-monitoring utilities have used for ~20 years. **Not** one of the private/entitlement-gated APIs ruled out above — those were about *forcing* a state change; this only *reads* a published property, the same trust boundary as `PowerSourceReader`. |
+| `DisplayTopologyReader` → `DisplayTopology` | How many external displays are online, whether the built-in panel is active | `CGGetOnlineDisplayList` / `CGDisplayIsBuiltin` — public CoreGraphics. |
+| `ExternalInputProbe` → `InputProbeResult` | Best-effort: is a non-built-in keyboard/pointer connected | `IOHIDManager` device enumeration, classified by HID transport. Deliberately three-valued (`.detected` / `.notDetected` / `.inconclusive`) — some Bluetooth/wireless combinations don't report a transport this probe can trust, and `.inconclusive` is the honest answer rather than a guess. |
+| `SleepDisabledReader` (pure parser) / `LiveSleepDisabledReader` | Whether *something* — not necessarily Decaffeinate — has globally disabled sleep | Parses the `SleepDisabled` line from `pmset -g`. Purely observational: Decaffeinate never sets this flag itself. Sampled on the panel's own cadence (open + ~30 s), never the 1 Hz tick — it's a subprocess spawn. |
+
+`ClamshellAdvisor.classify(lid:displays:power:input:) → ClamshellReadiness` is
+the pure decision engine (mirrors `SafetyRails.evaluate`'s shape exactly):
+`.notApplicable` on a Mac with no lid, `.ready` when every requirement is met,
+or `.missing(unmet:)` naming exactly which of power / external display /
+external input still needs attention. No IOKit/CoreGraphics calls live inside
+it — only the already-read snapshots — so it's fully unit-tested without a
+live system (`ClamshellAdvisorTests.swift`).
+
+Arming a clamshell session doesn't add a new safety rail: the existing
+`SafetyRails` (battery floor, thermal Backpack Guard) already govern any
+keep-awake hold exactly as they always have. There is no lid-closed-specific
+safety logic in Phase A — there doesn't need to be.
+
+Surface: `Decaffeinate --clamshell-status [--json]`, the `clamshell_status`
+MCP tool, and the `ClamshellStatusIntent` Shortcuts action — all read-only.
+Deliberately no MCP tool or Shortcuts action to *arm* a session: an AI agent
+or a blind voice command should never be the one deciding to change this
+Mac's power-management posture.

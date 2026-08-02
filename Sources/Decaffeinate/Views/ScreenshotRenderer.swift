@@ -157,6 +157,28 @@ enum ScreenshotRenderer {
                     history, size: NSSize(width: 660, height: 480), appearance: appearance,
                     to: dir.appendingPathComponent("settings-history-\(suffix).png")) && ok
         }
+        // The Clamshell Assistant panel (v1.24) — ready and missing-requirements
+        // states, driven directly (a plain value view, like SleepWarningHUD),
+        // no live AppState/IOKit involved.
+        for (name, appearance): (String, NSAppearance.Name) in [
+            ("light", .aqua), ("dark", .darkAqua),
+        ] {
+            let ready = ClamshellAssistantBody(
+                readiness: .ready, foreignSleepDisabled: false,
+                onArmClamshellSession: {}, onKeepScreensOff: {}
+            ).environment(\.theme, Theme.nightcap)
+            _ = capture(
+                ready, size: NSSize(width: 360, height: 320), appearance: appearance,
+                to: dir.appendingPathComponent("clamshell-ready-\(name).png"))
+
+            let missing = ClamshellAssistantBody(
+                readiness: .missing(unmet: [.power, .externalDisplay]), foreignSleepDisabled: true,
+                onArmClamshellSession: {}, onKeepScreensOff: {}
+            ).environment(\.theme, Theme.nightcap)
+            _ = capture(
+                missing, size: NSSize(width: 360, height: 460), appearance: appearance,
+                to: dir.appendingPathComponent("clamshell-missing-\(name).png"))
+        }
         renderMugStrip(to: dir.appendingPathComponent("mug-states.png"))
         renderMenubarStrip(to: dir.appendingPathComponent("menubar-icons.png"))
         print("Screenshots written to \(dir.path)")

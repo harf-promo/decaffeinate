@@ -71,6 +71,12 @@ final class AppState: ObservableObject {
     private let wakeReasonReader: any WakeReasonReading
     private let subtreeSampler: any SubtreeCPUSampling
     private var staleDetector: StaleHolderDetector
+    // Clamshell Assistant (v1.24 Phase A) — sampled only by
+    // `refreshClamshellReadiness()`, never the 1 Hz tick.
+    private let lidReader: any LidStateReading
+    private let displayReader: any DisplayTopologyReading
+    private let inputProbe: any ExternalInputProbing
+    private let sleepDisabledReader: any SleepDisabledReading
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -113,6 +119,22 @@ final class AppState: ObservableObject {
     /// Newly-seen, still-unclassified apps holding the Mac awake — the firewall's
     /// "decide what to do" queue, surfaced in the menu.
     @Published private(set) var pendingClassification: [PowerAssertion] = []
+
+    /// The zero-root Clamshell Assistant's live readiness verdict (v1.24 Phase
+    /// A) — refreshed by the "Use with lid closed…" panel itself
+    /// (`refreshClamshellReadiness()`), never the 1 Hz tick. `.notApplicable`
+    /// until first refreshed.
+    @Published private(set) var clamshellReadiness: ClamshellReadiness = .notApplicable
+    /// True when the global `SleepDisabled` `pmset` flag is set by something
+    /// other than Decaffeinate — this app never sets it in Phase A, so any
+    /// `true` reading here is inherently foreign. Purely informational,
+    /// refreshed alongside `clamshellReadiness`.
+    @Published private(set) var foreignSleepDisabled: Bool = false
+    private var lastSleepDisabledSampleAt: Date?
+    /// `SleepDisabledReader` shells out to `pmset -g` — never sampled faster
+    /// than this, regardless of how often the panel calls
+    /// `refreshClamshellReadiness()`.
+    private let sleepDisabledSampleInterval: TimeInterval = 30
 
     /// System-blocking holds grouped into stable rows: one group per agent session
     /// (coalesced across the `caffeinate -t` respawns), singletons for everything
@@ -251,6 +273,10 @@ final class AppState: ObservableObject {
         wakeReasonReader: any WakeReasonReading = LiveWakeReasonReader(),
         subtreeSampler: any SubtreeCPUSampling = SubtreeSampler(),
         staleDetector: StaleHolderDetector = StaleHolderDetector(),
+        lidReader: any LidStateReading = LidStateReader(),
+        displayReader: any DisplayTopologyReading = DisplayTopologyReader(),
+        inputProbe: any ExternalInputProbing = ExternalInputProbe(),
+        sleepDisabledReader: any SleepDisabledReading = LiveSleepDisabledReader(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -273,6 +299,10 @@ final class AppState: ObservableObject {
         self.wakeReasonReader = wakeReasonReader
         self.subtreeSampler = subtreeSampler
         self.staleDetector = staleDetector
+        self.lidReader = lidReader
+        self.displayReader = displayReader
+        self.inputProbe = inputProbe
+        self.sleepDisabledReader = sleepDisabledReader
         self.now = now
     }
 
@@ -582,6 +612,36 @@ final class AppState: ObservableObject {
         if case .failure(let error) = sleepController.displayOffNow() {
             setError(error.description)
         }
+    }
+
+    // MARK: Clamshell Assistant (v1.24 Phase A — zero-root)
+
+    /// Re-sample lid / external-display / external-input state and
+    /// re-classify readiness for the "Use with lid closed…" panel.
+    ///
+    /// The lid/display/input reads are cheap IOKit/CoreGraphics property
+    /// reads — safe to call as often as the panel likes. The `pmset`-backed
+    /// foreign-`SleepDisabled` flag is a subprocess spawn, so it's read off
+    /// the main actor (mirroring `latestWakeReason()`) and throttled to
+    /// `sleepDisabledSampleInterval` regardless of how often this method is
+    /// called — it is never sampled on the 1 Hz tick.
+    func refreshClamshellReadiness() async {
+        clamshellReadiness = ClamshellAdvisor.classify(
+            lid: lidReader.snapshot(),
+            displays: displayReader.snapshot(),
+            power: power,
+            input: inputProbe.probe())
+
+        let sampleAt = now()
+        let due =
+            lastSleepDisabledSampleAt.map {
+                sampleAt.timeIntervalSince($0) >= sleepDisabledSampleInterval
+            } ?? true
+        guard due else { return }
+        lastSleepDisabledSampleAt = sampleAt
+        let reader = sleepDisabledReader
+        let disabled = await Task.detached { reader.isSleepDisabled() }.value
+        foreignSleepDisabled = disabled == true
     }
 
     /// Clear a firewall rule and allow this app to be re-surfaced as a new

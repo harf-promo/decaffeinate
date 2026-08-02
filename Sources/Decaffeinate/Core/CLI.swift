@@ -25,6 +25,10 @@ enum CLI {
             runStatus(json: arguments.contains("--json"))
             return true
         }
+        if arguments.contains("--clamshell-status") {
+            runClamshellStatus(json: arguments.contains("--json"))
+            return true
+        }
         if arguments.contains("--sleep-now") {
             runSleepNow()
             return true
@@ -166,6 +170,38 @@ enum CLI {
                 ? ""
                 : " by \(report.holdingSystemSleep) app\(report.holdingSystemSleep == 1 ? "" : "s")"
             print("This Mac is \(verb)\(by). Idle \(report.idleSeconds)s.")
+        }
+    }
+
+    /// Print the zero-root Clamshell Assistant's readiness verdict — a plain
+    /// line, or JSON (same stable-sorted-keys convention as `--status --json`).
+    /// Read-only: this never arms a keep-awake hold, it only reports.
+    @MainActor
+    private static func runClamshellStatus(json: Bool) {
+        let readiness = ClamshellAdvisor.classify(
+            lid: LidStateReader().snapshot(),
+            displays: DisplayTopologyReader().snapshot(),
+            power: PowerSourceReader().snapshot(),
+            input: ExternalInputProbe().probe())
+        if json {
+            print(ClamshellStatusReport.from(readiness: readiness).jsonString())
+        } else {
+            print(clamshellStatusLine(readiness))
+        }
+    }
+
+    /// The human-readable line for `--clamshell-status` (without `--json`) and
+    /// `ClamshellStatusIntent`'s spoken dialog — one place so the two surfaces
+    /// never drift.
+    static func clamshellStatusLine(_ readiness: ClamshellReadiness) -> String {
+        switch readiness {
+        case .notApplicable:
+            return "This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply."
+        case .ready:
+            return "Ready for clamshell mode \u{2014} close the lid whenever you like."
+        case .missing(let unmet):
+            let items = ClamshellRequirement.allCases.filter { unmet.contains($0) }.map(\.label)
+            return "Not ready for clamshell mode \u{2014} " + items.joined(separator: "; ") + "."
         }
     }
 
@@ -529,6 +565,7 @@ enum CLI {
               Decaffeinate                  Run the menu-bar app
               Decaffeinate --scan           Print active sleep assertions and exit
               Decaffeinate --status [--json]  Print a status line (or JSON for scripts/hooks)
+              Decaffeinate --clamshell-status [--json]  Ready for Apple's lid-closed clamshell mode?
               Decaffeinate --why-awake [--json]  Alias for --scan (add --json for machine output)
               Decaffeinate --sleep-now      Put this Mac to sleep now and exit
               Decaffeinate --display-off    Turn the display off now (system keeps running)

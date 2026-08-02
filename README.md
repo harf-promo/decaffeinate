@@ -74,13 +74,22 @@ attribution, on-demand force-sleep, and being free & open source:
 | **Sleep Aid** (Ohanaware) | Shows a history of what *prevented* sleep | ❌ | No | Paid |
 | **MacRest** | Per-app *allow/deny* of keep-awake requests (app-level) | ❌ (blocks, doesn't force) | No | Paid, closed |
 | **Adrafinil** | Keeps the Mac awake *only while an AI agent works* (incl. lid-closed) | ❌ (the opposite job) | **Yes** (root helper + `pmset disablesleep`) | Free / OSS |
-| **Decaffeinate** | Per-**process** truth + one-click & idle **force-sleep** | ✅ | **No** | **Free / OSS** |
+| **Decaffeinate** | Per-**process** truth + one-click & idle **force-sleep** + a zero-root **Clamshell Assistant** for Apple's own lid-closed mode | ✅ | **No** | **Free / OSS** |
 
 Adrafinil is a clever, philosophically-aligned cousin (both believe "a Mac should
 sleep when the work is done") — but it needs a **root helper** and flips the
 global `pmset disablesleep` switch to hold the lid closed. Decaffeinate stays
 **entirely in user space — no root, no helper daemon, nothing to trust** — and
 runs on **macOS 14+**. Different job, and a smaller trust boundary.
+
+As of v1.24, Decaffeinate also ships a **Clamshell Assistant** (Keep awake… →
+*Use with lid closed…*): it detects whether this Mac already meets Apple's own
+requirements for clamshell mode — external display, AC power, an external
+keyboard/mouse — and, if so, arms the existing keep-awake hold so you can close
+the lid with confidence. It does **not** enable lid-closed-with-no-display —
+that's exactly the root-only `disablesleep` path above, which Decaffeinate
+still doesn't touch. See [`docs/LID-CLOSED.md`](docs/LID-CLOSED.md) for the
+honest, no-spin explanation.
 
 ---
 

@@ -9,6 +9,7 @@ enum MCPAction: Equatable {
     case releaseKeepAwake
     case sleepNow
     case sleepIfIdle(seconds: Int)
+    case clamshellStatus
 }
 
 /// A Model Context Protocol server (`Decaffeinate --mcp`, stdio JSON-RPC) so an
@@ -109,6 +110,11 @@ final class MCPServer {
                         ])
                     ]),
                 ])),
+            Tool(
+                name: "clamshell_status",
+                description:
+                    "Report whether this Mac is ready for Apple's own built-in clamshell mode (lid closed, with an external display, AC power, and an external keyboard/mouse) — the same shape as `Decaffeinate --clamshell-status --json`. Read-only: never arms or changes anything.",
+                inputSchema: emptyObjectSchema),
         ]
     }
 
@@ -129,6 +135,7 @@ final class MCPServer {
         case "sleep_if_idle":
             return .sleepIfIdle(
                 seconds: arguments?["seconds"]?.intValue ?? HookInstaller.defaultIdleSeconds)
+        case "clamshell_status": return .clamshellStatus
         default:
             return nil
         }
@@ -190,6 +197,9 @@ final class MCPServer {
                     content: [MCPServer.contentText("Couldn't sleep: \(error.description)")],
                     isError: true)
             }
+        case .clamshellStatus:
+            return .init(
+                content: [MCPServer.contentText(currentClamshellStatusJSON())], isError: false)
         }
     }
 
@@ -236,5 +246,17 @@ final class MCPServer {
             idleSeconds: IdleMonitor().secondsSinceLastInput(),
             uptimeSeconds: SystemStateReader().bootTime().map { Date().timeIntervalSince($0) }
         ).jsonString()
+    }
+
+    /// Read-only clamshell readiness — same reads `CLI --clamshell-status`
+    /// uses. Deliberately no `handle` case exists to *arm* a session: an
+    /// agent must never decide to change this Mac's power-management posture.
+    private func currentClamshellStatusJSON() -> String {
+        let readiness = ClamshellAdvisor.classify(
+            lid: LidStateReader().snapshot(),
+            displays: DisplayTopologyReader().snapshot(),
+            power: PowerSourceReader().snapshot(),
+            input: ExternalInputProbe().probe())
+        return ClamshellStatusReport.from(readiness: readiness).jsonString()
     }
 }

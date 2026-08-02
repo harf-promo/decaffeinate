@@ -120,9 +120,14 @@ preflight, pinned `Package.resolved`, cask lint in CI).
 
 ## Non-goals (for now)
 
-- Keeping a Mac awake with the lid closed / on battery with no display — that's
-  [Sleepless](https://github.com/Aboudjem/Sleepless)' job and needs `pmset
-  disablesleep` (root). Decaffeinate stays root-free.
+- Forcing a Mac to stay awake with the lid closed **and no external
+  display** — that's [Sleepless](https://github.com/Aboudjem/Sleepless)'s job
+  and needs `pmset disablesleep` (root). Decaffeinate stays root-free. As of
+  v1.24, Decaffeinate does ship a zero-root **Clamshell Assistant** that
+  detects and helps you reach the lid-closed mode macOS *already* supports
+  (external display + AC power + external input) — see
+  [`docs/LID-CLOSED.md`](LID-CLOSED.md). The root-requiring, no-display case
+  above remains a non-goal.
 - App Store distribution — incompatible with spawning `pmset` and reading
   system-wide telemetry.
 

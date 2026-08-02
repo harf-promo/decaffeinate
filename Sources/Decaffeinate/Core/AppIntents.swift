@@ -151,6 +151,31 @@ struct StopKeepingAwakeIntent: AppIntent {
     }
 }
 
+/// "Is my Mac ready for clamshell mode?" — read-only status, following
+/// `WhatsKeepingMacAwakeIntent`'s exact self-contained shape (works even when
+/// the menu-bar app isn't foregrounded). Deliberately no intent to *arm* a
+/// clamshell session via Shortcuts/Siri — the same reasoning
+/// `MCPServer`'s `clamshell_status` tool follows: read-only, no toggle. A
+/// blind voice command or an automated Shortcut should never be the one
+/// deciding to change this Mac's power-management posture.
+struct ClamshellStatusIntent: AppIntent {
+    static let title: LocalizedStringResource = "Is My Mac Ready For Clamshell Mode"
+    static let description = IntentDescription(
+        "Check whether this Mac is ready for Apple's built-in clamshell mode — lid closed, with an external display, AC power, and an external keyboard/mouse."
+    )
+    static let openAppWhenRun = false
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let readiness = ClamshellAdvisor.classify(
+            lid: LidStateReader().snapshot(),
+            displays: DisplayTopologyReader().snapshot(),
+            power: PowerSourceReader().snapshot(),
+            input: ExternalInputProbe().probe())
+        return .result(dialog: IntentDialog(stringLiteral: CLI.clamshellStatusLine(readiness)))
+    }
+}
+
 // MARK: - Shortcuts provider (Siri / Spotlight / Shortcuts.app discovery)
 
 struct DecaffeinateShortcuts: AppShortcutsProvider {
@@ -194,5 +219,15 @@ struct DecaffeinateShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Stop Keep Awake",
             systemImageName: "moon.fill")
+
+        AppShortcut(
+            intent: ClamshellStatusIntent(),
+            phrases: [
+                "Is my Mac ready for clamshell mode with \(.applicationName)",
+                "Ask \(.applicationName) if my Mac is ready for clamshell mode",
+                "\(.applicationName) clamshell status",
+            ],
+            shortTitle: "Clamshell Status",
+            systemImageName: "laptopcomputer")
     }
 }

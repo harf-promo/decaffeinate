@@ -84,4 +84,20 @@ final class CLITests: XCTestCase {
         XCTAssertEqual(CLI.hookTarget(after: 0, in: ["--install-hook", "claude"]), [.claude])
         XCTAssertEqual(CLI.hookTarget(after: 0, in: ["--install-hook", "codex"]), [.codex])
     }
+
+    // MARK: --clamshell-status line (v1.24)
+
+    func testClamshellStatusLineNotApplicable() {
+        XCTAssertTrue(CLI.clamshellStatusLine(.notApplicable).contains("doesn\u{2019}t have a lid"))
+    }
+
+    func testClamshellStatusLineReady() {
+        XCTAssertTrue(CLI.clamshellStatusLine(.ready).contains("Ready for clamshell mode"))
+    }
+
+    func testClamshellStatusLineListsWhatsMissing() {
+        let line = CLI.clamshellStatusLine(.missing(unmet: [.power, .externalDisplay]))
+        XCTAssertTrue(line.contains("Connect to power"))
+        XCTAssertTrue(line.contains("Plug in an external display"))
+    }
 }
