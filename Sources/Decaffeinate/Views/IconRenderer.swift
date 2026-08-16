@@ -9,31 +9,36 @@ enum IconRenderer {
     // no SwiftUI dependency and can be used from a headless CLI context).
     // Night gradient poles (top → bottom) behind the mark.
     private static let nightTop = CGColor(
-        srgbRed: 0x23 / 255, green: 0x25 / 255, blue: 0x2E / 255, alpha: 1)
+        srgbRed: 0x1C / 255, green: 0x22 / 255, blue: 0x30 / 255, alpha: 1)
     private static let nightBottom = CGColor(
-        srgbRed: 0x12 / 255, green: 0x13 / 255, blue: 0x18 / 255, alpha: 1)
+        srgbRed: 0x0C / 255, green: 0x0E / 255, blue: 0x14 / 255, alpha: 1)
     private static let moonColor = CGColor(
-        srgbRed: 0xA4 / 255, green: 0xCD / 255, blue: 0x39 / 255, alpha: 1)
+        srgbRed: 0x7E / 255, green: 0xAE / 255, blue: 0x3C / 255, alpha: 1)
     private static let zColor = CGColor(
         srgbRed: 0x93 / 255, green: 0x95 / 255, blue: 0x98 / 255, alpha: 1)
     // Porcelain — the cup and stars.
     private static let creamColor = CGColor(
         srgbRed: 0xF2 / 255, green: 0xED / 255, blue: 0xE4 / 255, alpha: 1)
+    // Coffee well — darker than the night field so the cup reads as a vessel.
+    private static let wellColor = CGColor(
+        srgbRed: 0x0A / 255, green: 0x0C / 255, blue: 0x12 / 255, alpha: 1)
 
     private static func fill(for ink: BrandMark.Ink) -> CGColor {
         switch ink {
         case .moon: return moonColor
         case .zzz: return zColor
         case .cream: return creamColor
+        case .well: return wellColor
         }
     }
 
     // SVG hex per role (matches the fills above).
     private static func svgHex(for ink: BrandMark.Ink) -> String {
         switch ink {
-        case .moon: return "#A4CD39"
+        case .moon: return "#7EAE3C"
         case .zzz: return "#939598"
         case .cream: return "#F2EDE4"
+        case .well: return "#0A0C12"
         }
     }
 
@@ -164,8 +169,8 @@ enum IconRenderer {
             // Night-sky gradient background — parity with the PNG/ICNS icon
             // (the SVG used to export the mark on a transparent canvas).
             "  <defs><linearGradient id=\"night\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">",
-            "    <stop offset=\"0\" stop-color=\"#23252E\"/>",
-            "    <stop offset=\"1\" stop-color=\"#121318\"/>",
+            "    <stop offset=\"0\" stop-color=\"#1C2230\"/>",
+            "    <stop offset=\"1\" stop-color=\"#0C0E14\"/>",
             "  </linearGradient></defs>",
             "  <rect width=\"\(sz)\" height=\"\(sz)\" rx=\"\(corner)\" fill=\"url(#night)\"/>",
         ]

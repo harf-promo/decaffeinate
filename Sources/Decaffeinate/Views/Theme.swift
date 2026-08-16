@@ -4,10 +4,9 @@ import SwiftUI
 // =====================================================================
 // Theme — Nightcap, the shipping skin.
 //
-// Cool, native, airy: white paper, hairline-separated zero-radius rows,
-// near-monochrome cool ink, one green moon. Downstream reads
-// `@Environment(\.theme)`. `usesCards` stays on the token so a future
-// skin can flip it without a structural rewrite.
+// Cool, native, airy: white paper, soft 10px rows with a little air
+// between them, near-monochrome cool ink, one green moon. Downstream
+// reads `@Environment(\.theme)`.
 // =====================================================================
 struct Theme: Equatable {
     var id: String
@@ -46,7 +45,7 @@ struct Theme: Equatable {
 }
 
 extension Theme {
-    /// Cool, native, airy. Hairlines, zero-radius rows, cool ink.
+    /// Cool, native, airy. Soft cards, a little air between rows, cool ink.
     ///
     /// Surfaces and ink reference the shared `HarfTheme` `Color.*` tokens so the
     /// palette has a single source of truth — the two used to drift (this theme
@@ -64,13 +63,13 @@ extension Theme {
         ink4: .ink4,
         accent: Color.harfGreen,
         teal: Color.positive,
-        popoverWidth: 340,
-        rowMinHeight: 44,
-        usesCards: false,
-        cardRadius: 0,
-        rowGap: 0,
-        contentInset: 16,
-        headlineSize: 18
+        popoverWidth: 372,
+        rowMinHeight: 46,
+        usesCards: true,
+        cardRadius: Radius.card,
+        rowGap: 6,
+        contentInset: 14,
+        headlineSize: 17
     )
 
 }

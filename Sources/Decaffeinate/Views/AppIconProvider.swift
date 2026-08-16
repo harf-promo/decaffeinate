@@ -62,6 +62,7 @@ struct AppIconView: View {
                     .resizable()
                     .interpolation(.high)
                     .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
             } else {
                 Image(systemName: assertion.reason.category.systemImage)
                     .font(.system(size: size * 0.66))

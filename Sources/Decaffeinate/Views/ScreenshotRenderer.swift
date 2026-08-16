@@ -51,14 +51,14 @@ enum ScreenshotRenderer {
             let onboarding = OnboardingView(onFinish: { _, _ in })
             ok =
                 capture(
-                    onboarding, size: NSSize(width: 480, height: 420), appearance: appearance,
+                    onboarding, size: NSSize(width: 500, height: 440), appearance: appearance,
                     to: dir.appendingPathComponent("onboarding-\(suffix).png")) && ok
 
             // Panel 2 — the explicit notification-choice + launch-at-login panel.
             let onboardingChoice = OnboardingView(onFinish: { _, _ in }, initialPage: 1)
             ok =
                 capture(
-                    onboardingChoice, size: NSSize(width: 480, height: 420), appearance: appearance,
+                    onboardingChoice, size: NSSize(width: 500, height: 440), appearance: appearance,
                     to: dir.appendingPathComponent("onboarding-notifications-\(suffix).png")) && ok
 
             // The pre-sleep warning HUD (v1.22) — a fixed sample countdown.
@@ -79,7 +79,7 @@ enum ScreenshotRenderer {
                 .environmentObject(updater)
             ok =
                 capture(
-                    settings, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    settings, size: NSSize(width: 700, height: 520), appearance: appearance,
                     to: dir.appendingPathComponent("settings-\(suffix).png")) && ok
 
             // The Notifications pane (v1.23) — split out of General.
@@ -94,7 +94,7 @@ enum ScreenshotRenderer {
                 .environmentObject(updater)
             ok =
                 capture(
-                    notifications, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    notifications, size: NSSize(width: 700, height: 520), appearance: appearance,
                     to: dir.appendingPathComponent("settings-notifications-\(suffix).png")) && ok
 
             // The new Rest & Restart pillar pane, opened directly.
@@ -109,7 +109,7 @@ enum ScreenshotRenderer {
                 .environmentObject(updater)
             ok =
                 capture(
-                    freshness, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    freshness, size: NSSize(width: 700, height: 520), appearance: appearance,
                     to: dir.appendingPathComponent("rest-restart-\(suffix).png")) && ok
 
             // Automation — shows the "Advanced" badge on strict takeover (v1.23).
@@ -124,7 +124,7 @@ enum ScreenshotRenderer {
                 .environmentObject(updater)
             ok =
                 capture(
-                    automation, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    automation, size: NSSize(width: 700, height: 520), appearance: appearance,
                     to: dir.appendingPathComponent("settings-automation-\(suffix).png")) && ok
 
             // About — shows the "Works with Shortcuts & Siri" discoverability line (v1.23, 2/2).
@@ -139,7 +139,7 @@ enum ScreenshotRenderer {
                 .environmentObject(updater)
             ok =
                 capture(
-                    about, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    about, size: NSSize(width: 700, height: 520), appearance: appearance,
                     to: dir.appendingPathComponent("settings-about-\(suffix).png")) && ok
 
             // History — the forced-sleep log + the new "This week — longest awake" ranking (v1.23, 2/2).
@@ -154,7 +154,7 @@ enum ScreenshotRenderer {
                 .environmentObject(updater)
             ok =
                 capture(
-                    history, size: NSSize(width: 660, height: 480), appearance: appearance,
+                    history, size: NSSize(width: 700, height: 520), appearance: appearance,
                     to: dir.appendingPathComponent("settings-history-\(suffix).png")) && ok
         }
         // The Clamshell Assistant panel (v1.24) — ready and missing-requirements

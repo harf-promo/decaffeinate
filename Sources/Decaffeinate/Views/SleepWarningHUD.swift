@@ -44,10 +44,11 @@ struct SleepWarningHUD: View {
         .padding(Space.s4)
         .frame(width: 360)
         .background(
-            RoundedRectangle(cornerRadius: Radius.soft * 2).fill(Color.paper)
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.paper)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: Radius.soft * 2).stroke(Color.rule, lineWidth: 1)
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .stroke(Color.rule, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
         .accessibilityElement(children: .combine)

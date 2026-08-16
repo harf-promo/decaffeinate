@@ -39,11 +39,13 @@ extension Color {
 
     // ── Brand (theme-independent — they belong to the brand, not the theme) ──
     static let harfGrey = Color(hex: 0x939598)
-    static let harfGreen = Color(hex: 0xA4CD39)
-    static let greenHover = Color(hex: 0x8FB72A)  // green-600
-    static let greenPress = Color(hex: 0x7AA01D)  // green-700
+    /// Deeper sage-lime — the old #A4CD39 read as highlighter on Sleep Now
+    /// and washed out the moon. Same family, less neon.
+    static let harfGreen = Color(hex: 0x7EAE3C)
+    static let greenHover = Color(hex: 0x6F9B32)
+    static let greenPress = Color(hex: 0x5A8228)
     /// green-900 — the only green legible as text on paper.
-    static let accentText = Color(hex: 0x4D6A0F)
+    static let accentText = Color(hex: 0x3D5A14)
     /// grey-900 — the ONLY legal foreground on a green field (never theme-flips).
     static let onGreen = Color(hex: 0x1A1B1D)
 
@@ -113,6 +115,10 @@ enum Space {
 enum Radius {
     static let sharp: CGFloat = 0
     static let soft: CGFloat = 4
+    /// Controls and small cards — buttons, HUD, auto-sleep row.
+    static let control: CGFloat = 8
+    /// Blocker rows and larger panels.
+    static let card: CGFloat = 10
     static let pill: CGFloat = 999
 }
 
@@ -200,7 +206,12 @@ struct DecaffeinateMark: View {
             let s = min(sz.width, sz.height)
             let rect = CGRect(
                 x: (sz.width - s) / 2, y: (sz.height - s) / 2, width: s, height: s)
-            for el in BrandMark.logo(in: rect) {
+            // Small sizes (menu header, onboarding masthead) drop the cup —
+            // a porcelain ring at 22–32px reads as a broken "C". The compact
+            // mark is just the crescent + z, which still reads as sleep.
+            let elements =
+                size >= 40 ? BrandMark.logo(in: rect) : BrandMark.logoCompact(in: rect)
+            for el in elements {
                 // In-app the mark is line-art on paper: green moon/steam, and the
                 // porcelain cup + stars render as adaptive ink (dark on light,
                 // light on dark) since cream would vanish on white paper.
@@ -209,6 +220,7 @@ struct DecaffeinateMark: View {
                 case .moon: color = .harfGreen
                 case .zzz: color = .ink2
                 case .cream: color = .ink1
+                case .well: color = Color(light: 0x1C2230, dark: 0x2A3140)
                 }
                 ctx.fill(Path(el.path), with: .color(color), style: FillStyle(eoFill: el.evenOdd))
             }
@@ -250,10 +262,10 @@ private struct HarfButtonBody: View {
             .foregroundStyle(fg)
             .background(bg)
             .overlay(
-                RoundedRectangle(cornerRadius: Radius.soft)
+                RoundedRectangle(cornerRadius: Radius.control)
                     .stroke(border, lineWidth: border == .clear ? 0 : 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: Radius.soft))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.control))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.1), value: hovering)

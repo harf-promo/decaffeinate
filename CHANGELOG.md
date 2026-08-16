@@ -4,6 +4,22 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.1] — 2026-08-16
+
+A visual pass — calmer colour, a mark that reads at menu-bar size, and a
+menu that breathes.
+
+### Changed
+- **Brand green deepened** from highlighter `#A4CD39` to sage-lime `#7EAE3C`
+  so Sleep Now and the moon stop shouting.
+- **App icon** fills the cup (a coffee well) so it reads as a vessel, not a
+  hollow ring. In-app marks at ≤32px drop the cup entirely and show just the
+  crescent + z — the ring was collapsing to a "C".
+- **Menu** uses soft 10px cards, a 372px popover, sentence-case section
+  labels (no more clipped ALL-CAPS), a tinted verdict chip, and a quieter
+  auto-sleep row. Settings sidebar selection is a wash, not a neon bar.
+  Buttons, HUD, and onboarding pick up the same 8–10px continuous corners.
+
 ## [1.26.0] — 2026-08-16
 
 An honesty pass — the docs catch up to what's tagged, the sleep HUD speaks

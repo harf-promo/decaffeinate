@@ -21,7 +21,7 @@ struct SettingsView: View {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(width: 660, height: 480)
+        .frame(width: 700, height: 520)
         .background(theme.paper)
         .tint(theme.accent)
     }
@@ -44,8 +44,9 @@ struct SettingsView: View {
     }
 
     private func sidebarLabel(_ text: String) -> some View {
-        Text(text).textCase(.uppercase).font(.system(size: 11, weight: .semibold))
-            .tracking(0.8).foregroundStyle(theme.ink4)
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(theme.ink4)
             .padding(.horizontal, Space.s2).padding(.bottom, 2)
     }
 
@@ -56,16 +57,16 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: Space.s2) {
                 Image(systemName: item.icon).frame(width: 18)
-                    .foregroundStyle(selected ? Color.onGreen : theme.ink3)
+                    .foregroundStyle(selected ? Color.accentText : theme.ink3)
                 Text(L10n.localized(item.title))
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? Color.onGreen : theme.ink1)
+                    .foregroundStyle(selected ? Color.accentText : theme.ink1)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, Space.s2).padding(.vertical, 6)
+            .padding(.horizontal, Space.s2).padding(.vertical, 7)
             .background(
-                RoundedRectangle(cornerRadius: Radius.soft)
-                    .fill(selected ? theme.accent : Color.clear)
+                RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                    .fill(selected ? Color.harfGreen.opacity(0.18) : Color.clear)
             )
             .contentShape(Rectangle())
         }

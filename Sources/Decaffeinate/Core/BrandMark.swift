@@ -22,9 +22,10 @@ enum BrandMark {
     /// one geometry reads correctly as a full-colour badge, an adaptive line
     /// mark, and a monochrome template.
     enum Ink {
-        case moon  // harf-green (#A4CD39) in colour; black in template
-        case zzz  // ink/grey (#939598) in colour; black in template
-        case cream  // porcelain (#F2EDE4) on the night icon; adaptive ink in-app
+        case moon  // sage-lime in colour; black in template
+        case zzz  // ink/grey in colour; black in template
+        case cream  // porcelain on the night icon; adaptive ink in-app
+        case well  // coffee/night surface inside the cup (so it reads as a vessel)
     }
 
     /// A rendered element: a filled path + colour role + fill rule.
@@ -52,29 +53,58 @@ enum BrandMark {
         func pr(_ n: CGFloat) -> CGFloat { n * s }
 
         return [
-            // Cup rim — a porcelain ring seen top-down (annulus, even-odd carve).
+            // Coffee well first — without it the cup is a hollow ring that
+            // collapses to a "C" on paper and at small icon sizes.
             Element(
-                path: ring(cx: px(0.45), cy: py(0.63), outer: pr(0.305), inner: pr(0.245)),
+                path: disc(cx: px(0.44), cy: py(0.62), r: pr(0.248)),
+                ink: .well, evenOdd: false),
+            // Cup rim — a thicker porcelain ring so it survives 128px.
+            Element(
+                path: ring(cx: px(0.44), cy: py(0.62), outer: pr(0.328), inner: pr(0.248)),
                 ink: .cream, evenOdd: true),
             // The handle, attached on the right.
             Element(
-                path: ring(cx: px(0.80), cy: py(0.63), outer: pr(0.105), inner: pr(0.052)),
+                path: ring(cx: px(0.805), cy: py(0.62), outer: pr(0.108), inner: pr(0.056)),
                 ink: .cream, evenOdd: true),
-            // The crescent moon floating in the coffee, its mouth opening up-right.
+            // The crescent moon floating in the coffee — larger, the hero.
             Element(
-                path: crescent(cx: px(0.45), cy: py(0.645), r: pr(0.15)),
+                path: crescent(cx: px(0.43), cy: py(0.635), r: pr(0.172)),
                 ink: .moon, evenOdd: false),
             // A star in the open night-coffee surface, tucked left of the moon.
             Element(
-                path: star4(cx: px(0.30), cy: py(0.52), r: pr(0.038)),
+                path: star4(cx: px(0.285), cy: py(0.495), r: pr(0.044)),
                 ink: .cream, evenOdd: false),
-            // The steam rises as two ascending z's — the universal "sleep" signal.
+            // Steam as two thinner ascending z's.
             Element(
-                path: zGlyph(x: px(0.485), y: py(0.255), w: pr(0.09), h: pr(0.075)),
+                path: zGlyph(
+                    x: px(0.48), y: py(0.235), w: pr(0.085), h: pr(0.07), thicknessRatio: 0.26),
                 ink: .moon, evenOdd: false),
             Element(
-                path: zGlyph(x: px(0.58), y: py(0.115), w: pr(0.13), h: pr(0.11)),
+                path: zGlyph(
+                    x: px(0.575), y: py(0.095), w: pr(0.125), h: pr(0.105), thicknessRatio: 0.26),
                 ink: .moon, evenOdd: false),
+        ]
+    }
+
+    /// Small-size mark (menu header, masthead): crescent + one z. No cup —
+    /// a porcelain ring at 22–32px is just noise.
+    static func logoCompact(in rect: CGRect) -> [Element] {
+        let s = min(rect.width, rect.height)
+        let ox = rect.minX + (rect.width - s) / 2
+        let oy = rect.minY + (rect.height - s) / 2
+
+        func px(_ n: CGFloat) -> CGFloat { ox + n * s }
+        func py(_ n: CGFloat) -> CGFloat { oy + n * s }
+        func pr(_ n: CGFloat) -> CGFloat { n * s }
+
+        return [
+            Element(
+                path: crescent(cx: px(0.42), cy: py(0.56), r: pr(0.34)),
+                ink: .moon, evenOdd: false),
+            Element(
+                path: zGlyph(
+                    x: px(0.66), y: py(0.14), w: pr(0.24), h: pr(0.20), thicknessRatio: 0.28),
+                ink: .zzz, evenOdd: false),
         ]
     }
 
@@ -278,11 +308,20 @@ enum BrandMark {
         return path
     }
 
+    /// A filled disc — the coffee well inside the cup.
+    static func disc(cx: CGFloat, cy: CGFloat, r: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        path.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+        return path
+    }
+
     /// Filled Z-glyph in a bounding box, y-down.
     /// The path is self-intersecting (the two diagonal inner edges cross);
     /// use non-zero winding rule for a solid fill.
-    static func zGlyph(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) -> CGPath {
-        let th = min(w, h) * 0.32  // bar thickness ~32% of the short dimension
+    static func zGlyph(
+        x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, thicknessRatio: CGFloat = 0.32
+    ) -> CGPath {
+        let th = min(w, h) * thicknessRatio
         let path = CGMutablePath()
         path.move(to: CGPoint(x: x, y: y))  // TL
         path.addLine(to: CGPoint(x: x + w, y: y))  // TR

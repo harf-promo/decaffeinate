@@ -55,7 +55,7 @@ struct RedesignMenuView: View {
     /// Dynamic Type sizes instead of clipping its content.
     static var menuHeight: CGFloat {
         let available = NSScreen.main?.visibleFrame.height ?? 720
-        return min(460, max(360, available * 0.8))
+        return min(480, max(400, available * 0.8))
     }
 
     /// The hard ceiling — never taller than the visible screen under the menu
@@ -76,7 +76,7 @@ private struct RDHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: Space.s3) {
-                DecaffeinateMark(size: 26)
+                DecaffeinateMark(size: 32)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(appState.headline)
@@ -108,6 +108,7 @@ private struct RDHeader: View {
         }
         .padding(.horizontal, theme.contentInset)
         .padding(.top, Space.s4)
+        .padding(.bottom, Space.s1)
     }
 
     /// "Battery 82% · 2 apps holding · Idle 4m" — neutral, never amber.
@@ -218,8 +219,8 @@ private struct RDActionBar: View {
             }
         }
         .padding(.horizontal, theme.contentInset)
-        .padding(.top, Space.s5)
-        .padding(.bottom, theme.usesCards ? Space.s2 : Space.s4)
+        .padding(.top, Space.s3)
+        .padding(.bottom, Space.s3)
         // Sleep Now bypasses the app's own "never cuts off calls" promise
         // unless we ask first — this is that ask. The mic-active check that
         // arms it lives in `AppState.sleepNow()`.
@@ -273,6 +274,11 @@ private struct RDActionBar: View {
                     )
                 )
         }
+        .padding(.horizontal, Space.s3)
+        .padding(.vertical, Space.s2)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.control, style: .continuous).fill(theme.card)
+        )
     }
 }
 
@@ -408,10 +414,10 @@ private struct RDList: View {
 
     private var sectionHeader: some View {
         HStack {
-            Text(L10n.localized("Keeping your Mac awake")).textCase(.uppercase)
-                .scaledFont(11, weight: .semibold, relativeTo: .caption2).tracking(0.8)
+            Text(L10n.localized("Keeping your Mac awake"))
+                .scaledFont(12, weight: .semibold, relativeTo: .caption)
                 .foregroundStyle(theme.ink3)
-                .lineLimit(1)
+                .lineLimit(2)
             Spacer()
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) { showExplainer.toggle() }
@@ -442,8 +448,13 @@ private struct RDList: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         .padding(Space.s3)
-        .background(RoundedRectangle(cornerRadius: Radius.soft).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: Radius.soft).stroke(theme.hairline, lineWidth: 1))
+        .background(
+            RoundedRectangle(cornerRadius: Radius.control, style: .continuous).fill(theme.card)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                .stroke(theme.hairline, lineWidth: 1)
+        )
         .padding(.horizontal, theme.contentInset)
         .padding(.bottom, Space.s2)
     }
@@ -462,8 +473,14 @@ private struct RDList: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
+        .padding(.horizontal, Space.s3)
+        .padding(.vertical, Space.s2)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                .fill(verdict.tone.color(theme).opacity(0.12))
+        )
         .padding(.horizontal, theme.contentInset)
-        .padding(.bottom, Space.s1)
+        .padding(.bottom, Space.s2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(verdict.text)
     }
@@ -540,9 +557,9 @@ private struct RDList: View {
             HStack {
                 Image(systemName: showOthers ? "chevron.down" : "chevron.right")
                     .scaledFont(9, weight: .semibold, relativeTo: .caption2)
-                Text(L10n.localized("Screen-only / background")).textCase(.uppercase)
-                    .scaledFont(11, weight: .semibold, relativeTo: .caption2).tracking(0.8)
-                    .lineLimit(1)
+                Text(L10n.localized("Screen-only / background"))
+                    .scaledFont(12, weight: .semibold, relativeTo: .caption)
+                    .lineLimit(2)
                 Spacer()
                 Text("\(others.count)")
                     .scaledFont(11, weight: .semibold, relativeTo: .caption2)
@@ -579,13 +596,14 @@ private struct RDSectionLabel: View {
 
     var body: some View {
         HStack {
-            Text(text).textCase(.uppercase).scaledFont(11, weight: .semibold, relativeTo: .caption2)
-                .tracking(0.8).foregroundStyle(theme.ink3).lineLimit(1)
+            Text(text)
+                .scaledFont(12, weight: .semibold, relativeTo: .caption)
+                .foregroundStyle(theme.ink3).lineLimit(2)
             Spacer()
             if let trailing {
-                Text(trailing).textCase(.uppercase)
-                    .scaledFont(11, weight: .semibold, relativeTo: .caption2)
-                    .tracking(0.8).foregroundStyle(theme.ink4).lineLimit(1)
+                Text(trailing)
+                    .scaledFont(12, weight: .medium, relativeTo: .caption)
+                    .foregroundStyle(theme.ink4).lineLimit(1)
             }
         }
         .padding(.horizontal, theme.contentInset)
@@ -640,7 +658,7 @@ private struct RDRow: View {
         }
         .background(rowBackground)
         .overlay(alignment: .leading) { pendingRail }
-        .clipShape(RoundedRectangle(cornerRadius: theme.cardRadius))
+        .clipShape(RoundedRectangle(cornerRadius: theme.cardRadius, style: .continuous))
         .overlay(cardBorder)
         .padding(.horizontal, theme.contentInset)
     }
@@ -873,7 +891,7 @@ private struct RDRow: View {
 
     @ViewBuilder private var rowBackground: some View {
         if theme.usesCards {
-            RoundedRectangle(cornerRadius: theme.cardRadius)
+            RoundedRectangle(cornerRadius: theme.cardRadius, style: .continuous)
                 .fill(pending ? theme.cardActive : theme.card)
         } else if pending {
             theme.cardActive
@@ -884,7 +902,8 @@ private struct RDRow: View {
 
     @ViewBuilder private var cardBorder: some View {
         if theme.usesCards {
-            RoundedRectangle(cornerRadius: theme.cardRadius).stroke(theme.hairline, lineWidth: 1)
+            RoundedRectangle(cornerRadius: theme.cardRadius, style: .continuous)
+                .stroke(theme.hairline, lineWidth: 1)
         }
     }
 
@@ -1045,9 +1064,9 @@ private struct RDButtonBody: View {
             .padding(.horizontal, compact ? Space.s3 : Space.s4)
             .padding(.vertical, compact ? 6 : 9)
             .foregroundStyle(fg)
-            .background(RoundedRectangle(cornerRadius: Radius.soft).fill(bg))
+            .background(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).fill(bg))
             .overlay(
-                RoundedRectangle(cornerRadius: Radius.soft)
+                RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
                     .stroke(border, lineWidth: border == .clear ? 0 : 1)
             )
             .contentShape(Rectangle())
@@ -1064,7 +1083,7 @@ private struct RDButtonBody: View {
             return pressed
                 ? Color.greenPress : (hovering ? Color.greenHover : theme.accent)
         case .secondary:
-            return hovering ? theme.cardActive : .clear
+            return hovering ? theme.cardActive : theme.card
         }
     }
     private var fg: Color {

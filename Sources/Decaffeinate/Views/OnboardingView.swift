@@ -42,8 +42,8 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             // Masthead — a quiet brand anchor.
             HStack(spacing: Space.s2) {
-                DecaffeinateMark(size: 22)
-                Text("Decaffeinate").scaledFont(13, weight: .medium).foregroundStyle(Color.ink1)
+                DecaffeinateMark(size: 28)
+                Text("Decaffeinate").scaledFont(14, weight: .semibold).foregroundStyle(Color.ink1)
                 Spacer()
                 Text(L10n.localized("Welcome")).eyebrow(.ink4)
             }
@@ -108,7 +108,7 @@ struct OnboardingView: View {
             .padding(.horizontal, Space.s5)
             .padding(.vertical, Space.s4)
         }
-        .frame(width: 480, height: 420)
+        .frame(width: 500, height: 440)
         .background(Color.paper)
     }
 

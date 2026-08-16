@@ -6,14 +6,26 @@ final class BrandMarkTests: XCTestCase {
     // ── logo() ────────────────────────────────────────────────────────────────
 
     func testLogoContainsMoonAndCup() {
-        // The moon-in-cup mark: a green crescent + steam-z (.moon) and a
-        // porcelain cup + star (.cream).
+        // The moon-in-cup mark: a green crescent + steam-z (.moon), a
+        // porcelain cup + star (.cream), and a coffee well so the cup
+        // reads as a vessel instead of a hollow ring.
         let elements = BrandMark.logo(in: CGRect(x: 0, y: 0, width: 64, height: 64))
         XCTAssertFalse(elements.isEmpty)
         XCTAssertTrue(
             elements.contains { $0.ink == .moon }, "logo must include a green moon/steam element")
         XCTAssertTrue(
             elements.contains { $0.ink == .cream }, "logo must include a porcelain cup element")
+        XCTAssertTrue(
+            elements.contains { $0.ink == .well }, "logo must fill the cup so it reads as a vessel")
+    }
+
+    func testCompactLogoIsMoonAndZWithoutCup() {
+        let elements = BrandMark.logoCompact(in: CGRect(x: 0, y: 0, width: 24, height: 24))
+        XCTAssertTrue(elements.contains { $0.ink == .moon }, "compact mark is the crescent")
+        XCTAssertTrue(elements.contains { $0.ink == .zzz }, "compact mark has a rising z")
+        XCTAssertFalse(
+            elements.contains { $0.ink == .cream },
+            "compact mark drops the cup — a ring at 24px is just a C")
     }
 
     func testLogoElementsHaveNonEmptyPaths() {
