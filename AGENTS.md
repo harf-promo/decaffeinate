@@ -13,7 +13,7 @@ macOS menu-bar app (SwiftPM executable, macOS 14+) — a *sleep firewall*: it sh
 
 ```bash
 swift build            # debug build (~10 s warm)
-swift test             # XCTest suite — 501 tests (across Tests/DecaffeinateTests + LidHelper tests)
+swift test             # XCTest suite — 502 tests (across Tests/DecaffeinateTests + LidHelper tests)
 swift build -c release
 ```
 
@@ -25,4 +25,6 @@ swift build -c release
 
 ## Verification before done
 
-`swift build && swift test`; for UI/menu-bar behavior, run the built app and observe — menu-bar interactions are not machine-checkable, name what to click when handing over.
+`swift build && swift test`. Visual QA **without sleeping the Mac**:
+`swift run Decaffeinate --preview` or `--screenshots <dir>` (see `docs/PREVIEW.md`).
+Do not click Sleep Now on the installed `/Applications` app unless you want `pmset`.

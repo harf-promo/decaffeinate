@@ -22,7 +22,7 @@
 
 ---
 
-> **Release status:** the latest tagged, notarized build is **v1.25.0** (Homebrew, DMG). `main` is **v1.26.0** (Cursor hooks, localized HUD, docs honesty).
+> **Release status:** the latest tagged, notarized build is **v1.26.1**. `main` is **v1.26.2** — crescent-Z mark on Dock, menu bar, and README.
 
 ---
 
@@ -180,9 +180,11 @@ Decaffeinate --provenance    # …and trace each one to its window / agent / pro
 Decaffeinate --status --json # machine-readable status for scripts / agent hooks
 Decaffeinate --sleep-now     # sleep now · --display-off  turn the screen off
 Decaffeinate --diagnose      # settings + rules + scan, for a bug report
+Decaffeinate --preview       # fixture UI — Sleep Now cannot sleep this Mac
 ```
 See [`docs/AUTOMATION.md`](docs/AUTOMATION.md) for the full CLI, the
-`decaffeinate://` URL scheme, and a safe agent-hook recipe.
+`decaffeinate://` URL scheme, and a safe agent-hook recipe. Visual QA
+without sleeping the Mac: [`docs/PREVIEW.md`](docs/PREVIEW.md).
 
 ---
 

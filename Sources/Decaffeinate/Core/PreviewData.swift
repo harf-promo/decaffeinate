@@ -77,6 +77,23 @@ struct PreviewAudio: AudioDeviceResolving {
     }
 }
 
+/// Never calls `pmset`. Used by `--preview` and `--screenshots`.
+@MainActor
+struct PreviewSleeper: SystemSleeping {
+    func sleepNow() -> Result<Void, SleepController.SleepError> { .success(()) }
+    func displayOffNow() -> Result<Void, SleepController.SleepError> { .success(()) }
+}
+
+/// Never takes a real IOKit keep-awake assertion.
+@MainActor
+final class PreviewCaffeine: KeepAwakeControlling {
+    private(set) var isActive = false
+    func update(keepSystemAwake: Bool, keepDisplayAwake: Bool, reason: String) {
+        isActive = keepSystemAwake || keepDisplayAwake
+    }
+    func releaseAll() { isActive = false }
+}
+
 @MainActor
 struct PreviewIdle: IdleReading {
     var seconds: TimeInterval = 8
@@ -139,6 +156,8 @@ extension AppState {
             telemetry: PreviewSampler(),
             idleMonitor: PreviewIdle(),
             powerReader: PreviewPower(),
+            caffeine: PreviewCaffeine(),
+            sleepController: PreviewSleeper(),
             thermalProvider: { .nominal },
             provenanceResolver: PreviewProvenance(),
             audioResolver: PreviewAudio(),

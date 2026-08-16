@@ -82,6 +82,10 @@ enum CLI {
             runDiagnose()
             return true
         }
+        if arguments.contains("--preview") {
+            PreviewApp.run()
+            return true
+        }
         return false
     }
 
@@ -699,6 +703,12 @@ enum CLI {
             ),
             L10n.localized(
                 "  Decaffeinate --icon [dir]     Regenerate icon-1024.png, AppIcon.icns, SVG (default: assets/)"
+            ),
+            L10n.localized(
+                "  Decaffeinate --preview        Open fixture UI (Sleep Now cannot sleep this Mac)"
+            ),
+            L10n.localized(
+                "  Decaffeinate --screenshots [dir]  Render UI PNGs from fixtures (no sleep)"
             ),
             L10n.localized("  Decaffeinate --version        Print the version and exit"),
             L10n.localized("  Decaffeinate --help           Show this help"),

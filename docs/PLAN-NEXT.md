@@ -1,23 +1,15 @@
-# Decaffeinate — Next Milestones (v1.26)
+# Decaffeinate — Next
 
-The 1.21–1.25 product-audit plan has shipped and been tagged. The original
-document lives at
-[`docs/archive/PLAN-NEXT-1.21-1.25.md`](archive/PLAN-NEXT-1.21-1.25.md).
+v1.21–v1.26.1 shipped and tagged. **v1.26.2** is the crescent-Z mark
+everywhere (including the menu bar) plus `--preview`.
 
-## v1.26 — Honesty · localized HUD · Cursor hook
+## Open (short)
 
-- Docs honesty: `Info.plist` / README / ROADMAP / AUTOMATION catch up to the
-  latest tag (v1.25.0); `main` is v1.26.0.
-- Sleep-warning HUD, relative-time shorthand, `MugState` accessibility
-  labels, and "Technical details" go through `L10n` (English + machine-draft
-  German).
-- Cursor user-level `~/.cursor/hooks.json` stop hook, same refuse /
-  idempotent / preserve rules as Claude.
-- Theme is Nightcap-only; `MugState` comments describe the crescent moon.
+- Native-speaker pass on the German draft
+- `TAP_REPO_TOKEN` so Homebrew tap tracks tags
+- Sleep-simulation harness under `swift test`
+- homebrew/cask-core once notable
 
-## After 1.26
+## Non-goals (unchanged)
 
-- More languages, and a native-speaker pass on the German draft
-- Sleep-simulation harness
-- Docs & advocacy
-- homebrew/cask-core submission
+No root helper, no SMC, no widgets, no App Store.

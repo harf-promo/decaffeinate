@@ -195,9 +195,8 @@ struct Hairline: View {
     var body: some View { Rectangle().fill(color).frame(height: 1) }
 }
 
-/// The Decaffeinate brand mark — the "Moon + Zzz" sleep identity: a harf-green
-/// crescent moon with three rising z's (small → medium → large). Drawn from
-/// `BrandMark` geometry so it matches the app icon and menu-bar glyph exactly.
+/// The Decaffeinate brand mark — crescent + one Z. Same geometry as the
+/// Dock icon and the menu-bar glyph.
 struct DecaffeinateMark: View {
     var size: CGFloat = 22
 
@@ -206,12 +205,7 @@ struct DecaffeinateMark: View {
             let s = min(sz.width, sz.height)
             let rect = CGRect(
                 x: (sz.width - s) / 2, y: (sz.height - s) / 2, width: s, height: s)
-            // Small sizes (menu header, onboarding masthead) drop the cup —
-            // a porcelain ring at 22–32px reads as a broken "C". The compact
-            // mark is just the crescent + z, which still reads as sleep.
-            let elements =
-                size >= 40 ? BrandMark.logo(in: rect) : BrandMark.logoCompact(in: rect)
-            for el in elements {
+            for el in BrandMark.logo(in: rect) {
                 // In-app the mark is line-art on paper: green moon/steam, and the
                 // porcelain cup + stars render as adaptive ink (dark on light,
                 // light on dark) since cream would vanish on white paper.

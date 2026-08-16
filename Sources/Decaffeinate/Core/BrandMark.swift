@@ -38,11 +38,9 @@ enum BrandMark {
 
     // ── Full-colour logo (in-app mark, app icon, SVG) ───────────────────────
 
-    /// The full brand mark — "the moon in your cup": a top-down porcelain cup
-    /// whose coffee surface is the night sky, a green crescent moon floating in
-    /// it, a star, and the steam rising as a single green "z". Tells the product
-    /// story in one image — the caffeine is gone, the moon is in the cup.
-    /// Scaled into `rect`. Y-down coordinate system; AppKit must flip the CTM.
+    /// The brand mark: a large crescent with a single Z in its open mouth.
+    /// Sleep, not coffee — no cup. Same geometry at Dock, menu bar, and GitHub.
+    /// Y-down; AppKit must flip the CTM.
     static func logo(in rect: CGRect) -> [Element] {
         let s = min(rect.width, rect.height)
         let ox = rect.minX + (rect.width - s) / 2
@@ -53,75 +51,34 @@ enum BrandMark {
         func pr(_ n: CGFloat) -> CGFloat { n * s }
 
         return [
-            // Coffee well first — without it the cup is a hollow ring that
-            // collapses to a "C" on paper and at small icon sizes.
             Element(
-                path: disc(cx: px(0.44), cy: py(0.62), r: pr(0.248)),
-                ink: .well, evenOdd: false),
-            // Cup rim — a thicker porcelain ring so it survives 128px.
-            Element(
-                path: ring(cx: px(0.44), cy: py(0.62), outer: pr(0.328), inner: pr(0.248)),
-                ink: .cream, evenOdd: true),
-            // The handle, attached on the right.
-            Element(
-                path: ring(cx: px(0.805), cy: py(0.62), outer: pr(0.108), inner: pr(0.056)),
-                ink: .cream, evenOdd: true),
-            // The crescent moon floating in the coffee — larger, the hero.
-            Element(
-                path: crescent(cx: px(0.43), cy: py(0.635), r: pr(0.172)),
+                path: crescent(
+                    cx: px(Self.markMoonCX), cy: py(Self.markMoonCY), r: pr(Self.markMoonR)),
                 ink: .moon, evenOdd: false),
-            // A star in the open night-coffee surface, tucked left of the moon.
             Element(
-                path: star4(cx: px(0.285), cy: py(0.495), r: pr(0.044)),
+                path: zGlyph(
+                    x: px(0.60), y: py(0.14), w: pr(0.28), h: pr(0.24), thicknessRatio: 0.28),
                 ink: .cream, evenOdd: false),
-            // Steam as two thinner ascending z's.
             Element(
-                path: zGlyph(
-                    x: px(0.48), y: py(0.235), w: pr(0.085), h: pr(0.07), thicknessRatio: 0.26),
-                ink: .moon, evenOdd: false),
-            Element(
-                path: zGlyph(
-                    x: px(0.575), y: py(0.095), w: pr(0.125), h: pr(0.105), thicknessRatio: 0.26),
-                ink: .moon, evenOdd: false),
+                path: star4(cx: px(0.30), cy: py(0.40), r: pr(0.055)),
+                ink: .cream, evenOdd: false),
         ]
     }
 
-    /// Small-size mark (menu header, masthead): crescent + one z. No cup —
-    /// a porcelain ring at 22–32px is just noise.
-    static func logoCompact(in rect: CGRect) -> [Element] {
-        let s = min(rect.width, rect.height)
-        let ox = rect.minX + (rect.width - s) / 2
-        let oy = rect.minY + (rect.height - s) / 2
+    /// Same mark as `logo` — one silhouette at every size.
+    static func logoCompact(in rect: CGRect) -> [Element] { logo(in: rect) }
 
-        func px(_ n: CGFloat) -> CGFloat { ox + n * s }
-        func py(_ n: CGFloat) -> CGFloat { oy + n * s }
-        func pr(_ n: CGFloat) -> CGFloat { n * s }
-
-        return [
-            Element(
-                path: crescent(cx: px(0.42), cy: py(0.56), r: pr(0.34)),
-                ink: .moon, evenOdd: false),
-            Element(
-                path: zGlyph(
-                    x: px(0.66), y: py(0.14), w: pr(0.24), h: pr(0.20), thicknessRatio: 0.28),
-                ink: .zzz, evenOdd: false),
-        ]
-    }
+    /// Shared moon placement so the menu-bar glyph is the same mark as the Dock icon.
+    static let markMoonCX: CGFloat = 0.44
+    static let markMoonCY: CGFloat = 0.54
+    static let markMoonR: CGFloat = 0.36
 
     // ── Menu-bar glyphs (monochrome template, 4 states) ─────────────────────
 
-    /// Menu-bar glyph for `state`, scaled into `rect`. All elements fill solid
-    /// black in a template `NSImage` (tinted automatically by the menu bar).
-    ///
-    /// Two things distinguish each state, not one tiny corner mark: the
-    /// **moon's own fullness** (how much of the disc the crescent carve keeps —
-    /// a thin new-moon sliver reads calm, a near-solid gibbous moon reads
-    /// heavy/urgent) plus a bold modifier glyph. At real menu-bar size (16–18pt)
-    /// a lone ~0.19×-height corner mark washes out; varying the base silhouette's
-    /// own ink weight survives that shrink because it's the largest shape on the
-    /// glyph, not the smallest. Template images can't use colour — only shape,
-    /// weight and fill carry state here. Y-down coordinate system; AppKit must
-    /// flip the CTM.
+    /// Menu-bar glyph for `state`. Uses the **same moon placement as `logo`**
+    /// so the 16px bar icon is the app mark, not a leftover sliver.
+    /// `.free` is the brand (crescent + Z). Other states keep a bold modifier
+    /// and, for `.blocked`, a fuller moon. Template images are monochrome.
     static func menuGlyph(for state: MugState, in rect: CGRect) -> [Element] {
         let s = min(rect.width, rect.height)
         let ox = rect.minX + (rect.width - s) / 2
@@ -134,45 +91,41 @@ enum BrandMark {
         func moon(carveRadiusRatio: CGFloat, carveOffsetRatio: CGFloat) -> Element {
             Element(
                 path: crescent(
-                    cx: px(0.40), cy: py(0.55), r: pr(0.27),
+                    cx: px(Self.markMoonCX), cy: py(Self.markMoonCY), r: pr(Self.markMoonR),
                     carveRadiusRatio: carveRadiusRatio, carveOffsetRatio: carveOffsetRatio),
                 ink: .moon, evenOdd: false)
         }
 
         switch state {
         case .free:
-            // A thin new-moon sliver — the lightest possible ink, the calmest
-            // state — plus a small z rising from its open side.
+            // The brand mark itself: standard crescent + Z in the mouth.
             return [
-                moon(carveRadiusRatio: 1.08, carveOffsetRatio: 0.66),
+                moon(
+                    carveRadiusRatio: crescentCarveRadiusRatio,
+                    carveOffsetRatio: crescentCarveOffsetRatio),
                 Element(
                     path: zGlyph(
-                        x: px(0.69), y: py(0.26), w: pr(0.22), h: pr(0.19)),
+                        x: px(0.60), y: py(0.14), w: pr(0.28), h: pr(0.24), thicknessRatio: 0.28),
                     ink: .zzz, evenOdd: false),
             ]
 
         case .counting:
-            // The standard crescent (same fullness the in-app logo uses) plus a
-            // bold filled downward chevron — winding down toward sleep.
             return [
                 moon(
                     carveRadiusRatio: crescentCarveRadiusRatio,
                     carveOffsetRatio: crescentCarveOffsetRatio),
                 Element(
                     path: chevronDown(
-                        cx: px(0.76), topY: py(0.22),
-                        halfSpan: pr(0.21), height: pr(0.20), barW: pr(0.10)),
+                        cx: px(0.76), topY: py(0.16),
+                        halfSpan: pr(0.20), height: pr(0.20), barW: pr(0.10)),
                     ink: .zzz, evenOdd: false),
             ]
 
         case .blocked:
-            // A near-full, near-solid moon — deliberately the heaviest silhouette
-            // in the set, reading "something is holding this" even before the
-            // exclamation mark is legible — plus a bold exclamation mark.
             let (body, dot) = exclamation(
-                cx: px(0.78), topY: py(0.20),
-                bodyH: pr(0.23), bodyW: pr(0.135),
-                gap: pr(0.045), dotR: pr(0.09))
+                cx: px(0.78), topY: py(0.16),
+                bodyH: pr(0.24), bodyW: pr(0.14),
+                gap: pr(0.04), dotR: pr(0.09))
             return [
                 moon(carveRadiusRatio: 0.82, carveOffsetRatio: 0.26),
                 Element(path: body, ink: .zzz, evenOdd: false),
@@ -180,8 +133,6 @@ enum BrandMark {
             ]
 
         case .caffeinated:
-            // The standard crescent plus a large lightning bolt — intentionally
-            // wired awake, a deliberate choice rather than an unwanted block.
             return [
                 moon(
                     carveRadiusRatio: crescentCarveRadiusRatio,

@@ -5,27 +5,23 @@ import XCTest
 final class BrandMarkTests: XCTestCase {
     // ── logo() ────────────────────────────────────────────────────────────────
 
-    func testLogoContainsMoonAndCup() {
-        // The moon-in-cup mark: a green crescent + steam-z (.moon), a
-        // porcelain cup + star (.cream), and a coffee well so the cup
-        // reads as a vessel instead of a hollow ring.
+    func testLogoIsCrescentAndZ() {
         let elements = BrandMark.logo(in: CGRect(x: 0, y: 0, width: 64, height: 64))
-        XCTAssertFalse(elements.isEmpty)
-        XCTAssertTrue(
-            elements.contains { $0.ink == .moon }, "logo must include a green moon/steam element")
-        XCTAssertTrue(
-            elements.contains { $0.ink == .cream }, "logo must include a porcelain cup element")
-        XCTAssertTrue(
-            elements.contains { $0.ink == .well }, "logo must fill the cup so it reads as a vessel")
+        XCTAssertTrue(elements.contains { $0.ink == .moon && !$0.evenOdd }, "crescent moon")
+        XCTAssertTrue(elements.contains { $0.ink == .cream }, "Z and star")
+        XCTAssertFalse(elements.contains { $0.ink == .well }, "the cup is gone")
     }
 
-    func testCompactLogoIsMoonAndZWithoutCup() {
-        let elements = BrandMark.logoCompact(in: CGRect(x: 0, y: 0, width: 24, height: 24))
-        XCTAssertTrue(elements.contains { $0.ink == .moon }, "compact mark is the crescent")
-        XCTAssertTrue(elements.contains { $0.ink == .zzz }, "compact mark has a rising z")
-        XCTAssertFalse(
-            elements.contains { $0.ink == .cream },
-            "compact mark drops the cup — a ring at 24px is just a C")
+    func testCompactLogoMatchesFullLogo() {
+        let rect = CGRect(x: 0, y: 0, width: 24, height: 24)
+        XCTAssertEqual(BrandMark.logo(in: rect).count, BrandMark.logoCompact(in: rect).count)
+    }
+
+    @MainActor
+    func testPreviewSleeperNeverFails() {
+        let sleeper = PreviewSleeper()
+        XCTAssertNoThrow(try sleeper.sleepNow().get())
+        XCTAssertNoThrow(try sleeper.displayOffNow().get())
     }
 
     func testLogoElementsHaveNonEmptyPaths() {
@@ -105,13 +101,9 @@ final class BrandMarkTests: XCTestCase {
             "each MugState must produce a unique composite bounding box")
     }
 
-    /// Regression guard for the pre-v1.23 design: all four states shared the
-    /// exact same crescent (only a small secondary modifier differed), so at
-    /// real menu-bar size the states were barely tellable apart. `.free`
-    /// (thin sliver) and `.blocked` (near-full moon) must each render a
-    /// genuinely different moon shape from the standard crescent that
-    /// `.counting`/`.caffeinated` share — the base silhouette itself must
-    /// carry state, not only the corner modifier.
+    /// `.free` / `.counting` / `.caffeinated` share the brand crescent (the
+    /// Dock icon). `.blocked` is a fuller moon. Modifiers (Z / chevron / bolt)
+    /// distinguish the three shared-moon states.
     func testFreeAndBlockedMoonsDifferFromTheStandardCrescent() {
         let rect = CGRect(x: 0, y: 0, width: 18, height: 18)
         func moonPath(_ state: MugState) -> CGPath {
@@ -122,15 +114,10 @@ final class BrandMarkTests: XCTestCase {
         let blocked = moonPath(.blocked)
         let caffeinated = moonPath(.caffeinated)
 
-        XCTAssertFalse(free == counting, ".free's thin sliver must differ from the standard moon")
-        XCTAssertFalse(
-            blocked == counting, ".blocked's full moon must differ from the standard moon")
-        XCTAssertFalse(free == blocked, ".free and .blocked must not share a moon shape")
-        // .counting and .caffeinated deliberately share the standard crescent —
-        // they're differentiated by their modifier (chevron vs. bolt) instead.
+        XCTAssertTrue(free == counting, ".free and .counting share the brand crescent")
         XCTAssertTrue(
-            counting == caffeinated,
-            ".counting and .caffeinated intentionally share the standard crescent")
+            counting == caffeinated, ".counting and .caffeinated share the brand crescent")
+        XCTAssertFalse(free == blocked, ".blocked must be a fuller moon than the brand crescent")
     }
 
     /// `.blocked` is the one state the audit called out as needing to read as

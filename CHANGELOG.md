@@ -4,6 +4,18 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.2] — 2026-08-16
+
+The mark is a crescent + one Z everywhere — Dock, menu bar, in-app, GitHub README.
+
+### Changed
+- **Dropped the cup.** `BrandMark.logo` is a large crescent with a single Z
+  in its mouth and one star. `menuGlyph(.free)` is that same moon+Z so the
+  16px menu-bar icon finally matches the app icon.
+- **`--preview`** opens fixture menu + Settings windows. Sleep Now and
+  keep-awake are no-ops (`PreviewSleeper` / `PreviewCaffeine`).
+  `--screenshots` uses the same fakes.
+
 ## [1.26.1] — 2026-08-16
 
 A visual pass — calmer colour, a mark that reads at menu-bar size, and a
