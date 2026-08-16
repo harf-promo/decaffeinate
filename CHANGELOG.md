@@ -4,7 +4,7 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.26.0] — Unreleased
+## [1.26.0] — 2026-08-16
 
 An honesty pass — the docs catch up to what's tagged, the sleep HUD speaks
 the user's language, and Cursor gets a first-class hook.
@@ -29,6 +29,16 @@ the user's language, and Cursor gets a first-class hook.
 - **Theme is Nightcap-only.** Dusk comments dropped; `usesCards` stays.
 - **MugState comments** describe the crescent moon, not a mug.
 - Cursor and Windsurf join the default "Common tools" watch list.
+- **Sleep when this finishes** now offers on any job-like hold (unknown /
+  background / `caffeinate`), not only a `caffeinate -w` wait-pid. Calls,
+  media, backups, and updates stay off that offer — those aren't jobs you
+  wait out. Also in the row's ⋯ menu.
+- Gemini CLI, GitHub Copilot, and Grok are recognized as AI-agent sessions
+  (labelled, not on the default Common tools list).
+- Update UI names the available version, says "X is the latest signed
+  release" when Sparkle finds nothing newer, and offers **Open Releases**
+  when a check fails. (In-app update from 1.25.0 requires this tagged
+  release — Sparkle had nothing newer to offer.)
 
 ## [1.25.0] — 2026-08-02
 

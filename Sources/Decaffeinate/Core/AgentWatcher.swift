@@ -48,6 +48,10 @@ final class AgentWatcher {
         return nil
     }
 
+    /// The armed target, if any — used so a hold row can tell whether *it* is
+    /// the one being watched (by pid *or* process name).
+    var currentTarget: WatchTarget? { target }
+
     func setTarget(_ newTarget: WatchTarget?) {
         target = newTarget
         lastSample = nil

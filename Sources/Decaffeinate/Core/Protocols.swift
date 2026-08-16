@@ -74,7 +74,8 @@ protocol BlockerNotifying {
     /// Settings-open) — unlike `requestAuthorizationIfNeeded()`, which only ever
     /// asks once per process launch, this notices a denial or a later revoke in
     /// System Settings. The completion always runs on the main actor.
-    func refreshAuthorizationStatus(_ completion: @escaping @MainActor (NotificationAuthorization) -> Void)
+    func refreshAuthorizationStatus(
+        _ completion: @escaping @MainActor (NotificationAuthorization) -> Void)
 }
 
 /// The seam a notification action ("Always Allow" / "Sleep Anyway") needs to

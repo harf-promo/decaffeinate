@@ -116,7 +116,8 @@ extension AppState {
         // Seed a couple of forced sleeps so the History pane's log isn't empty.
         history.record(
             SleepEvent(
-                date: now.addingTimeInterval(-3 * 3_600), reason: "Idle 10 min — putting Mac to sleep",
+                date: now.addingTimeInterval(-3 * 3_600),
+                reason: "Idle 10 min — putting Mac to sleep",
                 onBattery: true, sleptSeconds: 6 * 3_600))
         history.record(
             SleepEvent(

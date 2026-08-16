@@ -462,6 +462,9 @@
 "Decaffeinate — sleeping soon" = "Decaffeinate — schläft bald";
 "Decaffeinate — Mac is being kept awake" = "Decaffeinate — der Mac wird wachgehalten";
 "Decaffeinate — keeping awake" = "Decaffeinate — hält wach";
+"%@ is the latest signed release" = "%@ ist die neueste signierte Version";
+"%@ is available" = "%@ ist verfügbar";
+"Open Releases" = "Releases öffnen";
 
 /* The app name — a brand mark; intentionally identical in every language. */
 "Decaffeinate" = "Decaffeinate";

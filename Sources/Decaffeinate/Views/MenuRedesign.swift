@@ -313,7 +313,8 @@ private struct RDActiveControls: View {
                     Image(systemName: "bolt.horizontal.circle.fill")
                         .font(.caption2).foregroundStyle(theme.accent).accessibilityHidden(true)
                     Text(L10n.localized("Kept awake — %@", reason))
-                        .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink2).lineLimit(1)
+                        .scaledFont(12, relativeTo: .caption).foregroundStyle(theme.ink2).lineLimit(
+                            1)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -487,7 +488,9 @@ private struct RDList: View {
         }
         let folded = list.count - visible.count
         if folded > 0 {
-            foldRow(count: folded) { withAnimation(.easeInOut(duration: 0.15)) { showAllHolders = true } }
+            foldRow(count: folded) {
+                withAnimation(.easeInOut(duration: 0.15)) { showAllHolders = true }
+            }
         }
     }
 
@@ -748,10 +751,12 @@ private struct RDRow: View {
         return t.scaledFont(12, relativeTo: .caption)
     }
 
-    /// One-click "Sleep when it finishes" for an agentic `caffeinate -w` hold,
-    /// plus a dismiss — non-nagging, menu-only.
+    /// One-click "Sleep when it finishes" for a job-like hold (`caffeinate -w`
+    /// or any CPU-meaningful system-sleep holder), plus a dismiss.
     @ViewBuilder private var watchOffer: some View {
-        if let target = appState.agentWaitTarget(for: assertion) {
+        if appState.shouldOfferWatch(for: assertion),
+            let target = appState.watchableTarget(for: assertion)
+        {
             HStack(spacing: Space.s2) {
                 Button {
                     appState.setWatchTarget(.pid(target.pid))
@@ -844,8 +849,15 @@ private struct RDRow: View {
                 Button(L10n.localized("Clear rule")) { appState.clearRule(for: assertion) }
             }
             Divider()
+            if let target = appState.watchableTarget(for: assertion) {
+                Button(L10n.localized("Sleep when it finishes")) {
+                    appState.setWatchTarget(.pid(target.pid))
+                }
+            }
             if let app = appState.frontableAppName(for: assertion) {
-                Button(L10n.localized("Bring %@ to front", app)) { appState.bringToFront(assertion) }
+                Button(L10n.localized("Bring %@ to front", app)) {
+                    appState.bringToFront(assertion)
+                }
             }
             Button(L10n.localized("Show in Activity Monitor")) { appState.openActivityMonitor() }
             Button(L10n.localized("Copy details")) { appState.copyDetails(assertion) }
@@ -917,11 +929,15 @@ private struct RDFooter: View {
                     Button {
                         updater.checkForUpdatesUserInitiated()
                     } label: {
-                        Label(L10n.localized("Update available"), systemImage: "arrow.down.circle.fill")
+                        Label(
+                            L10n.localized("Update available"),
+                            systemImage: "arrow.down.circle.fill")
                     }
                     .buttonStyle(RDPrimaryButton(compact: true))
                     .fixedSize()
-                    .help(L10n.localized("A new version of Decaffeinate is ready — click to install."))
+                    .help(
+                        L10n.localized("A new version of Decaffeinate is ready — click to install.")
+                    )
                 } else if let last = appState.lastSleepAt {
                     Label(
                         L10n.localized("Slept %@", Format.relative(since: last)),
@@ -940,7 +956,8 @@ private struct RDFooter: View {
                         .scaledFont(12, weight: .medium, relativeTo: .caption)
                 }
                 .buttonStyle(.plain).foregroundStyle(theme.ink2)
-                .help(L10n.localized("Open Settings")).accessibilityLabel(L10n.localized("Settings"))
+                .help(L10n.localized("Open Settings")).accessibilityLabel(
+                    L10n.localized("Settings"))
                 iconButton("power", L10n.localized("Quit Decaffeinate")) { NSApp.terminate(nil) }
             }
             .padding(.horizontal, theme.contentInset)
@@ -1021,7 +1038,9 @@ private struct RDButtonBody: View {
 
     var body: some View {
         configuration.label
-            .scaledFont(compact ? 12 : 14, weight: .medium, relativeTo: compact ? .caption : .callout)
+            .scaledFont(
+                compact ? 12 : 14, weight: .medium, relativeTo: compact ? .caption : .callout
+            )
             .lineLimit(1)
             .padding(.horizontal, compact ? Space.s3 : Space.s4)
             .padding(.vertical, compact ? 6 : 9)

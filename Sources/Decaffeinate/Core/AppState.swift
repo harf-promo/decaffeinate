@@ -776,7 +776,7 @@ final class AppState: ObservableObject {
 
     /// How this hold will end — "until a task finishes" / timed / indefinite.
     func holdLifetime(for assertion: PowerAssertion) -> HoldLifetime {
-        if case .watching = watchStatus, isThisHoldWatched(assertion) {
+        if agentWatcher.isActive, isThisHoldWatched(assertion) {
             return .untilWatchedFinishes
         }
         if let target = agentWaitTarget(for: assertion) {
@@ -792,8 +792,30 @@ final class AppState: ObservableObject {
     }
 
     private func isThisHoldWatched(_ assertion: PowerAssertion) -> Bool {
-        guard let watched = agentWatcher.watchedTargetPID else { return false }
-        return agentWaitTarget(for: assertion)?.pid == watched
+        switch agentWatcher.currentTarget {
+        case .pid(let pid):
+            return agentWaitTarget(for: assertion)?.pid == pid
+                || assertion.pid == pid
+                || assertion.onBehalfOfPID == pid
+        case .processName(let name):
+            let needle = name.lowercased()
+            return assertion.processName.lowercased() == needle
+                || assertion.displayName.lowercased() == needle
+        case .none:
+            return false
+        }
+    }
+
+    /// A process we can watch to sleep when *this* hold's work finishes.
+    /// Prefers a `caffeinate -w` wait-pid; otherwise the holder itself, but
+    /// only when CPU is a valid "still working" signal (not a call/media/
+    /// backup — those aren't jobs you wait out).
+    func watchableTarget(for assertion: PowerAssertion) -> (pid: pid_t, label: String)? {
+        if let wait = agentWaitTarget(for: assertion) { return wait }
+        guard assertion.blocksSystemSleep, assertion.reason.category.cpuReflectsActivity else {
+            return nil
+        }
+        return (assertion.onBehalfOfPID ?? assertion.pid, assertion.displayName)
     }
 
     // MARK: Row actions (reveal / copy)
@@ -926,13 +948,13 @@ final class AppState: ObservableObject {
         if !settings.hasSeenAwakeExplainer { settingsStore.settings.hasSeenAwakeExplainer = true }
     }
 
-    /// Whether to show the inline "Sleep when it finishes" offer for an agentic
-    /// `caffeinate -w` hold (not dismissed, target alive, nothing watched yet).
+    /// Whether to show the inline "Sleep when it finishes" offer (not dismissed,
+    /// nothing watched yet, and this hold is a job we can wait out).
     func shouldOfferWatch(for assertion: PowerAssertion) -> Bool {
         guard case .idle = watchStatus, !watchSuggestionDismissed.contains(assertion.pid) else {
             return false
         }
-        return agentWaitTarget(for: assertion) != nil
+        return watchableTarget(for: assertion) != nil
     }
 
     /// A short origin crumb for the menu row — "Claude Code · ~/myrepo" / "Terminal".

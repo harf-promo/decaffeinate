@@ -190,7 +190,8 @@ extension Notifier: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let holderKey =
-            response.notification.request.content.userInfo[BlockerNotificationAction.holderKeyInfoKey]
+            response.notification.request.content.userInfo[
+                BlockerNotificationAction.holderKeyInfoKey]
             as? String
         let actionIdentifier = response.actionIdentifier
         Task { @MainActor in
@@ -204,7 +205,8 @@ extension Notifier: UNUserNotificationCenterDelegate {
     /// (silent-while-foreground) behavior would just make notifications vanish.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+        withCompletionHandler completionHandler:
+            @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
     }

@@ -125,7 +125,9 @@ enum BrandMark {
             // The standard crescent (same fullness the in-app logo uses) plus a
             // bold filled downward chevron — winding down toward sleep.
             return [
-                moon(carveRadiusRatio: crescentCarveRadiusRatio, carveOffsetRatio: crescentCarveOffsetRatio),
+                moon(
+                    carveRadiusRatio: crescentCarveRadiusRatio,
+                    carveOffsetRatio: crescentCarveOffsetRatio),
                 Element(
                     path: chevronDown(
                         cx: px(0.76), topY: py(0.22),
@@ -151,7 +153,9 @@ enum BrandMark {
             // The standard crescent plus a large lightning bolt — intentionally
             // wired awake, a deliberate choice rather than an unwanted block.
             return [
-                moon(carveRadiusRatio: crescentCarveRadiusRatio, carveOffsetRatio: crescentCarveOffsetRatio),
+                moon(
+                    carveRadiusRatio: crescentCarveRadiusRatio,
+                    carveOffsetRatio: crescentCarveOffsetRatio),
                 Element(
                     path: bolt(cx: px(0.77), cy: py(0.36), size: s, scale: 1.3),
                     ink: .zzz, evenOdd: false),
@@ -324,7 +328,9 @@ enum BrandMark {
         return (body, dot)
     }
 
-    private static func bolt(cx: CGFloat, cy: CGFloat, size s: CGFloat, scale: CGFloat = 1.0) -> CGPath {
+    private static func bolt(cx: CGFloat, cy: CGFloat, size s: CGFloat, scale: CGFloat = 1.0)
+        -> CGPath
+    {
         // Lightning-bolt polygon, y-down. `scale` grows the bolt around its own
         // (cx, cy) without moving its anchor point.
         let k = s * scale

@@ -43,4 +43,22 @@ final class AgentRegistryTests: XCTestCase {
         XCTAssertNil(
             AgentRegistry.identify(originApp: nil, bundleID: nil, processNames: ["Finder"]))
     }
+
+    func testIdentifiesGeminiCopilotAndGrokAsAgents() {
+        XCTAssertEqual(
+            AgentRegistry.identify(originApp: nil, bundleID: nil, processNames: ["gemini"])?.id,
+            "gemini")
+        XCTAssertEqual(
+            AgentRegistry.identify(originApp: nil, bundleID: nil, processNames: ["copilot"])?.id,
+            "copilot")
+        XCTAssertEqual(
+            AgentRegistry.identify(originApp: nil, bundleID: nil, processNames: ["grok"])?.id,
+            "grok")
+        XCTAssertTrue(
+            AgentRegistry.identify(originApp: nil, bundleID: nil, processNames: ["grok"])?
+                .isAIAgent == true)
+        XCTAssertFalse(
+            AgentRegistry.commonWatchProcessNames.contains("grok"),
+            "new identities stay off the default Common tools list")
+    }
 }

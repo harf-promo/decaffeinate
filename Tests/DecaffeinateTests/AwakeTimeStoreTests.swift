@@ -40,7 +40,8 @@ final class AwakeTimeStoreTests: XCTestCase {
         defer { cleanup() }
         store.record(appName: "Zoom", seconds: 0, date: Date())
         store.record(appName: "Zoom", seconds: -5, date: Date())
-        XCTAssertTrue(store.entries.isEmpty, "a non-positive duration must not create a phantom entry")
+        XCTAssertTrue(
+            store.entries.isEmpty, "a non-positive duration must not create a phantom entry")
     }
 
     func testRecordIgnoresEmptyAppName() {
@@ -204,7 +205,8 @@ final class AwakeTimeStoreTests: XCTestCase {
         let oldJSON = #"[{"day":1700000000,"appName":"Zoom"}]"#.data(using: .utf8)!
         defaults.set(oldJSON, forKey: "DecaffeinateAwakeTime.v1")
         let store = AwakeTimeStore(defaults: defaults)
-        XCTAssertEqual(store.entries.count, 1, "a record missing a field must not fail the whole array")
+        XCTAssertEqual(
+            store.entries.count, 1, "a record missing a field must not fail the whole array")
         XCTAssertEqual(store.entries[0].appName, "Zoom")
         XCTAssertEqual(store.entries[0].seconds, 0, "a missing field decodes to its safe default")
     }

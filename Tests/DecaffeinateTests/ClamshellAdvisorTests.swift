@@ -8,8 +8,10 @@ final class ClamshellAdvisorTests: XCTestCase {
     private let noLid = LidSnapshot(isPresent: false, isClosed: false)
     private let lidOpen = LidSnapshot(isPresent: true, isClosed: false)
     private let lidClosed = LidSnapshot(isPresent: true, isClosed: true)
-    private let externalDisplay = DisplayTopology(externalDisplayCount: 1, builtinDisplayActive: false)
-    private let noExternalDisplay = DisplayTopology(externalDisplayCount: 0, builtinDisplayActive: true)
+    private let externalDisplay = DisplayTopology(
+        externalDisplayCount: 1, builtinDisplayActive: false)
+    private let noExternalDisplay = DisplayTopology(
+        externalDisplayCount: 0, builtinDisplayActive: true)
 
     // MARK: notApplicable — no lid (desktop Mac)
 

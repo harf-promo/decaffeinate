@@ -75,14 +75,16 @@ struct ExternalInputProbe: ExternalInputProbing {
 
     func probe() -> InputProbeResult {
         guard
-            let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+            let manager = IOHIDManagerCreate(
+                kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
                 as IOHIDManager?
         else { return .inconclusive }
         // Match every HID device; we filter to keyboards/pointers ourselves
         // below (reading each device's own usage-page/usage is more robust
         // than a matching-dictionary criteria array here).
         IOHIDManagerSetDeviceMatching(manager, nil)
-        guard IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone)) == kIOReturnSuccess else {
+        guard IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone)) == kIOReturnSuccess
+        else {
             return .inconclusive
         }
         defer { IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone)) }
@@ -97,7 +99,8 @@ struct ExternalInputProbe: ExternalInputProbing {
                 let page = IOHIDDeviceGetProperty(device, kIOHIDPrimaryUsagePageKey as CFString)
                     as? Int,
                 page == Self.genericDesktopUsagePage,
-                let usage = IOHIDDeviceGetProperty(device, kIOHIDPrimaryUsageKey as CFString) as? Int,
+                let usage = IOHIDDeviceGetProperty(device, kIOHIDPrimaryUsageKey as CFString)
+                    as? Int,
                 usage == Self.keyboardUsage || Self.pointerUsages.contains(usage)
             else { continue }
             sawKeyboardOrPointer = true

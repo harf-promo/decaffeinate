@@ -102,7 +102,8 @@ struct ClamshellAssistantBody: View {
             Image(systemName: "desktopcomputer").foregroundStyle(theme.ink3)
             Text(
                 L10n.localized(
-                    "This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply.")
+                    "This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply."
+                )
             )
             .scaledFont(13, relativeTo: .callout)
             .foregroundStyle(theme.ink2)
@@ -151,7 +152,8 @@ struct ClamshellAssistantBody: View {
                 }
                 .buttonStyle(RDPrimaryButton())
                 .help(
-                    L10n.localized("Turn on keep-awake so the Mac stays up on the external display.")
+                    L10n.localized(
+                        "Turn on keep-awake so the Mac stays up on the external display.")
                 )
                 Text(
                     L10n.localized(

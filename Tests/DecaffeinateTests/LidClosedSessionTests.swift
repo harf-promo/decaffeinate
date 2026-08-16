@@ -9,7 +9,8 @@ final class LidClosedSessionTests: XCTestCase {
     private let expiry = Date(timeIntervalSince1970: 1_700_000_000)
 
     func testArmedConfirmedByHelperBecomesActive() {
-        let state = LidClosedSession.transition(.armed(ttlSeconds: 120), on: .helperConfirmed(expiresAt: expiry))
+        let state = LidClosedSession.transition(
+            .armed(ttlSeconds: 120), on: .helperConfirmed(expiresAt: expiry))
         XCTAssertEqual(state, .active(expiresAt: expiry))
         XCTAssertTrue(state.isActive)
     }
@@ -37,13 +38,15 @@ final class LidClosedSessionTests: XCTestCase {
         ]
         for (event, reason) in cases {
             let state = LidClosedSession.transition(.active(expiresAt: expiry), on: event)
-            XCTAssertEqual(state, .ending(reason: reason), "event \(event) should end with \(reason)")
+            XCTAssertEqual(
+                state, .ending(reason: reason), "event \(event) should end with \(reason)")
         }
     }
 
     func testEndingIsTerminalAndIgnoresFurtherEvents() {
         let ended = LidClosedSession.ending(reason: .userReleased)
-        XCTAssertEqual(LidClosedSession.transition(ended, on: .helperConfirmed(expiresAt: expiry)), ended)
+        XCTAssertEqual(
+            LidClosedSession.transition(ended, on: .helperConfirmed(expiresAt: expiry)), ended)
         XCTAssertEqual(LidClosedSession.transition(ended, on: .leaseExpired), ended)
     }
 

@@ -82,8 +82,9 @@ final class AwakeTimeStore: ObservableObject {
 
     /// App name → total held seconds over the last 7 days (inclusive of today),
     /// ranked highest-first, capped at `limit` — the "This week" list.
-    func weeklyRanking(now: Date = Date(), limit: Int = 8) -> [(appName: String, seconds: TimeInterval)]
-    {
+    func weeklyRanking(now: Date = Date(), limit: Int = 8) -> [(
+        appName: String, seconds: TimeInterval
+    )] {
         guard let weekAgo = calendar.date(byAdding: .day, value: -6, to: now) else { return [] }
         let cutoff = calendar.startOfDay(for: weekAgo)
         var totals: [String: TimeInterval] = [:]

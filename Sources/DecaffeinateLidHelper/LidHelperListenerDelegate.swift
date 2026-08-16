@@ -15,7 +15,9 @@ final class LidHelperListenerDelegate: NSObject, NSXPCListenerDelegate {
         self.exportedObject = exportedObject
     }
 
-    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
+    func listener(
+        _ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection
+    ) -> Bool {
         newConnection.exportedInterface = NSXPCInterface(with: LidHelperXPCProtocol.self)
         newConnection.exportedObject = exportedObject
         newConnection.resume()

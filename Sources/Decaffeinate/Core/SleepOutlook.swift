@@ -102,8 +102,10 @@ enum SleepBlocker: Equatable, Sendable {
     var subline: String {
         switch self {
         case .call:
-            return L10n.localized("You\u{2019}re on a call \u{2014} it\u{2019}ll sleep when your mic frees up")
-        case .media: return L10n.localized("Media is playing \u{2014} it\u{2019}ll sleep once that stops")
+            return L10n.localized(
+                "You\u{2019}re on a call \u{2014} it\u{2019}ll sleep when your mic frees up")
+        case .media:
+            return L10n.localized("Media is playing \u{2014} it\u{2019}ll sleep once that stops")
         case .timeMachine: return L10n.localized("Finishing a Time Machine backup first")
         case .systemUpdate: return L10n.localized("Installing a macOS update first")
         case .allowedApps(let x):
@@ -117,7 +119,8 @@ enum SleepBlocker: Equatable, Sendable {
             return L10n.localized(
                 "Standing down within your active hours (%@) \u{2014} macOS\u{2019}s own sleep still applies",
                 x)
-        case .batteryFloor: return L10n.localized("Low battery \u{2014} macOS handles sleep from here")
+        case .batteryFloor:
+            return L10n.localized("Low battery \u{2014} macOS handles sleep from here")
         case .thermal: return L10n.localized("Cooling down \u{2014} keep-awake dropped")
         case .lowBattery: return L10n.localized("Battery critically low")
         case .other(let s): return s
@@ -255,7 +258,8 @@ extension SleepOutlook {
             return overriding == 0
                 ? L10n.localized("You stepped away \u{2014} winding down")
                 : (overriding == 1
-                    ? L10n.localized("Overriding %d sleep block \u{2014} sleeping anyway", overriding)
+                    ? L10n.localized(
+                        "Overriding %d sleep block \u{2014} sleeping anyway", overriding)
                     : L10n.localized(
                         "Overriding %d sleep blocks \u{2014} sleeping anyway", overriding))
         case .heldByBlocker(let b): return b.subline
@@ -341,7 +345,8 @@ extension SleepOutlook {
             return anyIndefinite
                 ? SleepVerdict(
                     glyph: "exclamationmark.triangle",
-                    text: L10n.localized("Auto-sleep is off \u{2014} these holds will keep your Mac awake"),
+                    text: L10n.localized(
+                        "Auto-sleep is off \u{2014} these holds will keep your Mac awake"),
                     tone: .warning)
                 : SleepVerdict(
                     glyph: "checkmark",
@@ -420,7 +425,8 @@ extension SleepOutlook {
                     tone: .positive)
             case .keepAwakePaused:
                 return SleepVerdict(
-                    glyph: "checkmark", text: L10n.localized("Will sleep \u{2014} quiet window paused"),
+                    glyph: "checkmark",
+                    text: L10n.localized("Will sleep \u{2014} quiet window paused"),
                     tone: .calm
                 )
             default:

@@ -111,7 +111,8 @@ final class BrandMarkTests: XCTestCase {
         let caffeinated = moonPath(.caffeinated)
 
         XCTAssertFalse(free == counting, ".free's thin sliver must differ from the standard moon")
-        XCTAssertFalse(blocked == counting, ".blocked's full moon must differ from the standard moon")
+        XCTAssertFalse(
+            blocked == counting, ".blocked's full moon must differ from the standard moon")
         XCTAssertFalse(free == blocked, ".free and .blocked must not share a moon shape")
         // .counting and .caffeinated deliberately share the standard crescent —
         // they're differentiated by their modifier (chevron vs. bolt) instead.
@@ -164,12 +165,11 @@ final class BrandMarkTests: XCTestCase {
     /// range of fullness used by the menu-bar states — the moon's ink weight
     /// changes, but it must always still read as one moon.
     func testCrescentRemainsOneClosedLuneAcrossFullnessRange() {
-        let fullnessRange:
-            [(radius: CGFloat, offset: CGFloat)] = [
-                (1.08, 0.66),  // .free — thin sliver
-                (BrandMark.crescentCarveRadiusRatio, BrandMark.crescentCarveOffsetRatio),  // standard
-                (0.82, 0.26),  // .blocked — near-full
-            ]
+        let fullnessRange: [(radius: CGFloat, offset: CGFloat)] = [
+            (1.08, 0.66),  // .free — thin sliver
+            (BrandMark.crescentCarveRadiusRatio, BrandMark.crescentCarveOffsetRatio),  // standard
+            (0.82, 0.26),  // .blocked — near-full
+        ]
         for (radius, offset) in fullnessRange {
             let path = BrandMark.crescent(
                 cx: 32, cy: 32, r: 18, carveRadiusRatio: radius, carveOffsetRatio: offset)

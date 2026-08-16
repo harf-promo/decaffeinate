@@ -27,7 +27,8 @@ final class LidHelperServiceTests: XCTestCase {
 
         let state = await service.acquireLease(ttlSeconds: 999_999, now: epoch)
 
-        XCTAssertEqual(state.expiresAt, epoch.addingTimeInterval(TimeInterval(LidHelperLease.maxTTLSeconds)))
+        XCTAssertEqual(
+            state.expiresAt, epoch.addingTimeInterval(TimeInterval(LidHelperLease.maxTTLSeconds)))
     }
 
     func testRenewLeaseExtendsAnActiveLeaseAndReassertsTheFlag() async {

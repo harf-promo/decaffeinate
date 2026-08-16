@@ -71,7 +71,9 @@ private final class ThermalBox: @unchecked Sendable {
     func notifyForcedSleep(reason: String) { forcedSleeps.append(reason) }
     func notifyAgentFinished(label: String) { agentFinishes.append(label) }
     func notifyRestartOverdue(uptimeLabel: String) { restartOverdues.append(uptimeLabel) }
-    func refreshAuthorizationStatus(_ completion: @escaping @MainActor (NotificationAuthorization) -> Void) {
+    func refreshAuthorizationStatus(
+        _ completion: @escaping @MainActor (NotificationAuthorization) -> Void
+    ) {
         completion(authorizationStatusToReport)
     }
 }
@@ -328,7 +330,9 @@ final class AppStateTests: XCTestCase {
 
     func testMenuBarHolderCountReflectsDistinctApps() {
         let h = makeHarness { $0.showHolderCountInMenuBar = true }; defer { h.cleanup() }
-        h.scanner.assertions = [systemBlocker("Chrome"), systemBlocker("Zoom", bundle: "us.zoom.xos")]
+        h.scanner.assertions = [
+            systemBlocker("Chrome"), systemBlocker("Zoom", bundle: "us.zoom.xos"),
+        ]
         h.state.tick()
         XCTAssertEqual(h.state.menuBarHolderCountText, "2")
     }
@@ -1050,6 +1054,33 @@ final class AppStateTests: XCTestCase {
         XCTAssertNotEqual(on.state.watchStatus, .idle, "auto-arm fires for a recognized agent")
     }
 
+    func testWatchableTargetOffersJobLikeHoldsAndSkipsCalls() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let job = Fixtures.assertion(
+            pid: 700, process: "docker", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep)
+        let call = Fixtures.assertion(
+            pid: 701, process: "zoom.us", bundle: "us.zoom.xos",
+            type: AssertionType.preventUserIdleSystemSleep, resources: ["audio-in"])
+        XCTAssertEqual(h.state.watchableTarget(for: job)?.pid, 700)
+        XCTAssertTrue(h.state.shouldOfferWatch(for: job))
+        XCTAssertNil(h.state.watchableTarget(for: call), "a live call is not a job you wait out")
+        XCTAssertFalse(h.state.shouldOfferWatch(for: call))
+
+        h.state.dismissWatchSuggestion(forHolder: job.pid)
+        XCTAssertFalse(h.state.shouldOfferWatch(for: job), "dismiss hides the inline offer")
+    }
+
+    func testWatchingHolderPidMarksThatHold() {
+        let h = makeHarness(); defer { h.cleanup() }
+        let job = Fixtures.assertion(
+            pid: 800, process: "xcodebuild", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep)
+        h.scanner.assertions = [job]
+        h.state.setWatchTarget(.pid(800))
+        XCTAssertEqual(h.state.holdLifetime(for: job), .untilWatchedFinishes)
+    }
+
     // MARK: Session coalescing (ephemeral caffeinate churn)
 
     /// An agent caffeinate with explicit pid / cwd / tty / createdAt so tests can
@@ -1729,7 +1760,9 @@ final class AppStateTests: XCTestCase {
     // MARK: Pre-sleep countdown HUD (v1.22)
 
     func testPreSleepWarningArmsAtIdleThresholdThenFiresAfterItElapses() {
-        let h = makeHarness { $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = true }
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = true
+        }
         defer { h.cleanup() }
         h.idle.seconds = 120
         h.state.tick()
@@ -1743,7 +1776,9 @@ final class AppStateTests: XCTestCase {
     }
 
     func testCancelPendingIdleSleepPreventsSleepAndReArmsOnlyAfterFreshGrace() {
-        let h = makeHarness { $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = true }
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = true
+        }
         defer { h.cleanup() }
         h.idle.seconds = 120
         h.state.tick()
@@ -1777,7 +1812,9 @@ final class AppStateTests: XCTestCase {
     }
 
     func testPreSleepWarningDisabledSkipsStraightToSleep() {
-        let h = makeHarness { $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = false }
+        let h = makeHarness {
+            $0.idleThresholdMinutes = 1; $0.showPreSleepWarning = false
+        }
         defer { h.cleanup() }
         h.idle.seconds = 120
         h.state.tick()
@@ -1844,7 +1881,8 @@ final class AppStateTests: XCTestCase {
     func testSleepNowWithNoCallSleepsImmediatelyAsBefore() {
         let h = makeHarness(); defer { h.cleanup() }
         h.state.sleepNow()
-        XCTAssertEqual(h.sleeper.callCount, 1, "no call in progress — sleeps immediately, unchanged")
+        XCTAssertEqual(
+            h.sleeper.callCount, 1, "no call in progress — sleeps immediately, unchanged")
         XCTAssertFalse(h.state.pendingCallSleepConfirmation)
     }
 
@@ -1948,8 +1986,10 @@ final class AppStateTests: XCTestCase {
             systemBlocker("Chrome", bundle: "com.google.Chrome"),
         ]
         h.state.tick()
-        XCTAssertEqual(h.notifier.notifications.count, 1, "the one new blocker uses the singular path")
-        XCTAssertEqual(h.notifier.digestNotifications.count, 1, "no new digest for a single new blocker")
+        XCTAssertEqual(
+            h.notifier.notifications.count, 1, "the one new blocker uses the singular path")
+        XCTAssertEqual(
+            h.notifier.digestNotifications.count, 1, "no new digest for a single new blocker")
     }
 
     func testLiveAssertionResolvesByFirewallKey() {

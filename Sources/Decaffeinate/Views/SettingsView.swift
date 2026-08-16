@@ -1022,6 +1022,8 @@ private struct AboutView: View {
                     Text(L10n.localized("· %@", lastChecked))
                         .font(HarfFont.caption).foregroundStyle(Color.ink3)
                 }
+                Text(L10n.localized("%@ is the latest signed release", AppInfo.version))
+                    .font(HarfFont.caption).foregroundStyle(Color.ink3)
                 Button(L10n.localized("Check for Updates…")) {
                     updater.checkForUpdatesUserInitiated()
                 }
@@ -1029,7 +1031,11 @@ private struct AboutView: View {
             }
         case .updateAvailable:
             VStack(spacing: Space.s1) {
-                HarfPill(label: L10n.localized("Update available"), variant: .warning, dot: true)
+                HarfPill(
+                    label: updater.availableVersion.map {
+                        L10n.localized("%@ is available", $0)
+                    } ?? L10n.localized("Update available"),
+                    variant: .warning, dot: true)
                 Button(L10n.localized("Install Update…")) { updater.checkForUpdatesUserInitiated() }
                     .padding(.top, 2)
             }
@@ -1041,8 +1047,11 @@ private struct AboutView: View {
                 Text(reason)
                     .font(HarfFont.caption).foregroundStyle(Color.ink3)
                     .fixedSize(horizontal: false, vertical: true)
-                Button(L10n.localized("Try Again")) { updater.checkForUpdatesUserInitiated() }
-                    .padding(.top, 2)
+                HStack(spacing: Space.s2) {
+                    Button(L10n.localized("Try Again")) { updater.checkForUpdatesUserInitiated() }
+                    Button(L10n.localized("Open Releases")) { updater.openReleases() }
+                }
+                .padding(.top, 2)
             }
         }
     }

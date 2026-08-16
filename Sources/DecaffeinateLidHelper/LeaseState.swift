@@ -12,7 +12,9 @@ public struct LeaseState: Equatable, Sendable, Codable {
     public var expiresAt: Date?
     public var helperVersion: String
 
-    public init(isActive: Bool, expiresAt: Date?, helperVersion: String = LeaseState.currentHelperVersion) {
+    public init(
+        isActive: Bool, expiresAt: Date?, helperVersion: String = LeaseState.currentHelperVersion
+    ) {
         self.isActive = isActive
         self.expiresAt = expiresAt
         self.helperVersion = helperVersion

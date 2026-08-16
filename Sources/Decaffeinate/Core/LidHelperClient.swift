@@ -69,11 +69,16 @@ final class LidHelperClient: LidClosedControlling {
     /// reason to keep one open) and always resumes exactly once, whether the
     /// connection resolves or not.
     private func call(
-        _ body: @escaping (any LidHelperClientXPCProtocol, @escaping @Sendable (LidHelperReply) -> Void) -> Void
+        _ body:
+            @escaping (any LidHelperClientXPCProtocol, @escaping @Sendable (LidHelperReply) -> Void)
+            -> Void
     ) async -> LidHelperReply {
-        await withCheckedContinuation { (continuation: CheckedContinuation<LidHelperReply, Never>) in
-            let box = XPCConnectionBox(NSXPCConnection(machServiceName: machServiceName, options: .privileged))
-            box.connection.remoteObjectInterface = NSXPCInterface(with: LidHelperClientXPCProtocol.self)
+        await withCheckedContinuation {
+            (continuation: CheckedContinuation<LidHelperReply, Never>) in
+            let box = XPCConnectionBox(
+                NSXPCConnection(machServiceName: machServiceName, options: .privileged))
+            box.connection.remoteObjectInterface = NSXPCInterface(
+                with: LidHelperClientXPCProtocol.self)
             box.connection.resume()
             guard let proxy = box.connection.remoteObjectProxy as? LidHelperClientXPCProtocol else {
                 box.connection.invalidate()
@@ -113,8 +118,10 @@ final class LidHelperClient: LidClosedControlling {
 
     func helperVersion() async -> String? {
         await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-            let box = XPCConnectionBox(NSXPCConnection(machServiceName: machServiceName, options: .privileged))
-            box.connection.remoteObjectInterface = NSXPCInterface(with: LidHelperClientXPCProtocol.self)
+            let box = XPCConnectionBox(
+                NSXPCConnection(machServiceName: machServiceName, options: .privileged))
+            box.connection.remoteObjectInterface = NSXPCInterface(
+                with: LidHelperClientXPCProtocol.self)
             box.connection.resume()
             guard let proxy = box.connection.remoteObjectProxy as? LidHelperClientXPCProtocol else {
                 box.connection.invalidate()

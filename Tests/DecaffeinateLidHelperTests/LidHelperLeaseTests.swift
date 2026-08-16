@@ -26,7 +26,8 @@ final class LidHelperLeaseTests: XCTestCase {
     func testAcquireHonorsTheClampInsideExpiry() {
         var lease = LidHelperLease()
         lease.acquire(ttlSeconds: 999_999, now: epoch)
-        XCTAssertEqual(lease.expiresAt, epoch.addingTimeInterval(TimeInterval(LidHelperLease.maxTTLSeconds)))
+        XCTAssertEqual(
+            lease.expiresAt, epoch.addingTimeInterval(TimeInterval(LidHelperLease.maxTTLSeconds)))
     }
 
     func testRenewReplacesTheExpiry() {

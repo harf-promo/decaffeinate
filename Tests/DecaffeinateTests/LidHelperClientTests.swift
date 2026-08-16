@@ -77,7 +77,8 @@ final class LidClosedControllingSeamTests: XCTestCase {
     @MainActor
     func testFakeSatisfiesTheProtocolAndRecordsCalls() async {
         let fake = FakeLidClosedController()
-        fake.acquireReply = LidHelperReply(isActive: true, expiresAt: nil, helperVersion: "1.0.0-spike")
+        fake.acquireReply = LidHelperReply(
+            isActive: true, expiresAt: nil, helperVersion: "1.0.0-spike")
 
         let controller: any LidClosedControlling = fake
         let reply = await controller.acquireLease(ttlSeconds: 60)

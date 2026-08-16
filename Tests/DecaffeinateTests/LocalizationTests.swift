@@ -143,5 +143,12 @@ final class LocalizationTests: XCTestCase {
             "Decaffeinate \u{2014} der Mac wird wachgehalten")
         XCTAssertEqual(
             localized("Decaffeinate \u{2014} keeping awake"), "Decaffeinate \u{2014} hält wach")
+
+        XCTAssertEqual(localized("Open Releases"), "Releases öffnen")
+        XCTAssertEqual(
+            String(format: localized("%@ is available"), "1.26.0"), "1.26.0 ist verfügbar")
+        XCTAssertEqual(
+            String(format: localized("%@ is the latest signed release"), "1.26.0"),
+            "1.26.0 ist die neueste signierte Version")
     }
 }

@@ -51,6 +51,15 @@ enum AgentRegistry {
         AgentIdentity(
             id: "aider", displayName: "Aider", bundleIDs: [], processNames: ["aider"],
             isAIAgent: true, watchByDefault: false),
+        AgentIdentity(
+            id: "gemini", displayName: "Gemini CLI", bundleIDs: [], processNames: ["gemini"],
+            isAIAgent: true, watchByDefault: false),
+        AgentIdentity(
+            id: "copilot", displayName: "GitHub Copilot", bundleIDs: [],
+            processNames: ["copilot"], isAIAgent: true, watchByDefault: false),
+        AgentIdentity(
+            id: "grok", displayName: "Grok", bundleIDs: [], processNames: ["grok"],
+            isAIAgent: true, watchByDefault: false),
     ]
 
     /// The menu's "Common tools" watch list — one canonical name per default tool.

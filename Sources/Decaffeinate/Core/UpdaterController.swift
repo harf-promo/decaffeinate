@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Sparkle
 
@@ -33,6 +34,8 @@ final class UpdaterController: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     @Published private(set) var state: UpdateState = .idle
     @Published private(set) var lastCheckedAt: Date?
+    /// Set when Sparkle finds a newer item; nil when up to date or not yet checked.
+    @Published private(set) var availableVersion: String?
     @Published var automaticChecksEnabled: Bool = true {
         didSet { controller?.updater.automaticallyChecksForUpdates = automaticChecksEnabled }
     }
@@ -58,6 +61,12 @@ final class UpdaterController: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     var isAvailable: Bool { controller != nil }
 
+    static let releasesURL = URL(string: "https://github.com/harf-promo/decaffeinate/releases")!
+
+    func openReleases() {
+        NSWorkspace.shared.open(Self.releasesURL)
+    }
+
     func checkForUpdates() {
         state = .checking
         controller?.checkForUpdates(nil)
@@ -81,11 +90,17 @@ final class UpdaterController: NSObject, ObservableObject, SPUUpdaterDelegate {
     // resolves updates (delegate callbacks arrive on the main thread).
 
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        MainActor.assumeIsolated { state = .updateAvailable }
+        MainActor.assumeIsolated {
+            availableVersion = item.displayVersionString
+            state = .updateAvailable
+        }
     }
 
     nonisolated func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
-        MainActor.assumeIsolated { state = .upToDate }
+        MainActor.assumeIsolated {
+            availableVersion = nil
+            state = .upToDate
+        }
     }
 
     nonisolated func updater(
