@@ -22,7 +22,7 @@
 
 ---
 
-> **Release status:** the latest tagged, notarized build is **v1.13.0** (Homebrew, DMG). Everything this README and [`ROADMAP.md`](docs/ROADMAP.md) describe beyond that — the Harf redesign, wake-reason, agent hooks, the MCP server, localization — is merged to `main` and covered by tests, but not yet tagged or in a distributable build. Build from source (`swift build`) to try it early, or watch [Releases](https://github.com/harf-promo/decaffeinate/releases) for the next tag.
+> **Release status:** the latest tagged, notarized build is **v1.25.0** (Homebrew, DMG). `main` is **v1.26.0** (Cursor hooks, localized HUD, docs honesty).
 
 ---
 
@@ -248,13 +248,10 @@ Open areas where you can make a dent today:
 
 | Area | What's needed | Good for |
 | --- | --- | --- |
-| 🌍 **Localization** | Set up a string catalog and add a language | Anyone, anywhere |
-| 🗓 **Schedules & quiet windows** | "Never sleep 9–5", "stay awake until 3pm" | Swift devs |
-| 📊 **Sleep history & insights** | Persist forced sleeps + a "battery saved" estimate | Swift devs |
-| 🔀 **Triggers & automation** | Stay awake while app X runs / on AC / above a CPU % | Power users |
-| 👋 **Onboarding** | A friendly first-run explainer | Designers |
-| 🌡 **Deeper sensors** | SMC temperature & fan reads for a smarter Backpack Guard | Hardware-curious folks |
+| 🌍 **Localization** | More languages, and a native-speaker pass on the German draft | Anyone, anywhere |
+| 🧪 **Sleep-simulation harness** | Deterministic HUD / guard / digest coverage under `swift test` | Swift devs |
 | 📝 **Docs & advocacy** | Guides, blog posts, demo videos | Writers & creators |
+| 🍺 **homebrew/cask-core** | Notability-gated submission (see [`docs/HOMEBREW-CORE.md`](docs/HOMEBREW-CORE.md)) | Homebrew folks |
 
 **You can land your first PR in ~10 minutes.** The whole test suite runs with `swift test` — **no GUI, no Apple account, no signing** — so all the decision logic is contributable in minutes. Already shipped by contributors-to-be: agentic completion detection, assertion attribution, a signed/notarized/auto-updating release pipeline. Your name's next.
 
@@ -268,7 +265,7 @@ Open areas where you can make a dent today:
 
 **Shipped:** signed + notarized DMG, Homebrew, Sparkle auto-update · the reason engine (why each app keeps the Mac awake) · **process provenance (which window / agent / project)** · **agentic integration (Claude Code & friends — understand `caffeinate -w`, one-click "sleep when it finishes")** · **the Rest & Restart pillar (uptime tracking + a weekly-restart recommendation)** · schedules & quiet windows · sleep history · triggers/automation · agentic "sleep when the build finishes" detection · a Harf-design refresh + the crescent-moon "Zzz" mark unified across all renderers · universal (Intel + Apple Silicon) build · a pre-sleep warning + call-aware Sleep Now · a zero-root **Clamshell Assistant** for lid-closed mode · localization across the whole app (English + a machine-drafted German seed).
 
-**Next:** homebrew/cask-core submission · SMC temperature sensors · more languages · a native-speaker pass on the German translation. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md) and the milestone plan in [`docs/PLAN-NEXT.md`](docs/PLAN-NEXT.md).
+**Next:** more languages + a native-speaker German pass · sleep-simulation harness · docs & advocacy · homebrew/cask-core. Full list in [`docs/ROADMAP.md`](docs/ROADMAP.md) and the milestone plan in [`docs/PLAN-NEXT.md`](docs/PLAN-NEXT.md).
 
 ---
 

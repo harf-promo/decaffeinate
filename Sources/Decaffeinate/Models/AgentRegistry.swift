@@ -40,14 +40,14 @@ enum AgentRegistry {
         AgentIdentity(
             id: "docker", displayName: "docker", bundleIDs: [], processNames: ["docker"],
             isAIAgent: false, watchByDefault: true),
-        // AI agents that aren't in the default watch list but get labelled.
+        // AI agents that get labelled (Cursor / Windsurf also watch by default).
         AgentIdentity(
             id: "cursor", displayName: "Cursor",
             bundleIDs: ["com.todesktop.230313mzl4w4u92"], processNames: ["cursor"],
-            isAIAgent: true, watchByDefault: false),
+            isAIAgent: true, watchByDefault: true),
         AgentIdentity(
             id: "windsurf", displayName: "Windsurf", bundleIDs: ["com.exafunction.windsurf"],
-            processNames: ["windsurf"], isAIAgent: true, watchByDefault: false),
+            processNames: ["windsurf"], isAIAgent: true, watchByDefault: true),
         AgentIdentity(
             id: "aider", displayName: "Aider", bundleIDs: [], processNames: ["aider"],
             isAIAgent: true, watchByDefault: false),

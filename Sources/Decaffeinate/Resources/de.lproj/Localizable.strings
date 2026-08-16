@@ -142,6 +142,7 @@
 "Claude Code Stop hook" = "Claude Code Stop-Hook";
 "✗ %@ isn't readable UTF-8 — left it untouched." = "✗ %@ ist nicht als UTF-8 lesbar — unverändert gelassen.";
 "Codex notify hook" = "Codex notify-Hook";
+"Cursor stop hook" = "Cursor-Stop-Hook";
 "✗ %@ already sets `notify` — refusing to overwrite it. Remove it first, then re-run." = "✗ %@ legt bereits `notify` fest — wird nicht überschrieben. Entferne es zuerst und starte erneut.";
 "✓  Installed the %@ → %@" = "✓  %@ installiert → %@";
 "✗ Couldn't write %@: %@" = "✗ %@ konnte nicht geschrieben werden: %@";
@@ -150,6 +151,8 @@
 "Claude Code" = "Claude Code";
 "·  No Codex config at %@." = "·  Keine Codex-Konfiguration unter %@.";
 "Codex" = "Codex";
+"·  No Cursor hooks at %@." = "·  Keine Cursor-Hooks unter %@.";
+"Cursor" = "Cursor";
 "·  No Decaffeinate hook in %@." = "·  Kein Decaffeinate-Hook in %@.";
 "✓  Removed the %@ hook from %@." = "✓  %@-Hook aus %@ entfernt.";
 "☕️  Nothing is keeping this Mac awake. It is free to sleep." = "☕️  Nichts hält diesen Mac wach. Er kann schlafen.";
@@ -175,8 +178,8 @@
 "  Decaffeinate --display-off    Turn the display off now (system keeps running)" = "  Decaffeinate --display-off    Schaltet den Bildschirm sofort aus (System läuft weiter)";
 "  Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit" = "  Decaffeinate --keep-awake N   Hält diesen Mac N Minuten wach (Standard 30) und beendet sich danach";
 "  Decaffeinate --sleep-if-idle N  Sleep only if idle ≥ N seconds (default 300) — for turn-end hooks" = "  Decaffeinate --sleep-if-idle N  Schläft nur bei ≥ N Sekunden Leerlauf (Standard 300) — für Turn-End-Hooks";
-"  Decaffeinate --install-hook [claude|codex|all]    Install a turn-end sleep hook (default all)" = "  Decaffeinate --install-hook [claude|codex|all]    Installiert einen Turn-End-Sleep-Hook (Standard: alle)";
-"  Decaffeinate --uninstall-hook [claude|codex|all]  Remove the hook (marker-based, clean)" = "  Decaffeinate --uninstall-hook [claude|codex|all]  Entfernt den Hook (markerbasiert, sauber)";
+"  Decaffeinate --install-hook [claude|codex|cursor|all]    Install a turn-end sleep hook (default all)" = "  Decaffeinate --install-hook [claude|codex|cursor|all]    Installiert einen Turn-End-Sleep-Hook (Standard: alle)";
+"  Decaffeinate --uninstall-hook [claude|codex|cursor|all]  Remove the hook (marker-based, clean)" = "  Decaffeinate --uninstall-hook [claude|codex|cursor|all]  Entfernt den Hook (markerbasiert, sauber)";
 "  Decaffeinate --mcp            Run an MCP server over stdio (keep-awake / status / sleep tools)" = "  Decaffeinate --mcp            Startet einen MCP-Server über stdio (Wachhalten / Status / Ruhezustand-Tools)";
 "  Decaffeinate --provenance     Trace each holder to its window / agent / project" = "  Decaffeinate --provenance     Verfolgt jeden Halter zu seinem Fenster / Agent / Projekt zurück";
 "  Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)" = "  Decaffeinate --diagnose       Gibt einen Diagnosebericht aus (Einstellungen + Regeln + Scan)";
@@ -440,6 +443,25 @@
 "Rest & Restart" = "Ruhe & Neustart";
 "History" = "Verlauf";
 "About" = "Über";
+
+/* Views/SleepWarningHUD.swift, Core/Formatting.swift, MugState, Views/Components.swift — v1.26 */
+"Sleeping in %ds" = "Schläft in %ds";
+"You’ve been idle a while — Decaffeinate is stepping in." = "Du warst eine Weile inaktiv — Decaffeinate greift ein.";
+"Stay awake" = "Wach bleiben";
+"Sleeping in %d seconds" = "Schläft in %d Sekunden";
+"Technical details" = "Technische Details";
+"Hide technical details" = "Technische Details ausblenden";
+"Show technical details" = "Technische Details einblenden";
+"just now" = "gerade eben";
+"%ds ago" = "vor %ds";
+"%dm ago" = "vor %dm";
+"%dh ago" = "vor %dh";
+"%dd ago" = "vor %dd";
+"%dwk ago" = "vor %d Wo.";
+"Decaffeinate — free to sleep" = "Decaffeinate — kann schlafen";
+"Decaffeinate — sleeping soon" = "Decaffeinate — schläft bald";
+"Decaffeinate — Mac is being kept awake" = "Decaffeinate — der Mac wird wachgehalten";
+"Decaffeinate — keeping awake" = "Decaffeinate — hält wach";
 
 /* The app name — a brand mark; intentionally identical in every language. */
 "Decaffeinate" = "Decaffeinate";

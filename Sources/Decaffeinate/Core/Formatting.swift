@@ -21,12 +21,12 @@ enum Format {
     static func relative(since date: Date, now: Date = Date()) -> String {
         let elapsed = max(0, now.timeIntervalSince(date))
         switch elapsed {
-        case ..<10: return "just now"
-        case ..<60: return "\(Int(elapsed))s ago"
-        case ..<3600: return "\(Int(elapsed / 60))m ago"
-        case ..<86_400: return "\(Int(elapsed / 3600))h ago"
-        case ..<604_800: return "\(Int(elapsed / 86_400))d ago"
-        default: return "\(Int(elapsed / 604_800))wk ago"
+        case ..<10: return L10n.localized("just now")
+        case ..<60: return L10n.localized("%ds ago", Int(elapsed))
+        case ..<3600: return L10n.localized("%dm ago", Int(elapsed / 60))
+        case ..<86_400: return L10n.localized("%dh ago", Int(elapsed / 3600))
+        case ..<604_800: return L10n.localized("%dd ago", Int(elapsed / 86_400))
+        default: return L10n.localized("%dwk ago", Int(elapsed / 604_800))
         }
     }
 

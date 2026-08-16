@@ -2,25 +2,25 @@ import AppKit
 import Combine
 import Foundation
 
-/// Visual state of the menu-bar icon, mapped to the PRD's mug metaphor.
+/// Visual state of the menu-bar icon, mapped to the crescent-moon metaphor.
 enum MugState: Equatable {
-    /// Nothing is holding the Mac awake; it is free to sleep. (Empty mug.)
+    /// Nothing is holding the Mac awake; it is free to sleep. (Quiet crescent.)
     case free
-    /// The decaffeinate idle timer is armed and counting down. (Filling mug.)
+    /// The decaffeinate idle timer is armed and counting down. (Winding-down crescent.)
     case counting
-    /// Something is holding the Mac awake right now. (Warning mug.)
+    /// Something is holding the Mac awake right now. (Warning crescent.)
     case blocked
     /// Keep-awake is intentionally engaged. (Bolt.)
     case caffeinated
 
-    // The glyph for each state is drawn by `MugIcon` (custom template mugs).
+    // The glyph for each state is drawn by `MugIcon` (custom template crescents).
 
     var accessibilityLabel: String {
         switch self {
-        case .free: return "Decaffeinate — free to sleep"
-        case .counting: return "Decaffeinate — sleeping soon"
-        case .blocked: return "Decaffeinate — Mac is being kept awake"
-        case .caffeinated: return "Decaffeinate — keeping awake"
+        case .free: return L10n.localized("Decaffeinate \u{2014} free to sleep")
+        case .counting: return L10n.localized("Decaffeinate \u{2014} sleeping soon")
+        case .blocked: return L10n.localized("Decaffeinate \u{2014} Mac is being kept awake")
+        case .caffeinated: return L10n.localized("Decaffeinate \u{2014} keeping awake")
         }
     }
 }
@@ -1159,11 +1159,13 @@ final class AppState: ObservableObject {
                     let warning =
                         pendingIdleSleepWarning
                         ?? PendingSleepWarning(
-                            armedAt: now(), fireAt: now().addingTimeInterval(idleSleepWarningSeconds),
+                            armedAt: now(),
+                            fireAt: now().addingTimeInterval(idleSleepWarningSeconds),
                             reason: reason, agentFinished: agentFinished)
                     pendingIdleSleepWarning = warning
                     remaining = warning.fireAt.timeIntervalSince(now())
-                    if now() >= warning.fireAt, forceSleep(reason: warning.reason, bypassCooldown: false)
+                    if now() >= warning.fireAt,
+                        forceSleep(reason: warning.reason, bypassCooldown: false)
                     {
                         pendingIdleSleepWarning = nil
                         finishAgentWatchIfNeeded(warning.agentFinished)

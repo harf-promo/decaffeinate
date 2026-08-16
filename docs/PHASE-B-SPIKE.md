@@ -1,6 +1,6 @@
 # Phase B feasibility spike — the optional lid-closed privileged helper
 
-*Safe, non-live half of the timeboxed spike `docs/PLAN-NEXT.md`'s v1.24
+*Safe, non-live half of the timeboxed spike `docs/archive/PLAN-NEXT-1.21-1.25.md`'s v1.24
 "Phase B" section calls for. Verdict of this half: the mechanism compiles,
 is unit-tested via fakes, and is structurally reasoned about — but **three
 of the five original ABORT criteria are, by design, not touched by this
@@ -15,7 +15,7 @@ Decaffeinate's entire premise is root-free, user-space, no-private-API sleep
 management (`docs/ARCHITECTURE.md`). The one thing that premise can't do is
 keep a **closed, displayless** MacBook awake — Apple gives user space no way
 to do that; the only mechanism that works at all is the undocumented,
-root-only `pmset disablesleep 1` kernel flag. `docs/PLAN-NEXT.md`'s v1.24
+root-only `pmset disablesleep 1` kernel flag. `docs/archive/PLAN-NEXT-1.21-1.25.md`'s v1.24
 Phase B asks whether an **optional, opt-in, revocable privileged helper**
 built around that flag could be engineered safely enough to ship. This spike
 is the design's own prerequisite: build the non-dangerous half (does the
@@ -41,7 +41,7 @@ dangerous half (does it actually *work* on real, closed hardware).
 
 ## ABORT criteria — status
 
-The original design (`docs/PLAN-NEXT.md`) named five ABORT criteria. This is
+The original design (`docs/archive/PLAN-NEXT-1.21-1.25.md`) named five ABORT criteria. This is
 exactly what this spike could and couldn't touch without crossing its own
 hard safety constraints:
 
@@ -284,4 +284,4 @@ ship, because that requires the three live-hardware criteria above:
 
 Any failure on any of these three is a hard abort back to Tier 1 (the
 already-shipped, zero-root Clamshell Assistant) plus the transparency page —
-exactly as `docs/PLAN-NEXT.md` already specifies.
+exactly as `docs/archive/PLAN-NEXT-1.21-1.25.md` already specifies.

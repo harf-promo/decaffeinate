@@ -2,18 +2,12 @@ import AppKit
 import SwiftUI
 
 // =====================================================================
-// Theme — the swappable skin the design council produced.
+// Theme — Nightcap, the shipping skin.
 //
-// Two genuinely distinct poles share ONE set of structural fixes (the
-// "universal fixes"); they differ only in this token bundle: surface
-// warmth, hairlines-vs-cards, density and the headline size. Everything
-// downstream reads `@Environment(\.theme)`, so rendering a direction is
-// just injecting a different `Theme`.
-//
-//   • A "Nightcap" — cool, native, airy: white paper, hairline-separated
-//     zero-radius rows, near-monochrome cool ink, one green moon.
-//   • B "Dusk" — warm, cozy: warm off-white paper, soft tinted 10px cards,
-//     warm ink, one green crescent.
+// Cool, native, airy: white paper, hairline-separated zero-radius rows,
+// near-monochrome cool ink, one green moon. Downstream reads
+// `@Environment(\.theme)`. `usesCards` stays on the token so a future
+// skin can flip it without a structural rewrite.
 // =====================================================================
 struct Theme: Equatable {
     var id: String
@@ -52,7 +46,7 @@ struct Theme: Equatable {
 }
 
 extension Theme {
-    /// A — cool, native, airy. Hairlines, zero-radius rows, cool ink.
+    /// Cool, native, airy. Hairlines, zero-radius rows, cool ink.
     ///
     /// Surfaces and ink reference the shared `HarfTheme` `Color.*` tokens so the
     /// palette has a single source of truth — the two used to drift (this theme

@@ -24,16 +24,19 @@ struct SleepWarningHUD: View {
                 .foregroundStyle(Color.harfGreen)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Sleeping in \(clamped)s")
+                Text(L10n.localized("Sleeping in %ds", clamped))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.ink1)
-                Text("You\u{2019}ve been idle a while \u{2014} Decaffeinate is stepping in.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.ink3)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    L10n.localized(
+                        "You\u{2019}ve been idle a while \u{2014} Decaffeinate is stepping in.")
+                )
+                .font(.system(size: 12))
+                .foregroundStyle(Color.ink3)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
-            Button("Stay awake", action: onStayAwake)
+            Button(L10n.localized("Stay awake"), action: onStayAwake)
                 .buttonStyle(HarfButtonStyle(variant: .accent, size: .small))
                 .fixedSize()
                 .keyboardShortcut(.defaultAction)
@@ -48,8 +51,8 @@ struct SleepWarningHUD: View {
         )
         .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Sleeping in \(clamped) seconds")
-        .accessibilityAction(named: Text("Stay awake"), onStayAwake)
+        .accessibilityLabel(L10n.localized("Sleeping in %d seconds", clamped))
+        .accessibilityAction(named: Text(L10n.localized("Stay awake")), onStayAwake)
     }
 }
 

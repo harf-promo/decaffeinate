@@ -4,10 +4,8 @@ Decaffeinate v1 does one thing well: it tells you what's keeping your Mac awake
 and puts it to sleep when it should. Here's where we want to take it — and where
 **you** can jump in. Items tagged 🙋 are especially good for new contributors.
 
-> **"Shipped" below means merged to `main`, not necessarily tagged and
-> distributed.** The latest tagged release is **v1.13.0**; entries through
-> 1.20.0 are in the codebase and covered by tests but await the next tag. See
-> [`docs/PLAN-NEXT.md`](PLAN-NEXT.md) for what's next after that.
+> The latest tagged release is **v1.25.0**. Entries **1.14–1.25** have shipped
+> and been tagged. See [`docs/PLAN-NEXT.md`](PLAN-NEXT.md) for what's next.
 
 ## Shipped
 
@@ -80,6 +78,45 @@ re-engages), the app no longer scans its own assertion back in as a "blocker",
 fork-heavy workloads, a post-wake grace stops instant re-sleep, strict takeover
 is inert while auto-sleep is off, plus release-pipeline integrity (appcast
 preflight, pinned `Package.resolved`, cask lint in CI).
+
+**1.15.0** — a new **"moon in your cup"** logo (true crescent, unified across
+every renderer), confirmation on destructive actions, `PRIVACY.md`, Dynamic
+Type on onboarding/About, and a copy/keep-awake honesty pass.
+
+**1.16.0** — **"While you were away"** rest recap, **wake-reason** from
+`pmset -g log`, a **diagnostics export** (`--diagnose` + Settings → About),
+and structured `os.Logger` for forced sleeps.
+
+**1.17.0** — **scriptable status**: `--status` / `--status --json` /
+`--why-awake --json`, `--display-off`, and [`AUTOMATION.md`](AUTOMATION.md).
+
+**1.18.0** — **stale-holder CPU evidence**: sample each assertion holder's
+process-tree CPU and label a ~0%-CPU hold as likely stale.
+
+**1.19.0** — **one-command hook installer** (`--install-hook` /
+`--uninstall-hook` for Claude Code + Codex), idle-gated `--sleep-if-idle`,
+and an **MCP server** (`--mcp`).
+
+**1.20.0** — **localization scaffolding**: SwiftPM `.lproj` tables via `L10n`
+/`Bundle.module`, a seed German translation of onboarding + About.
+
+**1.21.0** — a **public** honesty/pipeline pass: docs stop describing
+unreleased work as shipped; release CI bumps the cask automatically.
+
+**1.22.0** — **Calm**: a cancelable pre-sleep countdown HUD, Sleep Now call
+guard, actionable notifications, burst digest, notification-permission
+repair, trimmed onboarding, launch-at-login offered on first run.
+
+**1.23.0** — **Glanceable**: distinct 16px menu-bar states, menu density
+restructure, Dynamic Type in the popover, Settings IA split, weekly
+awake-time history.
+
+**1.24.0** — **Closed**: the zero-root **Clamshell Assistant** (Apple's own
+lid-closed mode), `SleepDisabledReader`, `--clamshell-status`, and
+[`LID-CLOSED.md`](LID-CLOSED.md). Phase B privileged helper stays a spike.
+
+**1.25.0** — **Fluent**: app-wide localization (menu, Settings, verdicts,
+reasons, notifications, human CLI) plus compare pages and a press kit.
 
 ## Near term
 

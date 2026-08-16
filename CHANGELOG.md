@@ -4,6 +4,32 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] — Unreleased
+
+An honesty pass — the docs catch up to what's tagged, the sleep HUD speaks
+the user's language, and Cursor gets a first-class hook.
+
+### Added
+- **Cursor hook installer.** `Decaffeinate --install-hook cursor` writes a
+  user-level `~/.cursor/hooks.json` `stop` hook
+  (`{ "version": 1, "hooks": { "stop": [{ "command": "<bin> --sleep-if-idle N" }] } }`).
+  Same refuse / idempotent / preserve rules as the Claude installer; identity
+  is `--sleep-if-idle` + `Decaffeinate`. `--install-hook` / `--uninstall-hook`
+  now accept `[claude|codex|cursor|all]`.
+- **Localized sleep HUD, relative times, and menu-bar labels.** The pre-sleep
+  countdown ("Sleeping in %ds" / "Stay awake"), `Format.relative` ("just now" /
+  "%ds"/"%dm"/"%dh"/"%dd"/"%dwk ago"), `MugState` accessibility labels, and
+  the "Technical details" disclosure all resolve through `L10n`. German
+  machine-draft included.
+
+### Changed
+- **Docs honesty.** `Info.plist` is 1.26.0 (`CFBundleVersion` 1026000);
+  README / ROADMAP / AUTOMATION no longer describe a 1.13.0-tagged world.
+  The 1.21–1.25 plan is archived at `docs/archive/PLAN-NEXT-1.21-1.25.md`.
+- **Theme is Nightcap-only.** Dusk comments dropped; `usesCards` stays.
+- **MugState comments** describe the crescent moon, not a mug.
+- Cursor and Windsurf join the default "Common tools" watch list.
+
 ## [1.25.0] — 2026-08-02
 
 A "fluent" round — the app speaks the user's language, and the project speaks

@@ -56,12 +56,13 @@ popover (`MenuRedesign.swift`), every Settings pane, the sleep-verdict copy
 (`SleepOutlook`), notification templates (`Notifier`), the reason-engine
 labels (`ReasonEngine`), and the human-readable CLI output (`--scan`,
 `--status`, `--help`, etc. — **not** `--json` output, which is a machine
-contract and stays in English by design). Remaining gaps: `Formatting.swift`'s
-relative-time shorthand ("3m ago"), `Diagnostics.swift`'s report text, and a
-few compound strings that stitch a localized template around an
-un-localized fragment from a Model-layer type (`TriggerCondition.label` and
-similar) — a smaller, well-scoped follow-up rather than the original
-larger effort.
+contract and stays in English by design). As of v1.26 the sleep-warning HUD,
+`Format.relative` shorthand ("just now" / "%dm ago"), `MugState`
+accessibility labels, and the "Technical details" disclosure are also wired.
+Remaining gaps: `Diagnostics.swift`'s report text, and a few compound
+strings that stitch a localized template around an un-localized fragment
+from a Model-layer type (`TriggerCondition.label` and similar) — a smaller,
+well-scoped follow-up rather than the original larger effort.
 
 > **Translation quality note:** the German table was machine-translated (by an
 > AI agent) in the v1.25 sweep — natural and grammatically checked, but it

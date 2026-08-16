@@ -226,4 +226,111 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(out.contains("notify = \"something\""), "the sub-table key survives")
         XCTAssertTrue(out.contains(HookInstaller.codexMarker), "our root notify was added")
     }
+
+    // MARK: Cursor (~/.cursor/hooks.json)
+
+    private func cursorStopCommands(_ data: Data) -> [String] {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+            let hooks = root["hooks"] as? [String: Any],
+            let stop = hooks["stop"] as? [[String: Any]]
+        else { return [] }
+        return stop.compactMap { $0["command"] as? String }
+    }
+
+    func testCursorInstallIntoNilCreatesStopHook() {
+        let out = HookInstaller.installCursorHook(into: nil, binaryPath: bin, seconds: 300)!
+        let root = object(out)
+        XCTAssertEqual(root["version"] as? Int, 1)
+        let cmds = cursorStopCommands(out)
+        XCTAssertEqual(cmds.count, 1)
+        XCTAssertTrue(cmds[0].contains("--sleep-if-idle 300"))
+        XCTAssertTrue(cmds[0].contains(bin))
+    }
+
+    func testCursorInstallIntoBlankFileStartsFresh() {
+        XCTAssertNotNil(
+            HookInstaller.installCursorHook(into: Data(), binaryPath: bin, seconds: 300),
+            "an empty file is 'absent', not a parse error")
+        XCTAssertNotNil(
+            HookInstaller.installCursorHook(into: Data("  \n".utf8), binaryPath: bin, seconds: 300))
+    }
+
+    func testCursorInstallIsIdempotentByteForByte() {
+        let first = HookInstaller.installCursorHook(into: nil, binaryPath: bin, seconds: 300)
+        XCTAssertNotNil(first)
+        let second = HookInstaller.installCursorHook(into: first, binaryPath: bin, seconds: 300)
+        XCTAssertEqual(first, second, "re-installing must not duplicate or reformat")
+    }
+
+    func testCursorReinstallWithNewSecondsReplacesInPlace() {
+        let first = HookInstaller.installCursorHook(into: nil, binaryPath: bin, seconds: 300)
+        let updated = HookInstaller.installCursorHook(into: first, binaryPath: bin, seconds: 600)!
+        let cmds = cursorStopCommands(updated)
+        XCTAssertEqual(cmds.count, 1, "no duplicate entry")
+        XCTAssertTrue(cmds[0].contains("--sleep-if-idle 600"))
+    }
+
+    func testCursorInstallPreservesForeignKeysAndHooks() {
+        let input = Data(
+            """
+            {"version":1,"hooks":{"stop":[{"command":"echo hi"}],"sessionEnd":[{"command":"audit.sh"}]}}
+            """.utf8)
+        let out = HookInstaller.installCursorHook(into: input, binaryPath: bin, seconds: 300)!
+        let root = object(out)
+        XCTAssertEqual(root["version"] as? Int, 1)
+        let hooks = root["hooks"] as? [String: Any]
+        XCTAssertNotNil(hooks?["sessionEnd"], "unrelated hook events preserved")
+        let cmds = cursorStopCommands(out)
+        XCTAssertTrue(cmds.contains("echo hi"), "foreign stop hook preserved")
+        XCTAssertTrue(cmds.contains { $0.contains("--sleep-if-idle 300") }, "our hook added")
+    }
+
+    func testCursorUninstallRemovesOnlyOurs() {
+        let input = Data(
+            """
+            {"version":1,"hooks":{"stop":[{"command":"echo hi"}]}}
+            """.utf8)
+        let installed = HookInstaller.installCursorHook(into: input, binaryPath: bin, seconds: 300)!
+        let removed = HookInstaller.uninstallCursorHook(from: installed)
+        let cmds = cursorStopCommands(removed!)
+        XCTAssertEqual(cmds, ["echo hi"], "our hook gone, foreign hook intact")
+        XCTAssertEqual(object(removed!)["version"] as? Int, 1, "version preserved")
+    }
+
+    func testCursorUninstallWhenAbsentReturnsInputUnchanged() {
+        let input = Data(
+            """
+            {"version":1,"hooks":{"stop":[{"command":"echo hi"}]}}
+            """.utf8)
+        let out = HookInstaller.uninstallCursorHook(from: input)
+        XCTAssertEqual(out, input, "no Decaffeinate hook present → bytes untouched")
+    }
+
+    func testCursorInstallUninstallRoundTripDropsHooksKey() {
+        let input = Data(
+            """
+            {"permissions":{"allow":["Bash"]}}
+            """.utf8)
+        let installed = HookInstaller.installCursorHook(into: input, binaryPath: bin, seconds: 300)!
+        let removed = HookInstaller.uninstallCursorHook(from: installed)!
+        let root = object(removed)
+        XCTAssertNil(root["hooks"], "the empty hooks/stop scaffold is pruned away")
+        XCTAssertNotNil(root["permissions"], "unrelated keys survive the round-trip")
+        XCTAssertEqual(root["version"] as? Int, 1)
+    }
+
+    func testCursorInstallRefusesPresentButMalformedFile() {
+        let garbage = Data("{ not valid json, oops".utf8)
+        XCTAssertNil(HookInstaller.installCursorHook(into: garbage, binaryPath: bin, seconds: 300))
+        XCTAssertNil(
+            HookInstaller.uninstallCursorHook(from: garbage),
+            "never overwrite a file we can't parse")
+    }
+
+    func testCursorInstallRefusesUnexpectedStopShape() {
+        let weird = Data("{\"hooks\":{\"stop\":\"oops\"}}".utf8)
+        XCTAssertNil(HookInstaller.installCursorHook(into: weird, binaryPath: bin, seconds: 300))
+        let weird2 = Data("{\"hooks\":\"nope\"}".utf8)
+        XCTAssertNil(HookInstaller.installCursorHook(into: weird2, binaryPath: bin, seconds: 300))
+    }
 }

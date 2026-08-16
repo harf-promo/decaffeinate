@@ -17,7 +17,7 @@ struct SafetyDecision: Equatable, Sendable {
     var canForceSleep: Bool { holdForceSleepReasons.isEmpty }
 }
 
-/// Evaluates the PRD's safety rails from already-collected, in-process signals.
+/// Evaluates the product's safety/firewall rules from already-collected, in-process signals.
 /// No subprocesses, no polling: Time Machine, software updates and media are all
 /// detected from the same assertion snapshot the scanner already produces.
 enum SafetyRails {

@@ -103,4 +103,45 @@ final class LocalizationTests: XCTestCase {
         // Views/ClamshellAssistantView.swift
         XCTAssertEqual(localized("Arm clamshell session"), "Clamshell-Sitzung aktivieren")
     }
+
+    // v1.26: HUD, relative-time, MugState, and Technical-details keys resolve
+    // to real German values in Bundle.module.
+    func testV126HudAndRelativeKeysResolveInGerman() throws {
+        let deURL = try XCTUnwrap(
+            L10n.bundle.url(forResource: "de", withExtension: "lproj"),
+            "de.lproj not found in Bundle.module")
+        let de = try XCTUnwrap(Bundle(url: deURL))
+        func localized(_ key: String) -> String {
+            de.localizedString(forKey: key, value: "␀", table: nil)
+        }
+
+        XCTAssertEqual(String(format: localized("Sleeping in %ds"), 20), "Schläft in 20s")
+        XCTAssertEqual(
+            localized("You\u{2019}ve been idle a while \u{2014} Decaffeinate is stepping in."),
+            "Du warst eine Weile inaktiv \u{2014} Decaffeinate greift ein.")
+        XCTAssertEqual(localized("Stay awake"), "Wach bleiben")
+        XCTAssertEqual(
+            String(format: localized("Sleeping in %d seconds"), 20), "Schläft in 20 Sekunden")
+
+        XCTAssertEqual(localized("Technical details"), "Technische Details")
+        XCTAssertEqual(localized("Hide technical details"), "Technische Details ausblenden")
+        XCTAssertEqual(localized("Show technical details"), "Technische Details einblenden")
+
+        XCTAssertEqual(localized("just now"), "gerade eben")
+        XCTAssertEqual(String(format: localized("%ds ago"), 30), "vor 30s")
+        XCTAssertEqual(String(format: localized("%dm ago"), 3), "vor 3m")
+        XCTAssertEqual(String(format: localized("%dh ago"), 2), "vor 2h")
+        XCTAssertEqual(String(format: localized("%dd ago"), 5), "vor 5d")
+        XCTAssertEqual(String(format: localized("%dwk ago"), 2), "vor 2 Wo.")
+
+        XCTAssertEqual(
+            localized("Decaffeinate \u{2014} free to sleep"), "Decaffeinate \u{2014} kann schlafen")
+        XCTAssertEqual(
+            localized("Decaffeinate \u{2014} sleeping soon"), "Decaffeinate \u{2014} schläft bald")
+        XCTAssertEqual(
+            localized("Decaffeinate \u{2014} Mac is being kept awake"),
+            "Decaffeinate \u{2014} der Mac wird wachgehalten")
+        XCTAssertEqual(
+            localized("Decaffeinate \u{2014} keeping awake"), "Decaffeinate \u{2014} hält wach")
+    }
 }

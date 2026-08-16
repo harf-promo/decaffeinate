@@ -35,7 +35,7 @@ enum AllowDuration: CaseIterable, Hashable, Sendable {
 }
 
 /// What Decaffeinate should do about a given application's sleep-blocking
-/// assertions. Mirrors the four firewall prompt actions in the PRD.
+/// assertions. Mirrors the four firewall prompt actions in the product's safety/firewall rules.
 enum RulePolicy: Codable, Hashable, Sendable {
     /// Whitelist: this app is *allowed* to keep the Mac awake. While it holds a
     /// system-sleep assertion, Decaffeinate will not force sleep.

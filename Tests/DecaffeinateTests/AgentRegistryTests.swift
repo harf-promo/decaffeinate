@@ -7,7 +7,10 @@ final class AgentRegistryTests: XCTestCase {
     func testCommonWatchListMatchesLegacyNames() {
         XCTAssertEqual(
             AgentRegistry.commonWatchProcessNames,
-            ["claude", "node", "python3", "xcodebuild", "cargo", "make", "swift", "docker"])
+            [
+                "claude", "node", "python3", "xcodebuild", "cargo", "make", "swift", "docker",
+                "cursor", "windsurf",
+            ])
     }
 
     func testIdentifyByBundleID() {

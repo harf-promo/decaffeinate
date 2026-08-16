@@ -2,8 +2,9 @@ import Foundation
 
 /// Writes (and cleanly removes) a turn-end "let this Mac sleep once you're also
 /// away" hook into an agent's config — Claude Code's `~/.claude/settings.json`
-/// Stop hook and Codex's `~/.codex/config.toml` `notify` key. The installed
-/// command is `Decaffeinate --sleep-if-idle <seconds>`, so the gating lives in
+/// Stop hook, Codex's `~/.codex/config.toml` `notify` key, and Cursor's
+/// user-level `~/.cursor/hooks.json` `stop` hook. The installed command is
+/// `Decaffeinate --sleep-if-idle <seconds>`, so the gating lives in
 /// Decaffeinate, not a shell wrapper.
 ///
 /// Every editor is a **pure** `Data`/`String` transform so the whole merge/remove
@@ -14,6 +15,7 @@ enum HookInstaller {
     enum Client: String, CaseIterable {
         case claude
         case codex
+        case cursor
     }
 
     enum HookError: Error, Equatable {
@@ -43,6 +45,13 @@ enum HookInstaller {
         home.appendingPathComponent(".codex/config.toml")
     }
 
+    /// User-level only — never a project `.cursor/hooks.json`.
+    static func cursorHooksURL(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL {
+        home.appendingPathComponent(".cursor/hooks.json")
+    }
+
     /// `mkdir -p` the parent, then an atomic write (the codebase's first). Atomic so
     /// a crash mid-write can never leave a half-written settings file.
     static func atomicWrite(_ data: Data, to url: URL) throws {
@@ -60,8 +69,13 @@ enum HookInstaller {
     }
 
     /// Path-tolerant so a moved `.app` is still recognized on uninstall/re-install.
-    static func isDecaffeinateClaudeCommand(_ command: String) -> Bool {
+    /// Shared identity for Claude and Cursor: `--sleep-if-idle` + `Decaffeinate`.
+    static func isDecaffeinateHookCommand(_ command: String) -> Bool {
         command.contains("--sleep-if-idle") && command.contains("Decaffeinate")
+    }
+
+    static func isDecaffeinateClaudeCommand(_ command: String) -> Bool {
+        isDecaffeinateHookCommand(command)
     }
 
     /// Add/refresh our Stop hook, preserving every other key, matcher, and hook.
@@ -242,5 +256,71 @@ enum HookInstaller {
         let inner = trimmed[trimmed.index(after: trimmed.startIndex)..<close]
             .trimmingCharacters(in: CharacterSet(charactersIn: "[] \t"))
         return !inner.isEmpty && !inner.contains(",") && !inner.contains("=")
+    }
+
+    // MARK: - Cursor (~/.cursor/hooks.json, user-level only)
+
+    static func cursorHookCommand(binaryPath: String, seconds: Int) -> String {
+        "\(binaryPath) --sleep-if-idle \(seconds)"
+    }
+
+    /// Add/refresh our `stop` hook, preserving every other key and hook.
+    /// Shape: `{ "version": 1, "hooks": { "stop": [{ "command": "<bin> --sleep-if-idle N" }] } }`.
+    /// A nil or blank input starts from a fresh object (`version: 1`). Returns
+    /// **nil** — refusing to write — when the input is present but not valid
+    /// JSON, or when `hooks` / `hooks.stop` isn't the expected shape. Idempotent:
+    /// re-installing replaces our prior entry rather than duplicating it.
+    static func installCursorHook(into json: Data?, binaryPath: String, seconds: Int) -> Data? {
+        var root: [String: Any] = [:]
+        if let json, !isBlank(json) {
+            guard let parsed = (try? JSONSerialization.jsonObject(with: json)) as? [String: Any]
+            else { return nil }  // present but unparseable → never clobber
+            root = parsed
+        }
+        if root["version"] == nil { root["version"] = 1 }
+        var hooks: [String: Any] = [:]
+        if let existing = root["hooks"] {
+            guard let dict = existing as? [String: Any] else { return nil }
+            hooks = dict
+        }
+        var stop: [[String: Any]] = []
+        if let existing = hooks["stop"] {
+            guard let array = existing as? [[String: Any]] else { return nil }
+            stop = array
+        }
+
+        stop = stop.filter { entry in
+            !isDecaffeinateHookCommand(entry["command"] as? String ?? "")
+        }
+        stop.append([
+            "command": cursorHookCommand(binaryPath: binaryPath, seconds: seconds)
+        ])
+        hooks["stop"] = stop
+        root["hooks"] = hooks
+        return serialize(root)
+    }
+
+    /// Remove only our `stop` hook, pruning emptied groups/keys and leaving all
+    /// foreign keys intact. Returns nil if the file can't be parsed. Returns the
+    /// input unchanged when our hook isn't present.
+    static func uninstallCursorHook(from json: Data) -> Data? {
+        guard var root = (try? JSONSerialization.jsonObject(with: json)) as? [String: Any] else {
+            return nil
+        }
+        guard var hooks = root["hooks"] as? [String: Any],
+            var stop = hooks["stop"] as? [[String: Any]]
+        else { return json }
+
+        let hasOurs = stop.contains { entry in
+            isDecaffeinateHookCommand(entry["command"] as? String ?? "")
+        }
+        guard hasOurs else { return json }
+
+        stop = stop.filter { entry in
+            !isDecaffeinateHookCommand(entry["command"] as? String ?? "")
+        }
+        if stop.isEmpty { hooks.removeValue(forKey: "stop") } else { hooks["stop"] = stop }
+        if hooks.isEmpty { root.removeValue(forKey: "hooks") } else { root["hooks"] = hooks }
+        return serialize(root)
     }
 }

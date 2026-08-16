@@ -41,7 +41,7 @@ struct ConfirmableDestructiveButton: View {
         Button(title, role: .destructive) { showConfirm = true }
             .confirmationDialog(message, isPresented: $showConfirm, titleVisibility: .visible) {
                 Button(confirmLabel, role: .destructive, action: action)
-                Button("Cancel", role: .cancel) {}
+                Button(L10n.localized("Cancel"), role: .cancel) {}
             }
     }
 }
@@ -129,14 +129,17 @@ struct AssertionDetailView: View {
             HStack(spacing: 4) {
                 Image(systemName: showTechnical ? "chevron.down" : "chevron.right")
                     .scaledFont(9, weight: .semibold, relativeTo: .caption2)
-                Text("Technical details")
+                Text(L10n.localized("Technical details"))
             }
             .scaledFont(12, relativeTo: .caption)
             .foregroundStyle(Color.ink3)
         }
         .buttonStyle(.plain)
         .padding(.top, Space.s1)
-        .accessibilityLabel(showTechnical ? "Hide technical details" : "Show technical details")
+        .accessibilityLabel(
+            showTechnical
+                ? L10n.localized("Hide technical details")
+                : L10n.localized("Show technical details"))
     }
 
     private func technicalRows(provenance: ProcessProvenance?) -> some View {

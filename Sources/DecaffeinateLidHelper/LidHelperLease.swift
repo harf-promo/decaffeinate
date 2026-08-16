@@ -9,8 +9,8 @@ import Foundation
 public struct LidHelperLease: Equatable, Sendable {
     /// Hard ceiling on any requested TTL, regardless of what the app asks
     /// for — baked into the mechanism, not policy the app (or an XPC caller)
-    /// controls. Matches the design's stated cap (see `docs/PLAN-NEXT.md`'s
-    /// Phase B section: "TTL hard cap 8 h").
+    /// controls. Matches the design's stated cap (see
+    /// `docs/archive/PLAN-NEXT-1.21-1.25.md`'s Phase B section: "TTL hard cap 8 h").
     public static let maxTTLSeconds: Int = 8 * 60 * 60
 
     /// The heartbeat cadence the app is expected to renew at — informational

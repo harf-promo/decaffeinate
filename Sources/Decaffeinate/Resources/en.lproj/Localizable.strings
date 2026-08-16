@@ -142,6 +142,7 @@
 "Claude Code Stop hook" = "Claude Code Stop hook";
 "✗ %@ isn't readable UTF-8 — left it untouched." = "✗ %@ isn't readable UTF-8 — left it untouched.";
 "Codex notify hook" = "Codex notify hook";
+"Cursor stop hook" = "Cursor stop hook";
 "✗ %@ already sets `notify` — refusing to overwrite it. Remove it first, then re-run." = "✗ %@ already sets `notify` — refusing to overwrite it. Remove it first, then re-run.";
 "✓  Installed the %@ → %@" = "✓  Installed the %@ → %@";
 "✗ Couldn't write %@: %@" = "✗ Couldn't write %@: %@";
@@ -150,6 +151,8 @@
 "Claude Code" = "Claude Code";
 "·  No Codex config at %@." = "·  No Codex config at %@.";
 "Codex" = "Codex";
+"·  No Cursor hooks at %@." = "·  No Cursor hooks at %@.";
+"Cursor" = "Cursor";
 "·  No Decaffeinate hook in %@." = "·  No Decaffeinate hook in %@.";
 "✓  Removed the %@ hook from %@." = "✓  Removed the %@ hook from %@.";
 "☕️  Nothing is keeping this Mac awake. It is free to sleep." = "☕️  Nothing is keeping this Mac awake. It is free to sleep.";
@@ -175,8 +178,8 @@
 "  Decaffeinate --display-off    Turn the display off now (system keeps running)" = "  Decaffeinate --display-off    Turn the display off now (system keeps running)";
 "  Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit" = "  Decaffeinate --keep-awake N   Hold this Mac awake for N minutes (default 30), then exit";
 "  Decaffeinate --sleep-if-idle N  Sleep only if idle ≥ N seconds (default 300) — for turn-end hooks" = "  Decaffeinate --sleep-if-idle N  Sleep only if idle ≥ N seconds (default 300) — for turn-end hooks";
-"  Decaffeinate --install-hook [claude|codex|all]    Install a turn-end sleep hook (default all)" = "  Decaffeinate --install-hook [claude|codex|all]    Install a turn-end sleep hook (default all)";
-"  Decaffeinate --uninstall-hook [claude|codex|all]  Remove the hook (marker-based, clean)" = "  Decaffeinate --uninstall-hook [claude|codex|all]  Remove the hook (marker-based, clean)";
+"  Decaffeinate --install-hook [claude|codex|cursor|all]    Install a turn-end sleep hook (default all)" = "  Decaffeinate --install-hook [claude|codex|cursor|all]    Install a turn-end sleep hook (default all)";
+"  Decaffeinate --uninstall-hook [claude|codex|cursor|all]  Remove the hook (marker-based, clean)" = "  Decaffeinate --uninstall-hook [claude|codex|cursor|all]  Remove the hook (marker-based, clean)";
 "  Decaffeinate --mcp            Run an MCP server over stdio (keep-awake / status / sleep tools)" = "  Decaffeinate --mcp            Run an MCP server over stdio (keep-awake / status / sleep tools)";
 "  Decaffeinate --provenance     Trace each holder to its window / agent / project" = "  Decaffeinate --provenance     Trace each holder to its window / agent / project";
 "  Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)" = "  Decaffeinate --diagnose       Print a diagnostics report (settings + rules + scan)";
@@ -440,6 +443,25 @@
 "Rest & Restart" = "Rest & Restart";
 "History" = "History";
 "About" = "About";
+
+/* Views/SleepWarningHUD.swift, Core/Formatting.swift, MugState, Views/Components.swift — v1.26 */
+"Sleeping in %ds" = "Sleeping in %ds";
+"You’ve been idle a while — Decaffeinate is stepping in." = "You’ve been idle a while — Decaffeinate is stepping in.";
+"Stay awake" = "Stay awake";
+"Sleeping in %d seconds" = "Sleeping in %d seconds";
+"Technical details" = "Technical details";
+"Hide technical details" = "Hide technical details";
+"Show technical details" = "Show technical details";
+"just now" = "just now";
+"%ds ago" = "%ds ago";
+"%dm ago" = "%dm ago";
+"%dh ago" = "%dh ago";
+"%dd ago" = "%dd ago";
+"%dwk ago" = "%dwk ago";
+"Decaffeinate — free to sleep" = "Decaffeinate — free to sleep";
+"Decaffeinate — sleeping soon" = "Decaffeinate — sleeping soon";
+"Decaffeinate — Mac is being kept awake" = "Decaffeinate — Mac is being kept awake";
+"Decaffeinate — keeping awake" = "Decaffeinate — keeping awake";
 
 /* The app name — a brand mark; intentionally identical in every language. */
 "Decaffeinate" = "Decaffeinate";

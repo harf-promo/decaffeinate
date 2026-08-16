@@ -213,7 +213,8 @@ enum CLI {
             return L10n.localized(
                 "This Mac doesn\u{2019}t have a lid \u{2014} clamshell mode doesn\u{2019}t apply.")
         case .ready:
-            return L10n.localized("Ready for clamshell mode \u{2014} close the lid whenever you like.")
+            return L10n.localized(
+                "Ready for clamshell mode \u{2014} close the lid whenever you like.")
         case .missing(let unmet):
             let items = ClamshellRequirement.allCases.filter { unmet.contains($0) }
                 .map { L10n.localized($0.label) }
@@ -357,6 +358,7 @@ enum CLI {
         switch args[index + 1] {
         case "claude": return [.claude]
         case "codex": return [.codex]
+        case "cursor": return [.cursor]
         default: return HookInstaller.Client.allCases
         }
     }
@@ -394,8 +396,7 @@ enum CLI {
                 Data(
                     (L10n.localized(
                         "⚠️  Hook will run %@ — move Decaffeinate to /Applications for a stable path.",
-                        bin) + "\n"
-                    ).utf8))
+                        bin) + "\n").utf8))
         }
         let seconds = HookInstaller.defaultIdleSeconds
         var failed = false
@@ -424,8 +425,7 @@ enum CLI {
                         Data(
                             (L10n.localized(
                                 "✗ %@ isn't JSON I can safely edit — left it untouched. Fix or remove it, then re-run.",
-                                url.path) + "\n"
-                            ).utf8))
+                                url.path) + "\n").utf8))
                     failed = true
                     continue
                 }
@@ -441,8 +441,7 @@ enum CLI {
                             Data(
                                 (L10n.localized(
                                     "✗ %@ isn't readable UTF-8 — left it untouched.",
-                                    url.path) + "\n"
-                                ).utf8))
+                                    url.path) + "\n").utf8))
                         failed = true
                         continue
                     }
@@ -454,7 +453,8 @@ enum CLI {
                     into: existing, binaryPath: bin, seconds: seconds)
                 {
                 case .success(let text):
-                    if writeHook(Data(text.utf8), to: url, label: L10n.localized("Codex notify hook"))
+                    if writeHook(
+                        Data(text.utf8), to: url, label: L10n.localized("Codex notify hook"))
                     {
                         failed = true
                     }
@@ -463,8 +463,34 @@ enum CLI {
                         Data(
                             (L10n.localized(
                                 "✗ %@ already sets `notify` — refusing to overwrite it. Remove it first, then re-run.",
-                                url.path) + "\n"
-                            ).utf8))
+                                url.path) + "\n").utf8))
+                    failed = true
+                }
+            case .cursor:
+                let url = HookInstaller.cursorHooksURL()
+                let exists = fm.fileExists(atPath: url.path)
+                let data = try? Data(contentsOf: url)
+                if exists && data == nil {
+                    FileHandle.standardError.write(
+                        Data(
+                            (L10n.localized("✗ Couldn't read %@ — left it untouched.", url.path)
+                                + "\n").utf8))
+                    failed = true
+                    continue
+                }
+                guard
+                    let updated = HookInstaller.installCursorHook(
+                        into: data, binaryPath: bin, seconds: seconds)
+                else {
+                    FileHandle.standardError.write(
+                        Data(
+                            (L10n.localized(
+                                "✗ %@ isn't JSON I can safely edit — left it untouched. Fix or remove it, then re-run.",
+                                url.path) + "\n").utf8))
+                    failed = true
+                    continue
+                }
+                if writeHook(updated, to: url, label: L10n.localized("Cursor stop hook")) {
                     failed = true
                 }
             }
@@ -520,6 +546,23 @@ enum CLI {
                 removeHook(
                     Data(updated.utf8), wasUnchanged: updated == existing, to: url,
                     label: L10n.localized("Codex"))
+            case .cursor:
+                let url = HookInstaller.cursorHooksURL()
+                guard let existing = try? Data(contentsOf: url) else {
+                    print(L10n.localized("·  No Cursor hooks at %@.", url.path))
+                    continue
+                }
+                guard let updated = HookInstaller.uninstallCursorHook(from: existing) else {
+                    FileHandle.standardError.write(
+                        Data(
+                            (L10n.localized("✗ Couldn't parse %@ — left it untouched.", url.path)
+                                + "\n").utf8))
+                    failed = true
+                    continue
+                }
+                removeHook(
+                    updated, wasUnchanged: updated == existing, to: url,
+                    label: L10n.localized("Cursor"))
             }
         }
         if failed { exit(EXIT_FAILURE) }
@@ -580,7 +623,8 @@ enum CLI {
         }
 
         if !displayOnly.isEmpty {
-            print("\n" + L10n.localized("🖥  Keeping the display on (likely media or a call):") + "\n")
+            print(
+                "\n" + L10n.localized("🖥  Keeping the display on (likely media or a call):") + "\n")
             for a in displayOnly { printRow(a) }
         }
     }
@@ -620,7 +664,8 @@ enum CLI {
             "",
             L10n.localized("USAGE:"),
             L10n.localized("  Decaffeinate                  Run the menu-bar app"),
-            L10n.localized("  Decaffeinate --scan           Print active sleep assertions and exit"),
+            L10n.localized(
+                "  Decaffeinate --scan           Print active sleep assertions and exit"),
             L10n.localized(
                 "  Decaffeinate --status [--json]  Print a status line (or JSON for scripts/hooks)"),
             L10n.localized(
@@ -639,10 +684,10 @@ enum CLI {
                 "  Decaffeinate --sleep-if-idle N  Sleep only if idle ≥ N seconds (default 300) — for turn-end hooks"
             ),
             L10n.localized(
-                "  Decaffeinate --install-hook [claude|codex|all]    Install a turn-end sleep hook (default all)"
+                "  Decaffeinate --install-hook [claude|codex|cursor|all]    Install a turn-end sleep hook (default all)"
             ),
             L10n.localized(
-                "  Decaffeinate --uninstall-hook [claude|codex|all]  Remove the hook (marker-based, clean)"
+                "  Decaffeinate --uninstall-hook [claude|codex|cursor|all]  Remove the hook (marker-based, clean)"
             ),
             L10n.localized(
                 "  Decaffeinate --mcp            Run an MCP server over stdio (keep-awake / status / sleep tools)"

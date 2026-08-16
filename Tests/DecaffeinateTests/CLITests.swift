@@ -83,6 +83,7 @@ final class CLITests: XCTestCase {
     func testHookTargetSelectsSingleClient() {
         XCTAssertEqual(CLI.hookTarget(after: 0, in: ["--install-hook", "claude"]), [.claude])
         XCTAssertEqual(CLI.hookTarget(after: 0, in: ["--install-hook", "codex"]), [.codex])
+        XCTAssertEqual(CLI.hookTarget(after: 0, in: ["--install-hook", "cursor"]), [.cursor])
     }
 
     // MARK: --clamshell-status line (v1.24)

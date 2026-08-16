@@ -5,11 +5,6 @@ headless equivalent, so you can wire it into shell scripts, CI, and AI-agent
 sessions. No daemon, no root: just the CLI (and the `decaffeinate://` URL
 scheme), a one-command hook installer, and an opt-in MCP server.
 
-> Most of this page (`--status`, `--sleep-if-idle`, `--install-hook`, `--mcp`)
-> shipped after the last tagged release (v1.13.0) — it's in `main` and tested,
-> not yet in the Homebrew/DMG build. Build from source to use it today, or
-> check `Decaffeinate --version` after your next update.
-
 ## CLI verbs
 
 ```sh
@@ -23,8 +18,8 @@ Decaffeinate --sleep-if-idle 300    # sleep ONLY if idle ≥ 300 s (for turn-end
 Decaffeinate --display-off          # turn the display off, keep the system running
 Decaffeinate --keep-awake 60        # hold awake 60 min (honours the safety rails), then release
 Decaffeinate --diagnose             # settings + rules + scan, for a bug report
-Decaffeinate --install-hook [claude|codex|all]    # install a turn-end sleep hook
-Decaffeinate --uninstall-hook [claude|codex|all]  # remove it cleanly (marker-based)
+Decaffeinate --install-hook [claude|codex|cursor|all]    # install a turn-end sleep hook
+Decaffeinate --uninstall-hook [claude|codex|cursor|all]  # remove it cleanly (marker-based)
 Decaffeinate --mcp                  # run an MCP server over stdio (see below)
 ```
 
@@ -55,7 +50,7 @@ open "decaffeinate://keep-awake?minutes=90"
 open "decaffeinate://stop-awake"
 ```
 
-## Agent hooks (Claude Code, Codex, …)
+## Agent hooks (Claude Code, Codex, Cursor, …)
 
 The most common ask in the agentic era is *"let my Mac sleep once the agent is
 done."* Decaffeinate already does this automatically — it watches a recognised
@@ -67,8 +62,9 @@ If you want an explicit hook — e.g. to sleep the moment a long unattended job
 ends — let Decaffeinate install one:
 
 ```sh
-Decaffeinate --install-hook          # Claude Code + Codex (default: all)
+Decaffeinate --install-hook          # Claude Code + Codex + Cursor (default: all)
 Decaffeinate --install-hook claude   # just one
+Decaffeinate --install-hook cursor
 Decaffeinate --uninstall-hook        # clean removal, any time
 ```
 
@@ -83,9 +79,14 @@ so there's no wrapper script to maintain.
 - **Codex** → the `notify` key in `~/.codex/config.toml`, tagged
   `# decaffeinate-managed`. If you already set your own `notify`, the installer
   refuses to overwrite it and tells you so.
+- **Cursor** → a user-level `stop` hook in `~/.cursor/hooks.json` (home
+  directory only — never a project `.cursor/hooks.json`). Shape:
+  `{ "version": 1, "hooks": { "stop": [{ "command": "<bin> --sleep-if-idle N" }] } }`.
+  Same refuse / idempotent / preserve rules as Claude.
 
 `--uninstall-hook` removes only Decaffeinate's entry (matched by that marker /
-the command signature) and leaves everything else untouched.
+the command signature `--sleep-if-idle` + `Decaffeinate`) and leaves everything
+else untouched.
 
 Prefer to do it by hand? The Claude Code form is:
 
@@ -95,6 +96,19 @@ Prefer to do it by hand? The Claude Code form is:
     "Stop": [
       { "hooks": [ { "type": "command",
         "command": "/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --sleep-if-idle 300" } ] }
+    ]
+  }
+}
+```
+
+The Cursor user-level form (`~/.cursor/hooks.json` only) is:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      { "command": "/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --sleep-if-idle 300" }
     ]
   }
 }

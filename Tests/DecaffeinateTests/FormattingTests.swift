@@ -20,10 +20,24 @@ final class FormattingTests: XCTestCase {
 
     func testRelative() {
         let now = Date()
-        XCTAssertEqual(Format.relative(since: now.addingTimeInterval(-3), now: now), "just now")
-        XCTAssertEqual(Format.relative(since: now.addingTimeInterval(-30), now: now), "30s ago")
-        XCTAssertEqual(Format.relative(since: now.addingTimeInterval(-120), now: now), "2m ago")
-        XCTAssertEqual(Format.relative(since: now.addingTimeInterval(-7200), now: now), "2h ago")
+        XCTAssertEqual(
+            Format.relative(since: now.addingTimeInterval(-3), now: now),
+            L10n.localized("just now"))
+        XCTAssertEqual(
+            Format.relative(since: now.addingTimeInterval(-30), now: now),
+            L10n.localized("%ds ago", 30))
+        XCTAssertEqual(
+            Format.relative(since: now.addingTimeInterval(-120), now: now),
+            L10n.localized("%dm ago", 2))
+        XCTAssertEqual(
+            Format.relative(since: now.addingTimeInterval(-7200), now: now),
+            L10n.localized("%dh ago", 2))
+        XCTAssertEqual(
+            Format.relative(since: now.addingTimeInterval(-172_800), now: now),
+            L10n.localized("%dd ago", 2))
+        XCTAssertEqual(
+            Format.relative(since: now.addingTimeInterval(-1_209_600), now: now),
+            L10n.localized("%dwk ago", 2))
     }
 
     func testRemovingDuplicates() {
