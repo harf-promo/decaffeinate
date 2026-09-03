@@ -1,0 +1,15 @@
+scripts:
+  setup: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+      echo "decaffeinate is a Swift/macOS app -- build and test only work on macOS with Xcode."
+      echo "This host is not macOS; nothing to install here. Docs/read-only work only."
+      exit 0
+    fi
+
+    echo "== swift package resolve =="
+    swift package resolve
+
+    echo "Worktree setup complete. Build: swift build. Test: swift test."
