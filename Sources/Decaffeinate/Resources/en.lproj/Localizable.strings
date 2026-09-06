@@ -106,6 +106,7 @@
 "%@ and 1 other — open Decaffeinate to review them." = "%@ and 1 other — open Decaffeinate to review them.";
 "%@ and %d others — open Decaffeinate to review them." = "%@ and %d others — open Decaffeinate to review them.";
 "%d apps started keeping your Mac awake" = "%d apps started keeping your Mac awake";
+"Your Mac didn’t sleep" = "Your Mac didn’t sleep";
 "Putting your Mac to sleep" = "Putting your Mac to sleep";
 "Decaffeinate stepped in — %@." = "Decaffeinate stepped in — %@.";
 "%@ finished" = "%@ finished";
@@ -323,7 +324,7 @@
 "Quiet window" = "Quiet window";
 "Paused — %@" = "Paused — %@";
 "Holding awake until %@" = "Holding awake until %@";
-"No quiet window active. Start one any time from the menu's “Stay awake until…”." = "No quiet window active. Start one any time from the menu's “Stay awake until…”.";
+"No quiet window active. Start one from the menu's “Keep awake…”." = "No quiet window active. Start one from the menu's “Keep awake…”.";
 "Start and end are the same — this schedule does nothing." = "Start and end are the same — this schedule does nothing.";
 "Active now — auto-sleep is paused until %@" = "Active now — auto-sleep is paused until %@";
 "Outside active hours — auto-sleep is on. Next pause at %@." = "Outside active hours — auto-sleep is on. Next pause at %@.";

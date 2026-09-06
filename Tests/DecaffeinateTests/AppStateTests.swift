@@ -57,6 +57,7 @@ private final class ThermalBox: @unchecked Sendable {
     private(set) var notifications: [(app: String, reason: String, holderKey: String)] = []
     private(set) var digestNotifications: [(count: Int, sample: String)] = []
     private(set) var forcedSleeps: [String] = []
+    private(set) var sleepFailures: [String] = []
     private(set) var agentFinishes: [String] = []
     private(set) var restartOverdues: [String] = []
     private(set) var authorizationRequests = 0
@@ -69,6 +70,7 @@ private final class ThermalBox: @unchecked Sendable {
         digestNotifications.append((count, sample))
     }
     func notifyForcedSleep(reason: String) { forcedSleeps.append(reason) }
+    func notifySleepFailed(message: String) { sleepFailures.append(message) }
     func notifyAgentFinished(label: String) { agentFinishes.append(label) }
     func notifyRestartOverdue(uptimeLabel: String) { restartOverdues.append(uptimeLabel) }
     func refreshAuthorizationStatus(
@@ -1651,6 +1653,102 @@ final class AppStateTests: XCTestCase {
         h.clock.advance(31)  // past errorVisibilitySeconds
         h.state.tick()
         XCTAssertNil(h.state.lastError, "a one-off error clears itself")
+    }
+
+    // MARK: Honesty (Phase 1)
+
+    /// Automation exposes one verb for "let my Mac sleep". It used to clear only
+    /// the timed quiet window, so the Siri phrase answered "your Mac can sleep
+    /// normally again" while the indefinite keep-awake toggle held it awake.
+    func testReleaseAllKeepAwakeEndsBothHolds() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.settings.settings.caffeinateEnabled = true
+        h.state.stayAwake(forMinutes: 30)
+        XCTAssertTrue(h.state.isQuietWindowActive)
+
+        h.state.releaseAllKeepAwake()
+
+        XCTAssertFalse(h.state.isQuietWindowActive, "the quiet window ends")
+        XCTAssertFalse(
+            h.settings.settings.caffeinateEnabled,
+            "the indefinite keep-awake toggle ends too — one verb, both holds")
+    }
+
+    /// The narrow verb stays narrow: the menu and Settings each ship a separate
+    /// control, and "Cancel quiet window" must not silently also stop a
+    /// keep-awake the user turned on somewhere else.
+    func testClearQuietWindowLeavesTheKeepAwakeToggleAlone() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.settings.settings.caffeinateEnabled = true
+        h.state.stayAwake(forMinutes: 30)
+
+        h.state.clearQuietWindow()
+
+        XCTAssertFalse(h.state.isQuietWindowActive)
+        XCTAssertTrue(h.settings.settings.caffeinateEnabled)
+    }
+
+    /// Turning off "tell me about new blockers" used to delete the in-menu
+    /// Allow / Sleep-anyway queue as well — the firewall, switched off by a
+    /// notification preference, with nothing in the UI saying so.
+    func testApprovalQueueSurvivesNotificationsBeingOff() {
+        let h = makeHarness { $0.notifyOnNewBlocker = false }; defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Zoom", bundle: "us.zoom.xos")]
+
+        h.state.tick()
+
+        XCTAssertEqual(
+            h.state.pendingClassification.count, 1,
+            "the queue the menu reads is not a notification feature")
+        XCTAssertTrue(h.notifier.notifications.isEmpty, "but nothing is posted")
+    }
+
+    /// The fire-once suppression must not outlive the reason for it: a user who
+    /// turns notifications back on should hear about what is holding the Mac
+    /// awake now, not only about the next thing to start.
+    func testTurningNotificationsBackOnAnnouncesExistingBlockers() {
+        let h = makeHarness { $0.notifyOnNewBlocker = false }; defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Zoom", bundle: "us.zoom.xos")]
+        h.state.tick()
+        XCTAssertTrue(h.notifier.notifications.isEmpty)
+
+        h.settings.settings.notifyOnNewBlocker = true
+        h.state.tick()
+
+        XCTAssertEqual(h.notifier.notifications.count, 1, "the existing blocker announces itself")
+    }
+
+    /// Pressing Sleep Now usually closes the popover, so an error rendered
+    /// inside it is invisible exactly when it matters — and it self-clears after
+    /// 30s. A user-initiated sleep that never happened now leaves the popover.
+    func testFailedUserSleepPostsANotification() {
+        let h = makeHarness(); defer { h.cleanup() }
+        h.scanner.assertions = [systemBlocker("Docker", bundle: "com.docker.docker")]
+        h.state.tick()
+
+        h.state.sleepNow()  // launches, but the kernel never confirms a sleep
+        h.clock.advance(11)  // past userSleepFeedbackSeconds
+        h.state.tick()
+
+        XCTAssertEqual(h.notifier.sleepFailures.count, 1, "the user hears about it")
+        XCTAssertTrue(
+            h.notifier.sleepFailures[0].contains("Docker"),
+            "and the message names the holder: \(h.notifier.sleepFailures)")
+        XCTAssertNotNil(h.state.lastError, "the in-popover line still appears too")
+    }
+
+    /// An automatic idle sleep that fails is not the user waiting on an answer,
+    /// so it must not produce a notification.
+    func testFailedAutomaticSleepDoesNotNotify() {
+        let h = makeHarness { $0.idleThresholdMinutes = 1 }; defer { h.cleanup() }
+        h.idle.seconds = 600
+        h.state.tick()
+        h.clock.advance(11)
+        h.state.tick()
+
+        XCTAssertTrue(
+            h.notifier.sleepFailures.isEmpty,
+            "only a user-initiated Sleep Now earns a failure notification")
     }
 
     // MARK: Stale-holder CPU evidence (v1.18)

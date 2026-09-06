@@ -122,6 +122,10 @@ final class Notifier: NSObject {
             body: L10n.localized("Decaffeinate stepped in \u{2014} %@.", reason))
     }
 
+    func notifySleepFailed(message: String) {
+        post(title: L10n.localized("Your Mac didn\u{2019}t sleep"), body: message)
+    }
+
     func notifyAgentFinished(label: String) {
         post(
             title: L10n.localized("%@ finished", label),

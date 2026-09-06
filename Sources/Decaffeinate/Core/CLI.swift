@@ -599,8 +599,10 @@ enum CLI {
     static func runMCP() -> Never {
         let server = MCPServer()
         Task.detached {
-            await server.run()
-            exit(EXIT_SUCCESS)
+            // A server whose transport never came up used to write to stderr and
+            // then exit 0, so a supervisor could not tell it from a clean finish.
+            let served = await server.run()
+            exit(served ? EXIT_SUCCESS : EXIT_FAILURE)
         }
         dispatchMain()
     }

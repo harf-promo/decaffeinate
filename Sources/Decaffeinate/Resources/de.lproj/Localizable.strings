@@ -106,6 +106,7 @@
 "%@ and 1 other — open Decaffeinate to review them." = "%@ und 1 weitere — öffne Decaffeinate, um sie zu überprüfen.";
 "%@ and %d others — open Decaffeinate to review them." = "%@ und %d weitere — öffne Decaffeinate, um sie zu überprüfen.";
 "%d apps started keeping your Mac awake" = "%d Apps halten jetzt deinen Mac wach";
+"Your Mac didn’t sleep" = "Dein Mac ist nicht eingeschlafen";
 "Putting your Mac to sleep" = "Dein Mac wird in den Ruhezustand versetzt";
 "Decaffeinate stepped in — %@." = "Decaffeinate ist eingeschritten — %@.";
 "%@ finished" = "%@ fertig";
@@ -323,7 +324,7 @@
 "Quiet window" = "Ruhefenster";
 "Paused — %@" = "Pausiert — %@";
 "Holding awake until %@" = "Wach gehalten bis %@";
-"No quiet window active. Start one any time from the menu's “Stay awake until…”." = "Kein Ruhefenster aktiv. Starte jederzeit eines über „Wach bleiben bis…“ im Menü.";
+"No quiet window active. Start one from the menu's “Keep awake…”." = "Kein Ruhefenster aktiv. Starte eines über „Wach halten…“ im Menü.";
 "Start and end are the same — this schedule does nothing." = "Beginn und Ende sind identisch — dieser Zeitplan bewirkt nichts.";
 "Active now — auto-sleep is paused until %@" = "Jetzt aktiv — automatischer Ruhezustand pausiert bis %@";
 "Outside active hours — auto-sleep is on. Next pause at %@." = "Außerhalb der aktiven Zeiten — automatischer Ruhezustand ist an. Nächste Pause um %@.";

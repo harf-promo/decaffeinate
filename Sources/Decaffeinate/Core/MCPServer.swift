@@ -31,7 +31,11 @@ final class MCPServer {
 
     /// Build the server, register handlers, serve stdio until the client
     /// disconnects, then release the hold (also guaranteed by process exit).
-    func run() async {
+    /// Serves stdio until the client disconnects. Returns `false` if the
+    /// transport never came up — the caller turns that into a non-zero exit, so a
+    /// supervisor can tell a dead server from a finished one.
+    @discardableResult
+    func run() async -> Bool {
         let server = Server(
             name: "Decaffeinate",
             version: AppInfo.version,
@@ -48,15 +52,18 @@ final class MCPServer {
             return await self.handle(params)
         }
 
+        var served = true
         do {
             try await server.start(transport: StdioTransport())
             await server.waitUntilCompleted()
         } catch {
             FileHandle.standardError.write(Data("decaffeinate --mcp: \(error)\n".utf8))
+            served = false
         }
         keepAwakeTask?.cancel()
         engine.releaseAll()
         await server.stop()
+        return served
     }
 
     /// Non-deprecated `Tool.Content.text` — the SDK's `.text(_:)`/`.text(text:)`

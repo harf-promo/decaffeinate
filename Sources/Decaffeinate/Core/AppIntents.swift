@@ -146,7 +146,7 @@ struct StopKeepingAwakeIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        AppState.shared.clearQuietWindow()
+        AppState.shared.releaseAllKeepAwake()
         return .result(dialog: "Okay — your Mac can sleep normally again.")
     }
 }

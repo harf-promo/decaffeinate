@@ -66,6 +66,11 @@ protocol BlockerNotifying {
     func notifyNewBlockers(count: Int, sample: String)
     /// Posted when a confirmed forced sleep actually happens.
     func notifyForcedSleep(reason: String)
+    /// Posted when a **user-initiated** Sleep Now was issued and the Mac did not
+    /// sleep. The only reliable channel for it: pressing Sleep Now usually closes
+    /// the popover, so an error rendered inside the popover is invisible exactly
+    /// when it matters. `message` already names the holder.
+    func notifySleepFailed(message: String)
     /// Posted when a watched build/agent finishes and the Mac is sleeping now.
     func notifyAgentFinished(label: String)
     /// Posted once when uptime crosses into the overdue/urgent band.
