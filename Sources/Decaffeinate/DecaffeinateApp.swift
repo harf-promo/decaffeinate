@@ -131,8 +131,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // immediate, like the CLI / App Intents / MCP sleep_now.
                     AppState.shared.sleepNow(requireCallConfirmation: false)
                 case .keepAwake(let minutes): AppState.shared.stayAwake(forMinutes: minutes)
-                case .stopAwake: AppState.shared.clearQuietWindow()
-                case .none: break
+                case .stopAwake: AppState.shared.releaseAllKeepAwake()
+                case .none:
+                    // Silently ignoring an unrecognised verb makes a typo in a
+                    // Shortcut indistinguishable from a working automation.
+                    AppLog.engine.error(
+                        "Ignoring unrecognised decaffeinate:// URL: \(url.absoluteString, privacy: .public)"
+                    )
                 }
             }
         }

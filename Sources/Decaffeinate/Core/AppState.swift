@@ -197,6 +197,9 @@ final class AppState: ObservableObject {
     /// send only changes how many notifications a qualifying set produces, and
     /// never bypasses this dedup.
     private var notifiedBlockers: Set<String> = []
+    /// Last tick's value of the "tell me about new blockers" setting, so the
+    /// fire-once suppression above can be lifted when it turns back on.
+    private var notificationsWereEnabled: Bool?
 
     /// First time each live session key was observed — the anchor for a stable
     /// "held since" that survives `caffeinate -t` respawns. Pruned with a grace
@@ -722,8 +725,27 @@ final class AppState: ObservableObject {
     }
 
     /// Cancel an active quiet window immediately.
+    ///
+    /// Deliberately narrow: the menu and Settings each ship a separate control
+    /// ("Cancel quiet window" next to "Stop keeping awake"), and each ends
+    /// exactly what it names. Automation has only one verb — see
+    /// `releaseAllKeepAwake()`.
     func clearQuietWindow() {
         quietUntil = nil
+        tick()
+    }
+
+    /// Release every voluntary hold this app places on sleep: the timed quiet
+    /// window *and* the indefinite keep-awake toggle.
+    ///
+    /// Automation exposes one verb for this — `decaffeinate://stop-awake`, the
+    /// "Stop Keeping Mac Awake" intent, whose own Siri phrase is "Let my Mac
+    /// sleep". Those all used to call `clearQuietWindow()`, which leaves
+    /// `caffeinateEnabled` holding the Mac awake, and then answered "Okay — your
+    /// Mac can sleep normally again". One verb, so it ends both.
+    func releaseAllKeepAwake() {
+        quietUntil = nil
+        settingsStore.settings.caffeinateEnabled = false
         tick()
     }
 
@@ -1343,7 +1365,13 @@ final class AppState: ObservableObject {
             // `assertions` was refreshed at the top of this same tick, so this
             // names whoever is holding system sleep open *right now* — the app
             // already knows; the old message just never said so.
-            setError(failedSleepMessage())
+            let message = failedSleepMessage()
+            setError(message)
+            // Pressing Sleep Now usually closes the popover, so the error line
+            // inside it is invisible in the common case, and it self-clears after
+            // 30s. A user-initiated sleep that did not happen is worth a
+            // notification: the user asked for something and did not get it.
+            notifier.notifySleepFailed(message: message)
             pendingForcedSleep = nil
         }
         if let at = lastErrorAt, now().timeIntervalSince(at) > errorVisibilitySeconds {
@@ -1408,13 +1436,29 @@ final class AppState: ObservableObject {
 
     // MARK: Firewall queue
 
+    /// Populate the in-menu Allow / Sleep-anyway queue, and — separately —
+    /// decide whether this tick's new blockers are worth a notification.
+    ///
+    /// `enabled` is the *notification* setting. It used to gate this whole
+    /// method, so turning off "tell me when a new app keeps the Mac awake" also
+    /// deleted the approval queue from the popover: the firewall people install
+    /// this app for, switched off by a notification preference, with nothing in
+    /// the UI saying so. The queue is now always built; only the posting below
+    /// is gated.
     private func updateFirewallQueue(_ systemBlockers: [PowerAssertion], enabled: Bool) {
         // Prune resolved entries.
         let liveKeys = Set(systemBlockers.map(key))
         pendingClassification.removeAll { !liveKeys.contains(key($0)) }
         notifiedBlockers.formIntersection(liveKeys)
 
-        guard enabled else { return }
+        // `notifiedBlockers` is a fire-once gate, and it is now filled even while
+        // notifications are off. Without this, a user who turns them back on
+        // would never hear about anything already holding the Mac awake — the
+        // suppression would outlive the reason for it.
+        if let wasEnabled = notificationsWereEnabled, !wasEnabled, enabled {
+            notifiedBlockers.removeAll()
+        }
+        notificationsWereEnabled = enabled
 
         // Collect this tick's genuinely-new blockers first, rather than
         // notifying inline as the loop finds them, so a burst of several apps
@@ -1446,6 +1490,9 @@ final class AppState: ObservableObject {
             newlySurfaced.append((blocker, k))
         }
         guard !newlySurfaced.isEmpty else { return }
+        // Everything above maintains the queue the menu reads. Everything below
+        // posts a notification, which is what the setting actually governs.
+        guard enabled else { return }
 
         // A real, brand-new blocker is exactly the in-context moment to ask
         // for notification permission if the user deferred it at onboarding

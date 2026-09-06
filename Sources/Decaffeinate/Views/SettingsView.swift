@@ -408,7 +408,7 @@ private struct ScheduleSettings: View {
                 } else {
                     Text(
                         L10n.localized(
-                            "No quiet window active. Start one any time from the menu's “Stay awake until…”."
+                            "No quiet window active. Start one from the menu's “Keep awake…”."
                         )
                     )
                     .settingsCaption()
