@@ -31,8 +31,7 @@ final class LocalizationTests: XCTestCase {
         let enURL = try XCTUnwrap(L10n.bundle.url(forResource: "en", withExtension: "lproj"))
         let en = try XCTUnwrap(Bundle(url: enURL))
         XCTAssertEqual(en.localizedString(forKey: "Skip", value: "␀", table: nil), "Skip")
-        XCTAssertEqual(
-            en.localizedString(forKey: "Get started", value: "␀", table: nil), "Get started")
+        XCTAssertEqual(en.localizedString(forKey: "Next", value: "␀", table: nil), "Next")
     }
 
     // Both seeded language tables actually shipped inside the module bundle.
@@ -150,5 +149,76 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(
             String(format: localized("%@ is the latest signed release"), "1.26.0"),
             "1.26.0 ist die neueste signierte Version")
+    }
+
+    // MARK: - Table parity and coverage (the structural gates)
+
+    /// Keys that `L10n.localized` looks up but no table defines, so they render
+    /// as their English key text in every language. Fixed in the localization
+    /// phase; decrement this when they land.
+    ///
+    /// The five today are the three controls on the final onboarding panel — the
+    /// first screen a new German user sees — and two `--help` lines added with
+    /// `--preview` / `--screenshots` and never added to the table.
+    private static let untabledKeyLedger = 5
+
+    /// Every shipped table defines exactly the same keys.
+    ///
+    /// A language that silently drops a key falls back to the English key text,
+    /// which reads as a translation gap rather than as a bug. Compared on the
+    /// *bundled* tables, so this proves what actually ships.
+    func testEveryLanguageTableIsAtKeyParity() throws {
+        let english = try tableKeys("en")
+        XCTAssertFalse(
+            english.isEmpty, "the base table resolved to zero keys — parser or bundle bug")
+        for language in ["de"] {
+            let other = try tableKeys(language)
+            let missing = english.subtracting(other).sorted()
+            let extra = other.subtracting(english).sorted()
+            XCTAssertTrue(
+                missing.isEmpty,
+                "\(language).lproj is missing \(missing.count) key(s) present in en: \(missing)")
+            XCTAssertTrue(
+                extra.isEmpty,
+                "\(language).lproj defines \(extra.count) key(s) absent from en: \(extra)")
+        }
+    }
+
+    /// Every literal key the app looks up exists in the base table.
+    ///
+    /// This is the gate that would have caught the onboarding keys: they compile,
+    /// they run, and they resolve — to themselves — so nothing short of reading
+    /// the table notices.
+    func testEveryLiteralKeyExistsInTheEnglishTable() throws {
+        let english = try tableKeys("en")
+        let used = try SourceScanner.localizedKeys()
+        XCTAssertGreaterThan(used.count, 300, "key scanner found almost nothing — parser bug")
+
+        var untabled: [SourceScanner.LocalizedKey] = []
+        var seen = Set<String>()
+        for key in used where !english.contains(key.key) && seen.insert(key.key).inserted {
+            untabled.append(key)
+        }
+        guard untabled.count != Self.untabledKeyLedger else { return }
+        let listing = untabled.map { "    \($0.anchor)  \($0.key.debugDescription)" }
+            .sorted().joined(separator: "\n")
+        XCTFail(
+            """
+            Untabled localization keys: \(Self.untabledKeyLedger) -> \(untabled.count).
+            Add each key to en.lproj AND de.lproj, then decrement untabledKeyLedger.
+            \(listing)
+            """)
+    }
+
+    /// The keys defined by one bundled `.lproj`, read the way macOS reads them.
+    private func tableKeys(_ language: String) throws -> Set<String> {
+        let lproj = try XCTUnwrap(
+            L10n.bundle.url(forResource: language, withExtension: "lproj"),
+            "\(language).lproj not found in Bundle.module")
+        let table = lproj.appendingPathComponent("Localizable.strings")
+        let contents = try XCTUnwrap(
+            NSDictionary(contentsOf: table) as? [String: String],
+            "\(language)/Localizable.strings did not parse as a string table")
+        return Set(contents.keys)
     }
 }

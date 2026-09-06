@@ -65,12 +65,14 @@ enum CLI {
         }
         if let index = arguments.firstIndex(of: "--screenshots") {
             let dir = arguments.indices.contains(index + 1) ? arguments[index + 1] : "screenshots"
-            _ = ScreenshotRenderer.renderAll(to: dir)
+            // A visual gate that cannot go red is not a gate: exit non-zero so a
+            // CI step built on --screenshots fails when a surface fails to render.
+            if !ScreenshotRenderer.renderAll(to: dir) { exit(EXIT_FAILURE) }
             return true
         }
         if let index = arguments.firstIndex(of: "--icon") {
             let dir = arguments.indices.contains(index + 1) ? arguments[index + 1] : "assets"
-            _ = IconRenderer.renderAll(to: dir)
+            if !IconRenderer.renderAll(to: dir) { exit(EXIT_FAILURE) }
             return true
         }
         if let index = arguments.firstIndex(of: "--provenance") {

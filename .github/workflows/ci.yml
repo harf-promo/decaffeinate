@@ -44,3 +44,18 @@ jobs:
 
       - name: Build the .app bundle
         run: ./Scripts/build-app.sh
+
+      # The design gates in `swift test` check values in source. This checks that
+      # every surface still renders — and, uploaded, lets a human look at the
+      # result, which is the step that actually catches a visual regression.
+      - name: Render the UI screenshots
+        run: swift run Decaffeinate --screenshots "$RUNNER_TEMP/screenshots"
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.sha }}
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: error
+          retention-days: 14

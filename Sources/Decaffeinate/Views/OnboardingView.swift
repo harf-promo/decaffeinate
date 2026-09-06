@@ -108,7 +108,7 @@ struct OnboardingView: View {
             .padding(.horizontal, Space.s5)
             .padding(.vertical, Space.s4)
         }
-        .frame(width: 500, height: 440)
+        .frame(width: WindowMetrics.onboarding.width, height: WindowMetrics.onboarding.height)
         .background(Color.paper)
     }
 

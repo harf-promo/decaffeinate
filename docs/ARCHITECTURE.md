@@ -77,8 +77,15 @@ app. Each tick:
     the menu-bar icon project from — so they can never contradict each other.
 
 Steps 1–4 are cheap and in-process (no subprocesses, no polling of external
-tools), so the tick is fast and safe to run every second. Provenance resolution
-(the expensive part) is lazy — it runs on row render, never in the tick.
+tools), so the tick is fast and safe to run every second.
+
+**Known inaccuracy, being fixed.** This document used to claim provenance
+resolution was lazy and "never runs in the tick". It does: `AppState.tick()`
+reaches it through `updateSessionTracking`, `computeGroupedSystemBlockers`,
+`sessionKey(for:)`, `isAgentSession`, `activeHoldingCount` and `rowTitle`, so a
+parent-chain walk plus `argv` and `cwd` reads happen per holder every cache TTL,
+continuously. The performance phase moves it off the tick; until then this note
+stands so the document does not assert something the code contradicts.
 
 ## Engine map
 

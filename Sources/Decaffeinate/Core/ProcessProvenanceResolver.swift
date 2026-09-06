@@ -29,7 +29,13 @@ protocol ProcessIntrospecting {
 
 /// Resolves where a sleep-holder came from — the window / terminal / agent /
 /// project behind a `caffeinate` (or any) hold. Walks the parent chain with
-/// public APIs only; lazy + cached so it never runs in the 1 Hz tick path.
+/// public APIs only, cached by pid + start time with a short TTL.
+///
+/// This comment used to claim the resolver "never runs in the 1 Hz tick path".
+/// It does — `AppState.tick()` reaches it via `updateSessionTracking`,
+/// `computeGroupedSystemBlockers`, `sessionKey(for:)`, `isAgentSession`,
+/// `activeHoldingCount` and `rowTitle`. The performance phase moves it off the
+/// tick; the claim is retracted here rather than left standing.
 @MainActor
 final class ProcessProvenanceResolver {
     private let introspector: any ProcessIntrospecting

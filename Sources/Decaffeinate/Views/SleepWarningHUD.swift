@@ -42,7 +42,7 @@ struct SleepWarningHUD: View {
                 .keyboardShortcut(.defaultAction)
         }
         .padding(Space.s4)
-        .frame(width: 360)
+        .frame(width: WindowMetrics.hudWidth)
         .background(
             RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.paper)
         )

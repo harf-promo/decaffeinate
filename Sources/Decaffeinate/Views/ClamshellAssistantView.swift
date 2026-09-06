@@ -77,7 +77,7 @@ struct ClamshellAssistantBody: View {
             }
         }
         .padding(Space.s5)
-        .frame(width: 360)
+        .frame(width: WindowMetrics.clamshellWidth)
         .background(theme.paper)
     }
 
