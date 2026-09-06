@@ -11,7 +11,13 @@ enum ScreenshotRenderer {
     static func renderAll(to directory: String) -> Bool {
         _ = NSApplication.shared
         let dir = URL(fileURLWithPath: directory)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            FileHandle.standardError.write(
+                Data("Could not create \(dir.path): \(error.localizedDescription)\n".utf8))
+            return false
+        }
 
         var ok = true
         for (suffix, appearance): (String, NSAppearance.Name) in [
@@ -21,141 +27,48 @@ enum ScreenshotRenderer {
             let updater = UpdaterController()
             // Warm the icon cache so the menu shot shows real app icons.
             for assertion in state.assertions { _ = AppIconProvider.shared.icon(for: assertion) }
-
             let theme = Theme.nightcap
-            let menu = RedesignMenuView()
-                .environment(\.theme, theme)
-                .environmentObject(state)
-                .environmentObject(state.settingsStore)
-                .environmentObject(state.rulesEngine)
-                .environmentObject(updater)
-            ok =
-                capture(
-                    menu,
-                    size: NSSize(width: theme.popoverWidth, height: RedesignMenuView.menuHeight),
-                    appearance: appearance, to: dir.appendingPathComponent("menu-\(suffix).png"))
-                && ok
+
+            func shoot<V: View>(_ view: V, _ size: CGSize, _ name: String) {
+                ok =
+                    capture(
+                        view, size: NSSize(width: size.width, height: size.height),
+                        appearance: appearance,
+                        to: dir.appendingPathComponent("\(name)-\(suffix).png")) && ok
+            }
+
+            shoot(
+                menuView(state: state, updater: updater, theme: theme),
+                CGSize(width: theme.popoverWidth, height: RedesignMenuView.menuHeight), "menu")
 
             // The expanded provenance detail for the agentic caffeinate row.
             if let caffeinate = state.assertions.first(where: { $0.processName == "caffeinate" }) {
                 let detail = AssertionDetailView(assertion: caffeinate)
                     .environment(\.theme, theme)
                     .environmentObject(state)
-                    .frame(width: 360)
-                ok =
-                    capture(
-                        detail, size: NSSize(width: 360, height: 360), appearance: appearance,
-                        to: dir.appendingPathComponent("detail-\(suffix).png")) && ok
+                    .frame(width: WindowMetrics.assertionDetailCapture.width)
+                shoot(detail, WindowMetrics.assertionDetailCapture, "detail")
             }
 
-            let onboarding = OnboardingView(onFinish: { _, _ in })
-            ok =
-                capture(
-                    onboarding, size: NSSize(width: 500, height: 440), appearance: appearance,
-                    to: dir.appendingPathComponent("onboarding-\(suffix).png")) && ok
-
+            shoot(OnboardingView(onFinish: { _, _ in }), WindowMetrics.onboarding, "onboarding")
             // Panel 2 — the explicit notification-choice + launch-at-login panel.
-            let onboardingChoice = OnboardingView(onFinish: { _, _ in }, initialPage: 1)
-            ok =
-                capture(
-                    onboardingChoice, size: NSSize(width: 500, height: 440), appearance: appearance,
-                    to: dir.appendingPathComponent("onboarding-notifications-\(suffix).png")) && ok
+            shoot(
+                OnboardingView(onFinish: { _, _ in }, initialPage: 1), WindowMetrics.onboarding,
+                "onboarding-notifications")
 
             // The pre-sleep warning HUD (v1.22) — a fixed sample countdown.
-            let sleepWarningHUD = SleepWarningHUD(secondsRemaining: 14, onStayAwake: {})
-            ok =
-                capture(
-                    sleepWarningHUD, size: NSSize(width: 400, height: 130), appearance: appearance,
-                    to: dir.appendingPathComponent("sleep-warning-hud-\(suffix).png")) && ok
+            shoot(
+                SleepWarningHUD(secondsRemaining: 14, onStayAwake: {}), WindowMetrics.hudCapture,
+                "sleep-warning-hud")
 
-            let settings = SettingsView()
-                .environment(\.theme, theme)
-                .environmentObject(state)
-                .environmentObject(state.settingsStore)
-                .environmentObject(state.rulesEngine)
-                .environmentObject(state.history)
-                .environmentObject(state.restHistory)
-                .environmentObject(state.awakeTime)
-                .environmentObject(updater)
-            ok =
-                capture(
-                    settings, size: NSSize(width: 700, height: 520), appearance: appearance,
-                    to: dir.appendingPathComponent("settings-\(suffix).png")) && ok
-
-            // The Notifications pane (v1.23) — split out of General.
-            let notifications = SettingsView(initialPane: .notifications)
-                .environment(\.theme, theme)
-                .environmentObject(state)
-                .environmentObject(state.settingsStore)
-                .environmentObject(state.rulesEngine)
-                .environmentObject(state.history)
-                .environmentObject(state.restHistory)
-                .environmentObject(state.awakeTime)
-                .environmentObject(updater)
-            ok =
-                capture(
-                    notifications, size: NSSize(width: 700, height: 520), appearance: appearance,
-                    to: dir.appendingPathComponent("settings-notifications-\(suffix).png")) && ok
-
-            // The new Rest & Restart pillar pane, opened directly.
-            let freshness = SettingsView(initialPane: .freshness)
-                .environment(\.theme, theme)
-                .environmentObject(state)
-                .environmentObject(state.settingsStore)
-                .environmentObject(state.rulesEngine)
-                .environmentObject(state.history)
-                .environmentObject(state.restHistory)
-                .environmentObject(state.awakeTime)
-                .environmentObject(updater)
-            ok =
-                capture(
-                    freshness, size: NSSize(width: 700, height: 520), appearance: appearance,
-                    to: dir.appendingPathComponent("rest-restart-\(suffix).png")) && ok
-
-            // Automation — shows the "Advanced" badge on strict takeover (v1.23).
-            let automation = SettingsView(initialPane: .automation)
-                .environment(\.theme, theme)
-                .environmentObject(state)
-                .environmentObject(state.settingsStore)
-                .environmentObject(state.rulesEngine)
-                .environmentObject(state.history)
-                .environmentObject(state.restHistory)
-                .environmentObject(state.awakeTime)
-                .environmentObject(updater)
-            ok =
-                capture(
-                    automation, size: NSSize(width: 700, height: 520), appearance: appearance,
-                    to: dir.appendingPathComponent("settings-automation-\(suffix).png")) && ok
-
-            // About — shows the "Works with Shortcuts & Siri" discoverability line (v1.23, 2/2).
-            let about = SettingsView(initialPane: .about)
-                .environment(\.theme, theme)
-                .environmentObject(state)
-                .environmentObject(state.settingsStore)
-                .environmentObject(state.rulesEngine)
-                .environmentObject(state.history)
-                .environmentObject(state.restHistory)
-                .environmentObject(state.awakeTime)
-                .environmentObject(updater)
-            ok =
-                capture(
-                    about, size: NSSize(width: 700, height: 520), appearance: appearance,
-                    to: dir.appendingPathComponent("settings-about-\(suffix).png")) && ok
-
-            // History — the forced-sleep log + the new "This week — longest awake" ranking (v1.23, 2/2).
-            let history = SettingsView(initialPane: .history)
-                .environment(\.theme, theme)
-                .environmentObject(state)
-                .environmentObject(state.settingsStore)
-                .environmentObject(state.rulesEngine)
-                .environmentObject(state.history)
-                .environmentObject(state.restHistory)
-                .environmentObject(state.awakeTime)
-                .environmentObject(updater)
-            ok =
-                capture(
-                    history, size: NSSize(width: 700, height: 520), appearance: appearance,
-                    to: dir.appendingPathComponent("settings-history-\(suffix).png")) && ok
+            // Every Settings pane. `SettingsPane.allCases` drives this so a new
+            // pane cannot be added without also being captured — the Schedule
+            // pane went un-photographed for four releases that way.
+            for pane in SettingsPane.allCases {
+                let view = settingsView(
+                    pane: pane, state: state, updater: updater, theme: theme)
+                shoot(view, WindowMetrics.settings, captureName(for: pane))
+            }
         }
         // The Clamshell Assistant panel (v1.24) — ready and missing-requirements
         // states, driven directly (a plain value view, like SleepWarningHUD),
@@ -167,27 +80,81 @@ enum ScreenshotRenderer {
                 readiness: .ready, foreignSleepDisabled: false,
                 onArmClamshellSession: {}, onKeepScreensOff: {}
             ).environment(\.theme, Theme.nightcap)
-            _ = capture(
-                ready, size: NSSize(width: 360, height: 320), appearance: appearance,
-                to: dir.appendingPathComponent("clamshell-ready-\(name).png"))
+            ok =
+                capture(
+                    ready,
+                    size: NSSize(
+                        width: WindowMetrics.clamshellReadyCapture.width,
+                        height: WindowMetrics.clamshellReadyCapture.height),
+                    appearance: appearance,
+                    to: dir.appendingPathComponent("clamshell-ready-\(name).png")) && ok
 
             let missing = ClamshellAssistantBody(
                 readiness: .missing(unmet: [.power, .externalDisplay]), foreignSleepDisabled: true,
                 onArmClamshellSession: {}, onKeepScreensOff: {}
             ).environment(\.theme, Theme.nightcap)
-            _ = capture(
-                missing, size: NSSize(width: 360, height: 460), appearance: appearance,
-                to: dir.appendingPathComponent("clamshell-missing-\(name).png"))
+            ok =
+                capture(
+                    missing,
+                    size: NSSize(
+                        width: WindowMetrics.clamshellMissingCapture.width,
+                        height: WindowMetrics.clamshellMissingCapture.height),
+                    appearance: appearance,
+                    to: dir.appendingPathComponent("clamshell-missing-\(name).png")) && ok
         }
-        renderMugStrip(to: dir.appendingPathComponent("mug-states.png"))
-        renderMenubarStrip(to: dir.appendingPathComponent("menubar-icons.png"))
-        print("Screenshots written to \(dir.path)")
+        ok = renderMugStrip(to: dir.appendingPathComponent("mug-states.png")) && ok
+        ok = renderMenubarStrip(to: dir.appendingPathComponent("menubar-icons.png")) && ok
+        if ok {
+            print("Screenshots written to \(dir.path)")
+        } else {
+            FileHandle.standardError.write(
+                Data("Some screenshots failed to render or write — see above.\n".utf8))
+        }
         return ok
+    }
+
+    /// The menu popover with its full environment — one declaration, so a new
+    /// dependency cannot be wired into the app and forgotten here.
+    private static func menuView(
+        state: AppState, updater: UpdaterController, theme: Theme
+    ) -> some View {
+        RedesignMenuView()
+            .environment(\.theme, theme)
+            .environmentObject(state)
+            .environmentObject(state.settingsStore)
+            .environmentObject(state.rulesEngine)
+            .environmentObject(updater)
+    }
+
+    /// One Settings pane with its full environment. This chain was pasted six
+    /// times before; the seventh pane is why it is a function now.
+    private static func settingsView(
+        pane: SettingsPane, state: AppState, updater: UpdaterController, theme: Theme
+    ) -> some View {
+        SettingsView(initialPane: pane)
+            .environment(\.theme, theme)
+            .environmentObject(state)
+            .environmentObject(state.settingsStore)
+            .environmentObject(state.rulesEngine)
+            .environmentObject(state.history)
+            .environmentObject(state.restHistory)
+            .environmentObject(state.awakeTime)
+            .environmentObject(updater)
+    }
+
+    /// The README and the docs already link these filenames, so the two panes
+    /// that shipped under a different name keep it.
+    private static func captureName(for pane: SettingsPane) -> String {
+        switch pane {
+        case .general: return "settings"
+        case .freshness: return "rest-restart"
+        default: return "settings-\(pane.rawValue)"
+        }
     }
 
     /// A clean single-row strip of the four states for the README, at a friendly
     /// size on white, evenly spaced.
-    private static func renderMenubarStrip(to url: URL) {
+    private static func renderMenubarStrip(to url: URL) -> Bool {
         let states: [MugState] = [.free, .counting, .blocked, .caffeinated]
         let glyph: CGFloat = 44
         let cell: CGFloat = 96
@@ -204,17 +171,16 @@ enum ScreenshotRenderer {
                 .draw(in: NSRect(x: cx - glyph / 2, y: cy - glyph / 2, width: glyph, height: glyph))
         }
         image.unlockFocus()
-        if let tiff = image.tiffRepresentation,
+        guard let tiff = image.tiffRepresentation,
             let rep = NSBitmapImageRep(data: tiff),
             let png = rep.representation(using: .png, properties: [:])
-        {
-            try? png.write(to: url)
-        }
+        else { return false }
+        return write(png, to: url)
     }
 
     /// The 4 menu-bar states at real sizes, black-on-white, so their shape
     /// distinctness can actually be judged (the menu bar renders them at ~18px).
-    private static func renderMugStrip(to url: URL) {
+    private static func renderMugStrip(to url: URL) -> Bool {
         let states: [MugState] = [.free, .counting, .blocked, .caffeinated]
         let sizes: [CGFloat] = [18, 36, 72]
         let cellW: CGFloat = 120
@@ -234,11 +200,24 @@ enum ScreenshotRenderer {
             }
         }
         image.unlockFocus()
-        if let tiff = image.tiffRepresentation,
+        guard let tiff = image.tiffRepresentation,
             let rep = NSBitmapImageRep(data: tiff),
             let png = rep.representation(using: .png, properties: [:])
-        {
-            try? png.write(to: url)
+        else { return false }
+        return write(png, to: url)
+    }
+
+    /// Writes one PNG, naming the failure instead of discarding it — the whole
+    /// point of a screenshot gate is that it can go red.
+    private static func write(_ png: Data, to url: URL) -> Bool {
+        do {
+            try png.write(to: url)
+            return true
+        } catch {
+            let name = url.lastPathComponent
+            let message = "Could not write \(name): \(error.localizedDescription)\n"
+            FileHandle.standardError.write(Data(message.utf8))
+            return false
         }
     }
 
@@ -277,11 +256,6 @@ enum ScreenshotRenderer {
         }
         hosting.cacheDisplay(in: hosting.bounds, to: rep)
         guard let data = rep.representation(using: .png, properties: [:]) else { return false }
-        do {
-            try data.write(to: url)
-            return true
-        } catch {
-            return false
-        }
+        return write(data, to: url)
     }
 }

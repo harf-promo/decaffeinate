@@ -21,7 +21,7 @@ struct SettingsView: View {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(width: 700, height: 520)
+        .frame(width: WindowMetrics.settings.width, height: WindowMetrics.settings.height)
         .background(theme.paper)
         .tint(theme.accent)
     }
