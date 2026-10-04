@@ -1,4 +1,4 @@
-<!-- fleet-template: v1 | reconciled-against: fleet-kit/templates/AGENT-CONTEXT-TEMPLATE.md @ 35354d0 2026-09-02 -->
+<!-- fleet-template: v1 | reconciled-against: fleet-kit/templates/AGENT-CONTEXT-TEMPLATE.md @ 08dbc79 2026-09-19 -->
 # AGENTS.md — Decaffeinate
 
 ## What this repo is
@@ -34,9 +34,11 @@ Layout:
   localized string tables, copied into `Bundle.module` at build time via
   `defaultLocalization` (see `docs/LOCALIZATION.md`)
 - `Sources/DecaffeinateLidHelper/` — the spike target above
-- `Tests/DecaffeinateTests/` (481 tests) + `Tests/DecaffeinateLidHelperTests/` (21
-  tests) — 502 total, reconfirmed this session via `swift test list`
-- `Scripts/` — release tooling: `version.sh` (derives CFBundleVersion: major×1_000_000
+- `Tests/DecaffeinateTests/` + `Tests/DecaffeinateLidHelperTests/` — XCTest suites, one
+  per target. The test count drifts; run `swift test` (or `swift test list`) for the
+  current number instead of trusting one written here.
+- `Scripts/` — `check-l10n.sh` (localization key check without Xcode) and release
+  tooling: `version.sh` (derives CFBundleVersion: major×1_000_000
   + minor×1_000 + patch — do **not** reintroduce `GITHUB_RUN_NUMBER` coupling),
   `build-app.sh` (produces the `.app` bundle), `make-dmg.sh`, `generate-icon.sh`
 - `Casks/decaffeinate.rb` — the **canonical copy** of the Homebrew cask; the live tap
@@ -45,20 +47,19 @@ Layout:
 - `docs/` — `ARCHITECTURE.md`, `DISTRIBUTION.md`, `LOCALIZATION.md`, `LID-CLOSED.md`,
   `PHASE-B-SPIKE.md`, `PREVIEW.md`, `AUTOMATION.md`, `ROADMAP.md`, `PRESS-KIT.md`,
   `HOMEBREW-CORE.md`, `WIDGET-SPIKE.md`, `PLAN-NEXT.md`
-- `.github/workflows/ci.yml` (build + test + `swift-format` lint + cask style, on
-  push/PR to `main`) and `release.yml` (sign/notarize/publish DMG + cask bump, on a
+- `.github/workflows/ci.yml` (macos-15: `swift-format` lint, cask style, build, test,
+  `--scan` smoke, `.app` bundle, `--screenshots` render, on push/PR to `main`) and `release.yml` (sign/notarize/publish DMG + cask bump, on a
   `v*` tag push)
 
 ## Commands
 
-Every command below is grounded in `.github/workflows/ci.yml` or re-verified directly
-this session (`swift build` and `swift test list` both ran clean on this Mac):
+Every command below is grounded in `.github/workflows/ci.yml` (`swift test list` was
+also run clean on this Mac, 2026-10-04):
 
 ```bash
 swift build              # debug build (~6-10 s warm)
 swift build -c release   # release build
-swift test                 # full XCTest suite — 502 tests
-                             # (481 DecaffeinateTests + 21 DecaffeinateLidHelperTests)
+swift test                 # full XCTest suite (both test targets)
 swift format lint --strict --recursive --configuration .swift-format Sources Tests Package.swift
                              # CI lint gate
 brew style Casks/decaffeinate.rb   # cask sanity — also a CI gate
@@ -100,7 +101,7 @@ swift run Decaffeinate --scan       # headless power-assertion scan — CI smoke
 **Tier: unguarded** — absent from `~/.claude/hooks/billed_repos.json`, checked
 directly rather than assumed. Public repo, no branch protection on `main` (confirmed
 via `gh api repos/harf-promo/decaffeinate/branches/main/protection` → 404 "Branch not
-protected"). Direct push to `main` is technically fine on this repo; see Git & PR flow
+protected"; a ruleset on the default branch blocks only deletion and non-fast-forward). Direct push to `main` is technically fine on this repo; see Git & PR flow
 below for the convention this session is following anyway.
 
 - **Never reintroduce `GITHUB_RUN_NUMBER` into the CFBundleVersion formula** —
