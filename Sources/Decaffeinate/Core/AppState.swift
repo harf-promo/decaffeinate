@@ -98,7 +98,7 @@ final class AppState: ObservableObject {
     @Published private(set) var outlook: SleepOutlook = .freeToSleep(
         idleMinutes: 10, batteryNote: false)
     @Published private(set) var mug: MugState = .free
-    @Published private(set) var headline: String = "Monitoring sleep"
+    @Published private(set) var headline: String = L10n.localized("Monitoring sleep")
     @Published private(set) var detail: String = ""
     @Published private(set) var secondsUntilForcedSleep: TimeInterval?
     @Published private(set) var lastSleepAt: Date?
@@ -165,6 +165,9 @@ final class AppState: ObservableObject {
     /// Why a keep-awake trigger is currently holding the Mac awake (an app is
     /// running, on AC, CPU busy), or `nil`.
     @Published private(set) var activeTriggerReason: String?
+    /// Which trigger rule `activeTriggerReason` belongs to — what Settings
+    /// matches on to badge the active rule (the reason text is localized).
+    @Published private(set) var activeTriggerRuleID: UUID?
 
     /// When the Mac last booted (read once at `start()`); `uptime` derives from it.
     @Published private(set) var bootTime: Date?
@@ -926,8 +929,9 @@ final class AppState: ObservableObject {
         else { return base }
         return SleepVerdict(
             glyph: "checkmark",
-            text:
-                "Idle \(Format.duration(evidence.quietSeconds)) at ~0% CPU \u{2014} likely stale, safe to sleep",
+            text: L10n.localized(
+                "Idle %@ at ~0%% CPU \u{2014} likely stale, safe to sleep",
+                Format.duration(evidence.quietSeconds)),
             tone: .calm)
     }
 
@@ -1083,12 +1087,14 @@ final class AppState: ObservableObject {
         // Triggers: conditional keep-awake while a rule is satisfied (an app is
         // running / on AC / CPU busy). Sampled only when rules exist, and dropped
         // under a safety rail like every other hold.
-        let triggerReason: String? = {
+        let triggerMatch: (rule: TriggerRule, reason: String)? = {
             guard !s.triggers.isEmpty, !decision.shouldDropKeepAwake else { return nil }
             let signals = triggerSampler.sample(onACPower: !power.onBattery)
-            return TriggerEngine.activeReason(rules: s.triggers, signals: signals)
+            return TriggerEngine.activeMatch(rules: s.triggers, signals: signals)
         }()
+        let triggerReason = triggerMatch?.reason
         activeTriggerReason = triggerReason
+        activeTriggerRuleID = triggerMatch?.rule.id
         let triggerHolding = triggerReason != nil
 
         // 1) Reconcile keep-awake holds (caffeine + strict takeover + quiet
@@ -1380,13 +1386,19 @@ final class AppState: ObservableObject {
         let names = assertions.filter(\.blocksSystemSleep).map(\.displayName).removingDuplicates()
         switch names.count {
         case 0:
-            return "The Mac didn\u{2019}t sleep \u{2014} an app is holding system sleep open."
+            return L10n.localized(
+                "The Mac didn\u{2019}t sleep \u{2014} an app is holding system sleep open.")
         case 1:
-            return "The Mac didn\u{2019}t sleep \u{2014} \(names[0]) is holding system sleep open."
+            return L10n.localized(
+                "The Mac didn\u{2019}t sleep \u{2014} %@ is holding system sleep open.", names[0])
+        case 2:
+            return L10n.localized(
+                "The Mac didn\u{2019}t sleep \u{2014} %@ and 1 other are holding system sleep open.",
+                names[0])
         default:
-            let others = names.count - 1
-            return
-                "The Mac didn\u{2019}t sleep \u{2014} \(names[0]) and \(others) other\(others == 1 ? "" : "s") are holding system sleep open."
+            return L10n.localized(
+                "The Mac didn\u{2019}t sleep \u{2014} %@ and %ld others are holding system sleep open.",
+                names[0], names.count - 1)
         }
     }
 
@@ -1418,7 +1430,7 @@ final class AppState: ObservableObject {
             restHistory.record(
                 RestEvent(date: when, kind: .forcedSleep, onBattery: pending.onBattery))
             if settings.notifyOnForcedSleep {
-                notifier.notifyForcedSleep(reason: pending.reason)
+                notifier.notifyForcedSleep(reason: SleepEvent.localizedReason(pending.reason))
             }
         } else {
             restHistory.record(
@@ -1736,7 +1748,8 @@ final class AppState: ObservableObject {
     /// When a quiet window is set but a safety rail has paused its hold, why.
     var quietWindowPausedReason: String? {
         guard isQuietWindowActive, !quietWindowHoldingAwake else { return nil }
-        return decision.dropKeepAwakeReasons.first ?? "Paused by a safety rail"
+        return SafetyRails.localizedReason(
+            decision.dropKeepAwakeReasons.first ?? "Paused by a safety rail")
     }
 
     /// Minutes after stepping away that the Mac will sleep (battery-aware) — feeds

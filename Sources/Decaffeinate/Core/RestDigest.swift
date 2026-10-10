@@ -26,16 +26,19 @@ enum RestDigest {
         if let lastSleep = recent.first(where: {
             $0.kind == .systemSleep || $0.kind == .forcedSleep
         }) {
-            parts.append("Last slept \(ScheduleEngine.timeLabel(lastSleep.date))")
+            parts.append(L10n.localized("Last slept %@", ScheduleEngine.timeLabel(lastSleep.date)))
         }
-        if wakes > 0 { parts.append("woken \(countLabel(wakes, "time", "times"))") }
+        if wakes > 0 {
+            parts.append(
+                wakes == 1 ? L10n.localized("woken once") : L10n.localized("woken %ld times", wakes)
+            )
+        }
         if forced > 0 {
-            parts.append("Decaffeinate stepped in \(countLabel(forced, "time", "times"))")
+            parts.append(
+                forced == 1
+                    ? L10n.localized("Decaffeinate stepped in once")
+                    : L10n.localized("Decaffeinate stepped in %ld times", forced))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    private static func countLabel(_ n: Int, _ singular: String, _ plural: String) -> String {
-        n == 1 ? "once" : "\(n) \(plural)"
     }
 }

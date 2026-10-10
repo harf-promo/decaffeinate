@@ -624,12 +624,7 @@ private struct AutomationSettings: View {
     }
 
     private func isActive(_ rule: TriggerRule) -> Bool {
-        guard let reason = appState.activeTriggerReason else { return false }
-        switch rule.condition {
-        case .onACPower: return reason == "On AC power"
-        case .cpuAbove: return reason.hasPrefix("CPU is busy")
-        case .appRunning(let name): return reason.contains(name)
-        }
+        appState.activeTriggerRuleID == rule.id
     }
 
     private func add(_ condition: TriggerCondition) {
@@ -869,7 +864,8 @@ private struct HistorySettings: View {
                                     Image(systemName: event.onBattery ? "battery.50" : "powerplug")
                                         .foregroundStyle(Color.ink3).frame(width: 18)
                                     VStack(alignment: .leading, spacing: 1) {
-                                        Text(event.reason).foregroundStyle(Color.ink1).lineLimit(1)
+                                        Text(SleepEvent.localizedReason(event.reason))
+                                            .foregroundStyle(Color.ink1).lineLimit(1)
                                         Text(
                                             event.date.formatted(
                                                 date: .abbreviated, time: .shortened)

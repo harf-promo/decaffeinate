@@ -113,4 +113,31 @@ enum SafetyRails {
         let updaters: Set<String> = ["softwareupdated", "installd", "system_installd"]
         return assertions.contains { updaters.contains($0.processName.lowercased()) }
     }
+
+    /// The user-facing copy for an immediate-sleep / drop-keep-awake reason.
+    ///
+    /// The reasons themselves stay English: `SleepBlocker.classify(_:)` matches
+    /// on them and they land in the log. This maps each one this file emits (plus
+    /// the callers' fallbacks) to its localized form at display time; anything
+    /// unrecognized passes through unchanged.
+    static func localizedReason(_ reason: String) -> String {
+        switch reason {
+        case "Mac is overheating (backpack guard)", "Thermal pressure is high",
+            "Safety guard", "Paused by a safety rail":
+            return L10n.localized(reason)
+        default: break
+        }
+        if let pct = number(in: reason, prefix: "Battery critically low (", suffix: "%)") {
+            return L10n.localized("Battery critically low (%ld%%)", pct)
+        }
+        if let pct = number(in: reason, prefix: "Battery below ", suffix: "% floor") {
+            return L10n.localized("Battery below %ld%% floor", pct)
+        }
+        return reason
+    }
+
+    private static func number(in text: String, prefix: String, suffix: String) -> Int? {
+        guard text.hasPrefix(prefix), text.hasSuffix(suffix) else { return nil }
+        return Int(text.dropFirst(prefix.count).dropLast(suffix.count))
+    }
 }

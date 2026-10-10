@@ -25,11 +25,13 @@ enum HoldLifetime: Equatable, Sendable {
     /// The detail-view "Ends" copy.
     var detailLabel: String {
         switch self {
-        case .untilProcess(let name): return "When \(name) finishes"
-        case .untilWatchedFinishes: return "When the watched task finishes"
+        case .untilProcess(let name): return L10n.localized("When %@ finishes", name)
+        case .untilWatchedFinishes: return L10n.localized("When the watched task finishes")
         case .timed(let reArms):
-            return reArms ? "On a timer (re-arms automatically)" : "On a timer"
-        case .indefinite: return "No timeout — held until released"
+            return reArms
+                ? L10n.localized("On a timer (re-arms automatically)")
+                : L10n.localized("On a timer")
+        case .indefinite: return L10n.localized("No timeout \u{2014} held until released")
         }
     }
 

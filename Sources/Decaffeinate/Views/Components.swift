@@ -84,30 +84,36 @@ struct AssertionDetailView: View {
                 }
             }
             // ── The human answer: what, who, where, how long, and when it ends ──
-            row("Why", appState.displayReason(for: assertion))
+            row(L10n.localized("Why"), appState.displayReason(for: assertion))
 
             let devices = appState.audioDevices(for: assertion)
-            if !devices.isEmpty { row("Device", devices.joined(separator: ", ")) }
+            if !devices.isEmpty { row(L10n.localized("Device"), devices.joined(separator: ", ")) }
 
             if let p = provenance {
-                if let started = p.originDisplayName { row("Started by", started) }
+                if let started = p.originDisplayName { row(L10n.localized("Started by"), started) }
                 if let folder = p.cwd.flatMap(ProcessProvenance.relativizeHome) {
-                    row("Folder", folder)
+                    row(L10n.localized("Folder"), folder)
                 }
-                if let tty = p.ttyName { row("Terminal", tty) }
+                if let tty = p.ttyName { row(L10n.localized("Terminal"), tty) }
             }
             // Held duration anchored to the session's first sighting, so an agent's
             // `caffeinate -t` respawn doesn't reset it.
             if let secs = appState.sessionHeldSeconds(for: assertion) {
-                row("Held for", Format.duration(secs))
+                row(L10n.localized("Held for"), Format.duration(secs))
             }
             if let anchor = appState.sessionAnchor(for: assertion) {
-                row("Holding since", anchor.formatted(date: .abbreviated, time: .shortened))
+                row(
+                    L10n.localized("Holding since"),
+                    anchor.formatted(date: .abbreviated, time: .shortened))
             } else if let created = assertion.createdAt {
-                row("Holding since", created.formatted(date: .abbreviated, time: .shortened))
+                row(
+                    L10n.localized("Holding since"),
+                    created.formatted(date: .abbreviated, time: .shortened))
             }
-            row("Ends", appState.holdLifetime(for: assertion).detailLabel)
-            if let secs = reason.autoReleaseSeconds { row("Auto-releases", "in \(secs)s") }
+            row(L10n.localized("Ends"), appState.holdLifetime(for: assertion).detailLabel)
+            if let secs = reason.autoReleaseSeconds {
+                row(L10n.localized("Auto-releases"), L10n.localized("in %lds", secs))
+            }
 
             // ── The raw plumbing (type, assertion name, PID, …) — hidden by default ──
             technicalToggle
@@ -145,33 +151,38 @@ struct AssertionDetailView: View {
     private func technicalRows(provenance: ProcessProvenance?) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Group {
-                row("Held by", assertion.processName)
+                row(L10n.localized("Held by"), assertion.processName)
                 if let owner = assertion.realOwner {
                     row(
-                        "Real app",
+                        L10n.localized("Real app"),
                         owner.bundleIdentifier.map { "\(owner.name) (\($0))" } ?? owner.name)
                 }
-                if assertion.viaRunningboard { row("Routed via", "runningboardd (background app)") }
+                if assertion.viaRunningboard {
+                    row(
+                        L10n.localized("Routed via"),
+                        L10n.localized("runningboardd (background app)"))
+                }
                 if appState.isAgentSession(assertion), let created = assertion.createdAt {
                     row(
-                        "This process",
-                        "started " + created.formatted(date: .omitted, time: .shortened))
+                        L10n.localized("This process"),
+                        L10n.localized(
+                            "started %@", created.formatted(date: .omitted, time: .shortened)))
                 }
                 if let p = provenance, !p.holderArgv.isEmpty {
-                    row("Command", p.holderArgv.joined(separator: " "))
+                    row(L10n.localized("Command"), p.holderArgv.joined(separator: " "))
                 }
             }
             Group {
-                if let path = assertion.bundlePath { row("Where", path) }
-                row("Type", assertion.assertionType)
+                if let path = assertion.bundlePath { row(L10n.localized("Where"), path) }
+                row(L10n.localized("Type"), assertion.assertionType)
                 if let details = assertion.details, !details.isEmpty {
-                    row("App context", details)
+                    row(L10n.localized("App context"), details)
                 }
                 if let raw = assertion.humanReadableReason, !raw.isEmpty {
-                    row("System reason", raw)
+                    row(L10n.localized("System reason"), raw)
                 }
-                row("Assertion", assertion.name)
-                row("PID", "\(assertion.pid)")
+                row(L10n.localized("Assertion"), assertion.name)
+                row(L10n.localized("PID"), "\(assertion.pid)")
             }
         }
     }

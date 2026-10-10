@@ -23,13 +23,13 @@ struct RestEvent: Codable, Identifiable, Hashable, Sendable {
 
         var label: String {
             switch self {
-            case .forcedSleep: return "Forced to sleep"
-            case .systemSleep: return "Slept"
-            case .wake: return "Woke"
-            case .displayOff: return "Screen rested"
-            case .displayOn: return "Screen on"
-            case .restart: return "Restarted"
-            case .launch: return "Decaffeinate launched"
+            case .forcedSleep: return L10n.localized("Forced to sleep")
+            case .systemSleep: return L10n.localized("Slept")
+            case .wake: return L10n.localized("Woke")
+            case .displayOff: return L10n.localized("Screen rested")
+            case .displayOn: return L10n.localized("Screen on")
+            case .restart: return L10n.localized("Restarted")
+            case .launch: return L10n.localized("Decaffeinate launched")
             }
         }
 

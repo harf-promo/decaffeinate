@@ -38,10 +38,14 @@ enum RestartAdvisor {
     /// "9 days" / "3 hours" / "12 min" — the headline uptime label.
     static func uptimeLabel(_ uptime: TimeInterval) -> String {
         let days = Int(uptime / 86_400)
-        if days >= 1 { return "\(days) day\(days == 1 ? "" : "s")" }
+        if days >= 1 {
+            return days == 1 ? L10n.localized("1 day") : L10n.localized("%ld days", days)
+        }
         let hours = Int(uptime / 3_600)
-        if hours >= 1 { return "\(hours) hour\(hours == 1 ? "" : "s")" }
-        return "\(max(0, Int(uptime / 60))) min"
+        if hours >= 1 {
+            return hours == 1 ? L10n.localized("1 hour") : L10n.localized("%ld hours", hours)
+        }
+        return L10n.localized("%ld min", max(0, Int(uptime / 60)))
     }
 
     static func daysSinceBoot(_ uptime: TimeInterval) -> Int { Int(uptime / 86_400) }
@@ -49,12 +53,17 @@ enum RestartAdvisor {
     /// The calm, in-app one-liner for each level.
     static func message(_ advice: RestartAdvice, uptimeLabel: String) -> String {
         switch advice {
-        case .fresh: return "Up \(uptimeLabel) — fresh. Daily sleep is doing its job."
-        case .consider: return "Up \(uptimeLabel) — a restart would freshen things up."
-        case .overdue: return "Up \(uptimeLabel) — a weekly restart is overdue."
+        case .fresh:
+            return L10n.localized(
+                "Up %@ \u{2014} fresh. Daily sleep is doing its job.", uptimeLabel)
+        case .consider:
+            return L10n.localized("Up %@ \u{2014} a restart would freshen things up.", uptimeLabel)
+        case .overdue:
+            return L10n.localized("Up %@ \u{2014} a weekly restart is overdue.", uptimeLabel)
         case .urgent:
-            return
-                "Up \(uptimeLabel) — restart soon: macOS networking can fail near 50 days of uptime."
+            return L10n.localized(
+                "Up %@ \u{2014} restart soon: macOS networking can fail near 50 days of uptime.",
+                uptimeLabel)
         }
     }
 
@@ -62,13 +71,16 @@ enum RestartAdvisor {
     static func reason(_ advice: RestartAdvice) -> String {
         switch advice {
         case .fresh:
-            return "Sleep pauses your Mac; a restart clears it. You're in good shape."
+            return L10n.localized(
+                "Sleep pauses your Mac; a restart clears it. You're in good shape.")
         case .consider, .overdue:
-            return
-                "A restart clears memory leaks and caches, resets the network stack, and applies pending updates — things sleep can't do."
+            return L10n.localized(
+                "A restart clears memory leaks and caches, resets the network stack, and applies pending updates \u{2014} things sleep can't do."
+            )
         case .urgent:
-            return
+            return L10n.localized(
                 "macOS has a ~49-day uptime limit where networking can stop working until you restart."
+            )
         }
     }
 }
