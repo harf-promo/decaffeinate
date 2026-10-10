@@ -776,13 +776,15 @@ private struct RDRow: View {
             let target = appState.watchableTarget(for: assertion)
         {
             HStack(spacing: Space.s2) {
-                Button {
-                    appState.setWatchTarget(.pid(target.pid))
-                } label: {
-                    Label(L10n.localized("Sleep when it finishes"), systemImage: "binoculars")
+                // Drop the icon before widening the row: a fixed-size button
+                // wider than the text column pushes the popover content off
+                // both edges (the German label is the long one).
+                ViewThatFits(in: .horizontal) {
+                    watchButton(target) {
+                        Label(L10n.localized("Sleep when it finishes"), systemImage: "binoculars")
+                    }
+                    watchButton(target) { Text(L10n.localized("Sleep when it finishes")) }
                 }
-                .buttonStyle(RDSecondaryButton(compact: true))
-                .fixedSize()
                 .help(
                     L10n.localized(
                         "Watch %@ and put the Mac to sleep once it's done.", target.label))
@@ -799,6 +801,18 @@ private struct RDRow: View {
             }
             .padding(.top, Space.s1)
         }
+    }
+
+    private func watchButton<L: View>(
+        _ target: (pid: pid_t, label: String), @ViewBuilder label: () -> L
+    ) -> some View {
+        Button {
+            appState.setWatchTarget(.pid(target.pid))
+        } label: {
+            label()
+        }
+        .buttonStyle(RDSecondaryButton(compact: true))
+        .fixedSize()
     }
 
     @ViewBuilder private var tag: some View {
@@ -822,36 +836,66 @@ private struct RDRow: View {
         }
     }
 
+    /// The allow / ignore / allow-for decision. One line when it fits, else
+    /// two buttons and the menu below, else stacked — a fixed-size row wider
+    /// than the text column used to widen every row, so the scroll content
+    /// overflowed the popover and was clipped on both sides (worst in German).
     private var approvalButtons: some View {
-        HStack(spacing: Space.s2) {
-            Button(L10n.localized(RulePolicy.allow.menuActionLabel)) {
-                appState.setPolicy(.allow, for: assertion)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Space.s2) {
+                allowButton
+                ignoreButton
+                allowForMenu
+                Spacer(minLength: 0)
             }
-            .buttonStyle(RDPrimaryButton(compact: true))
-            .fixedSize()
-            .accessibilityLabel(
-                L10n.localized(
-                    "Always allow %@ to keep the Mac awake", assertion.displayName)
-            )
-            Button(L10n.localized(RulePolicy.ignore.menuActionLabel)) {
-                appState.setPolicy(.ignore, for: assertion)
+            VStack(alignment: .leading, spacing: Space.s2) {
+                HStack(spacing: Space.s2) {
+                    allowButton
+                    ignoreButton
+                }
+                allowForMenu
             }
-            .buttonStyle(RDSecondaryButton(compact: true))
-            .fixedSize()
-            .accessibilityLabel(
-                L10n.localized(
-                    "Sleep anyway — ignore %@ and force sleep when idle", assertion.displayName)
-            )
-            AllowForMenu(
-                title: L10n.localized(RulePolicy.allowUntil(Date()).menuActionLabel),
-                assertion: assertion
-            )
-            .menuStyle(.borderlessButton)
-            .tint(theme.ink3)
-            .fixedSize()
-            .accessibilityLabel(L10n.localized("Allow %@ for a set time", assertion.displayName))
-            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: Space.s2) {
+                allowButton
+                ignoreButton
+                allowForMenu
+            }
         }
+    }
+
+    private var allowButton: some View {
+        Button(L10n.localized(RulePolicy.allow.menuActionLabel)) {
+            appState.setPolicy(.allow, for: assertion)
+        }
+        .buttonStyle(RDPrimaryButton(compact: true))
+        .fixedSize()
+        .accessibilityLabel(
+            L10n.localized(
+                "Always allow %@ to keep the Mac awake", assertion.displayName)
+        )
+    }
+
+    private var ignoreButton: some View {
+        Button(L10n.localized(RulePolicy.ignore.menuActionLabel)) {
+            appState.setPolicy(.ignore, for: assertion)
+        }
+        .buttonStyle(RDSecondaryButton(compact: true))
+        .fixedSize()
+        .accessibilityLabel(
+            L10n.localized(
+                "Sleep anyway — ignore %@ and force sleep when idle", assertion.displayName)
+        )
+    }
+
+    private var allowForMenu: some View {
+        AllowForMenu(
+            title: L10n.localized(RulePolicy.allowUntil(Date()).menuActionLabel),
+            assertion: assertion
+        )
+        .menuStyle(.borderlessButton)
+        .tint(theme.ink3)
+        .fixedSize()
+        .accessibilityLabel(L10n.localized("Allow %@ for a set time", assertion.displayName))
     }
 
     private var rowMenu: some View {
