@@ -4,8 +4,10 @@ Decaffeinate v1 does one thing well: it tells you what's keeping your Mac awake
 and puts it to sleep when it should. Here's where we want to take it — and where
 **you** can jump in. Items tagged 🙋 are especially good for new contributors.
 
-> The latest tagged release is **v1.25.0**. Entries **1.14–1.25** have shipped
-> and been tagged. See [`docs/PLAN-NEXT.md`](PLAN-NEXT.md) for what's next.
+> The latest tagged release is **v1.26.2**. Entries **1.14–1.26** have shipped
+> and been tagged; untagged work on `main` is listed under *Unreleased* in
+> [`CHANGELOG.md`](../CHANGELOG.md). See [`docs/PLAN-NEXT.md`](PLAN-NEXT.md) for
+> what's next.
 
 ## Shipped
 
@@ -118,6 +120,11 @@ lid-closed mode), `SleepDisabledReader`, `--clamshell-status`, and
 **1.25.0** — **Fluent**: app-wide localization (menu, Settings, verdicts,
 reasons, notifications, human CLI) plus compare pages and a press kit.
 
+**1.26.0 – 1.26.2** — an honesty + visual pass: a Cursor hook installer,
+localized sleep HUD and relative times, docs that match what's tagged, a
+calmer brand green, and the crescent-Z mark everywhere (Dock, menu bar,
+in-app), plus `--preview` fixture windows.
+
 ## Near term
 
 - [ ] **Submit to homebrew/cask core** (removes the one-time tap step) — the cask
@@ -151,8 +158,10 @@ reasons, notifications, human CLI) plus compare pages and a press kit.
 
 - [x] **Sleep history** — shipped in 1.4.0 (Settings → History), with a rough
   "needless wake avoided" estimate.
-- [ ] 🙋 **Localization** — more languages, and widening coverage beyond the
-  seeded onboarding + About surfaces (see [`LOCALIZATION.md`](LOCALIZATION.md)).
+- [ ] 🙋 **Localization** — more languages, and a native-speaker pass on the
+  German draft ([#21](https://github.com/harf-promo/decaffeinate/issues/21));
+  the whole app already routes through `L10n` (see
+  [`LOCALIZATION.md`](LOCALIZATION.md)).
 - [ ] 🙋 **More tests** — broader coverage. The sleep-simulation harness
   (`SleepSimulator` + `SleepSimulationTests`) is in; new idle/wake scenarios are
   welcome there.
