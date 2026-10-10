@@ -73,25 +73,31 @@ enum CaffeinateExplainer {
     /// `waitTargetName` is the resolved process name for `waitPID`, when known.
     /// No trailing period (matches the assertion-label voice).
     static func explain(_ inv: CaffeinateInvocation, waitTargetName: String? = nil) -> String {
+        // Each scope word is its own key so a language can attach its own article
+        // or case ("das System & den Bildschirm"); English keeps "the" in the
+        // sentence templates below.
         var scopes: [String] = []
-        if inv.effectivePreventsSystem { scopes.append("system") }
-        if inv.preventsDisplay { scopes.append("display") }
-        if inv.preventsDisk { scopes.append("disk activity") }
-        let scope = scopes.isEmpty ? "system" : scopes.joined(separator: " & ")
+        if inv.effectivePreventsSystem { scopes.append(L10n.localized("system")) }
+        if inv.preventsDisplay { scopes.append(L10n.localized("display")) }
+        if inv.preventsDisk { scopes.append(L10n.localized("disk activity")) }
+        let scope = scopes.isEmpty ? L10n.localized("system") : scopes.joined(separator: " & ")
 
         if let pid = inv.waitPID {
             if let name = waitTargetName, !name.isEmpty {
-                return "Keeping the \(scope) awake until \(name) (PID \(pid)) finishes"
+                return L10n.localized(
+                    "Keeping the %@ awake until %@ (PID %d) finishes", scope, name, pid)
             }
-            return "Keeping the \(scope) awake until process \(pid) exits"
+            return L10n.localized("Keeping the %@ awake until process %d exits", scope, pid)
         }
         if let secs = inv.timeoutSeconds {
-            return "Keeping the \(scope) awake for up to \(Format.duration(TimeInterval(secs)))"
+            return L10n.localized(
+                "Keeping the %@ awake for up to %@", scope, Format.duration(TimeInterval(secs)))
         }
         if !inv.trailingCommand.isEmpty {
-            return
-                "Keeping the \(scope) awake while \(inv.trailingCommand.joined(separator: " ")) runs"
+            return L10n.localized(
+                "Keeping the %@ awake while %@ runs", scope,
+                inv.trailingCommand.joined(separator: " "))
         }
-        return "Keeping the \(scope) awake"
+        return L10n.localized("Keeping the %@ awake", scope)
     }
 }

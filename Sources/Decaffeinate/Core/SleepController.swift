@@ -19,8 +19,9 @@ struct SleepController {
 
         var description: String {
             switch self {
-            case .launchFailed(let message): return "Could not launch pmset: \(message)"
-            case .nonZeroExit(let code): return "pmset exited with code \(code)"
+            case .launchFailed(let message):
+                return L10n.localized("Could not launch pmset: %@", message)
+            case .nonZeroExit(let code): return L10n.localized("pmset exited with code %d", code)
             }
         }
     }

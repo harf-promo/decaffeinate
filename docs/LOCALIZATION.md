@@ -59,13 +59,25 @@ labels (`ReasonEngine`), and the human-readable CLI output (`--scan`,
 contract and stays in English by design). As of v1.26 the sleep-warning HUD,
 `Format.relative` shorthand ("just now" / "%dm ago"), `MugState`
 accessibility labels, and the "Technical details" disclosure are also wired.
-Remaining gaps: `Diagnostics.swift`'s report text, and a few compound
-strings that stitch a localized template around an un-localized fragment
-from a Model-layer type (`TriggerCondition.label` and similar) — a smaller,
-well-scoped follow-up rather than the original larger effort.
+As of v1.27 the menu and Settings are fully covered (issue #4): hold-detail
+rows and the `caffeinate` explainer, the Allow-for durations, trigger labels
+and reasons, hold lifetimes, the failed-Sleep-Now and `pmset` errors,
+safety-rail reasons, and the Rest & Restart advice, digest, and timeline
+labels. No key is untabled any more (the ledger in `LocalizationTests` and
+`Scripts/check-l10n.sh` is 0), and a test checks every German value keeps its
+key's format specifiers. The remaining gap is `Diagnostics.swift`'s report
+text (a bug-report payload, English by design like `--json`).
+
+Two strings are deliberately **stored in English and localized at display**,
+because code matches on them: `SafetyRails` reasons (classified by
+`SleepBlocker.classify`; shown via `SafetyRails.localizedReason`) and
+forced-sleep history reasons (persisted; shown via
+`SleepEvent.localizedReason`, so history recorded before a language switch
+still translates). Settings badges the active trigger by rule ID, never by
+reason text.
 
 > **Translation quality note:** the German table was machine-translated (by an
-> AI agent) in the v1.25 sweep — natural and grammatically checked, but it
+> AI agent) in the v1.25 and v1.27 sweeps — natural and grammatically checked, but it
 > hasn't had a native-speaker pass. Treat it as a solid first draft; a
 > native-German review is a genuinely useful, low-effort contribution.
 

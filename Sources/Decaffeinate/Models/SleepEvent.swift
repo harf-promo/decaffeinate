@@ -4,6 +4,29 @@ import Foundation
 /// your Mac to sleep and why". Deliberately minimal: process/reason text only,
 /// never raw assertion names that could be sensitive.
 struct SleepEvent: Codable, Identifiable, Hashable, Sendable {
+    /// The user-facing copy for a stored `reason`.
+    ///
+    /// Reasons are persisted in canonical English (see `AppState.forceSleep`
+    /// callers and `SafetyRails`) and localized only when shown, so history
+    /// recorded before a language change still reads in the current language.
+    /// Unrecognized reasons pass through unchanged.
+    static func localizedReason(_ reason: String) -> String {
+        switch reason {
+        case "Sleep Now pressed", "Sleep Now pressed (confirmed during a call)":
+            return L10n.localized(reason)
+        case "Watched work finished \u{2014} putting Mac to sleep":
+            return L10n.localized("Watched work finished \u{2014} putting Mac to sleep")
+        default: break
+        }
+        let idle = (prefix: "Idle ", suffix: " min \u{2014} putting Mac to sleep")
+        if reason.hasPrefix(idle.prefix), reason.hasSuffix(idle.suffix),
+            let minutes = Int(reason.dropFirst(idle.prefix.count).dropLast(idle.suffix.count))
+        {
+            return L10n.localized("Idle %ld min \u{2014} putting Mac to sleep", minutes)
+        }
+        return SafetyRails.localizedReason(reason)
+    }
+
     var id: UUID
     var date: Date
     var reason: String

@@ -151,16 +151,116 @@ final class LocalizationTests: XCTestCase {
             "1.26.0 ist die neueste signierte Version")
     }
 
+    // v1.27: the menu + Settings strings that still rendered English — hold
+    // detail rows, trigger labels/reasons, Rest & Restart copy, the failed-sleep
+    // line — resolve to real German values in Bundle.module.
+    func testV127MenuAndSettingsKeysResolveInGerman() throws {
+        let deURL = try XCTUnwrap(
+            L10n.bundle.url(forResource: "de", withExtension: "lproj"),
+            "de.lproj not found in Bundle.module")
+        let de = try XCTUnwrap(Bundle(url: deURL))
+        func localized(_ key: String) -> String {
+            de.localizedString(forKey: key, value: "␀", table: nil)
+        }
+
+        // Views/Components.swift — hold detail
+        XCTAssertEqual(localized("Ends"), "Endet")
+        XCTAssertEqual(String(format: localized("in %lds"), 30), "in 30 s")
+        // Core/HoldLifetime.swift
+        XCTAssertEqual(
+            String(format: localized("When %@ finishes"), "npm"), "Wenn npm fertig ist")
+        // Models/Rule.swift — Allow-for submenu
+        XCTAssertEqual(localized("Until tomorrow"), "Bis morgen")
+        // Core/TriggerEngine.swift
+        XCTAssertEqual(
+            String(format: localized("While CPU is above %ld%%"), 80),
+            "Solange die CPU-Last über 80 % liegt")
+        XCTAssertEqual(localized("On AC power"), "Am Netzteil")
+        // Core/AppState.swift — the failed Sleep Now line
+        XCTAssertEqual(
+            String(
+                format: localized(
+                    "The Mac didn\u{2019}t sleep \u{2014} %@ and %ld others are holding system sleep open."
+                ), "Docker", 2),
+            "Der Mac hat nicht geschlafen \u{2014} Docker und 2 weitere Apps verhindern den Ruhezustand."
+        )
+        // Core/SafetyRails.swift — display mapping
+        XCTAssertEqual(
+            String(format: localized("Battery below %ld%% floor"), 20), "Akku unter 20-%-Grenze")
+        // Settings → Rest & Restart
+        XCTAssertEqual(localized("Forced to sleep"), "Schlafen erzwungen")
+        XCTAssertEqual(String(format: localized("%ld days"), 9), "9 Tagen")
+        XCTAssertEqual(
+            String(format: localized("Up %@ \u{2014} a weekly restart is overdue."), "9 Tagen"),
+            "Seit 9 Tagen an \u{2014} der wöchentliche Neustart ist überfällig.")
+        // Previously untabled onboarding control
+        XCTAssertEqual(localized("Not now"), "Nicht jetzt")
+    }
+
+    /// Every translation keeps its key's format specifiers — a dropped or
+    /// retyped `%@`/`%ld` would crash or garble `String(format:)` at runtime,
+    /// in that language only.
+    func testTranslationsKeepFormatSpecifiers() throws {
+        let deURL = try XCTUnwrap(L10n.bundle.url(forResource: "de", withExtension: "lproj"))
+        let table = deURL.appendingPathComponent("Localizable.strings")
+        let contents = try XCTUnwrap(NSDictionary(contentsOf: table) as? [String: String])
+        let specifier = try NSRegularExpression(pattern: "%(?:\\d+\\$)?(?:l{0,2}[dDuUxX]|[@fs%])")
+        func specifiers(_ text: String) -> [String] {
+            specifier.matches(in: text, range: NSRange(text.startIndex..., in: text))
+                .map { String(text[Range($0.range, in: text)!]) }.sorted()
+        }
+        for (key, value) in contents {
+            XCTAssertEqual(
+                specifiers(key), specifiers(value),
+                "de.lproj changes the specifiers of \(key.debugDescription)")
+        }
+    }
+
+    /// The display mapping covers every reason `SafetyRails` emits as an
+    /// immediate-sleep / drop-keep-awake reason, plus the
+    /// callers' fallbacks; anything else passes through untouched.
+    func testSafetyRailReasonsMapToTabledKeys() {
+        XCTAssertEqual(
+            SafetyRails.localizedReason("Battery below 20% floor"),
+            L10n.localized("Battery below %ld%% floor", 20))
+        XCTAssertEqual(
+            SafetyRails.localizedReason("Battery critically low (3%)"),
+            L10n.localized("Battery critically low (%ld%%)", 3))
+        for reason in [
+            "Mac is overheating (backpack guard)", "Thermal pressure is high", "Safety guard",
+            "Paused by a safety rail",
+        ] {
+            XCTAssertEqual(SafetyRails.localizedReason(reason), L10n.localized(reason))
+        }
+        XCTAssertEqual(SafetyRails.localizedReason("Something new"), "Something new")
+    }
+
+    /// Forced-sleep reasons are stored in English and localized for display,
+    /// covering every reason `AppState` records.
+    func testStoredSleepReasonsLocalizeForDisplay() {
+        XCTAssertEqual(
+            SleepEvent.localizedReason("Idle 10 min \u{2014} putting Mac to sleep"),
+            L10n.localized("Idle %ld min \u{2014} putting Mac to sleep", 10))
+        for reason in [
+            "Sleep Now pressed", "Sleep Now pressed (confirmed during a call)",
+            "Watched work finished \u{2014} putting Mac to sleep",
+        ] {
+            XCTAssertEqual(SleepEvent.localizedReason(reason), L10n.localized(reason))
+        }
+        XCTAssertEqual(
+            SleepEvent.localizedReason("Battery critically low (3%)"),
+            SafetyRails.localizedReason("Battery critically low (3%)"))
+        XCTAssertEqual(SleepEvent.localizedReason("Legacy reason"), "Legacy reason")
+    }
+
     // MARK: - Table parity and coverage (the structural gates)
 
     /// Keys that `L10n.localized` looks up but no table defines, so they render
     /// as their English key text in every language. Fixed in the localization
     /// phase; decrement this when they land.
     ///
-    /// The five today are the three controls on the final onboarding panel — the
-    /// first screen a new German user sees — and two `--help` lines added with
-    /// `--preview` / `--screenshots` and never added to the table.
-    private static let untabledKeyLedger = 5
+    /// Zero since the v1.27 sweep tabled the last five (onboarding + `--help`).
+    private static let untabledKeyLedger = 0
 
     /// Every shipped table defines exactly the same keys.
     ///

@@ -469,3 +469,113 @@
 
 /* The app name — a brand mark; intentionally identical in every language. */
 "Decaffeinate" = "Decaffeinate";
+
+/* v1.27 sweep — menu + Settings coverage (issue #4).
+   DRAFT: machine-translated, pending a native-speaker review. */
+
+/* Menu: hold detail rows (Views/Components.swift) */
+"Why" = "Warum";
+"Device" = "Gerät";
+"Started by" = "Gestartet von";
+"Folder" = "Ordner";
+"Terminal" = "Terminal";
+"Held for" = "Hält seit";
+"Holding since" = "Hält wach seit";
+"Ends" = "Endet";
+"in %lds" = "in %ld s";
+"Held by" = "Gehalten von";
+"Real app" = "Eigentliche App";
+"Routed via" = "Weitergeleitet über";
+"runningboardd (background app)" = "runningboardd (Hintergrund-App)";
+"This process" = "Dieser Prozess";
+"started %@" = "gestartet %@";
+"Command" = "Befehl";
+"Where" = "Ort";
+"Type" = "Typ";
+"App context" = "App-Kontext";
+"System reason" = "Systemgrund";
+"Assertion" = "Assertion";
+"PID" = "PID";
+
+/* Menu: hold lifetime (Core/HoldLifetime.swift) */
+"When %@ finishes" = "Wenn %@ fertig ist";
+"When the watched task finishes" = "Wenn die beobachtete Aufgabe fertig ist";
+"On a timer" = "Per Timer";
+"On a timer (re-arms automatically)" = "Per Timer (erneuert sich automatisch)";
+"No timeout — held until released" = "Kein Timeout — gehalten bis zur Freigabe";
+
+/* Menu: Allow-for durations (Models/Rule.swift); 30 minutes / 1 hour already tabled */
+"4 hours" = "4 Stunden";
+"Until tomorrow" = "Bis morgen";
+
+/* Menu + Settings: trigger rules and reasons (Core/TriggerEngine.swift) */
+"While “%@” is running" = "Solange „%@“ läuft";
+"While CPU is above %ld%%" = "Solange die CPU-Last über %ld %% liegt";
+"“%@” is running" = "„%@“ läuft";
+"On AC power" = "Am Netzteil";
+"CPU is busy (%ld%%)" = "CPU ist ausgelastet (%ld %%)";
+
+/* Menu: status, errors, forced-sleep reasons (Core/AppState.swift, Core/SleepController.swift) */
+"Monitoring sleep" = "Ruhezustand wird überwacht";
+"Sleep Now pressed" = "„Jetzt schlafen“ gedrückt";
+"Sleep Now pressed (confirmed during a call)" = "„Jetzt schlafen“ gedrückt (während eines Anrufs bestätigt)";
+"Watched work finished — putting Mac to sleep" = "Beobachtete Arbeit fertig — Mac wird schlafen gelegt";
+"Idle %ld min — putting Mac to sleep" = "%ld Min. inaktiv — Mac wird schlafen gelegt";
+"Idle %@ at ~0%% CPU — likely stale, safe to sleep" = "%@ inaktiv bei ~0 %% CPU — vermutlich verwaist, Schlafen ist sicher";
+"The Mac didn’t sleep — an app is holding system sleep open." = "Der Mac hat nicht geschlafen — eine App verhindert den Ruhezustand.";
+"The Mac didn’t sleep — %@ is holding system sleep open." = "Der Mac hat nicht geschlafen — %@ verhindert den Ruhezustand.";
+"The Mac didn’t sleep — %@ and 1 other are holding system sleep open." = "Der Mac hat nicht geschlafen — %@ und 1 weitere App verhindern den Ruhezustand.";
+"The Mac didn’t sleep — %@ and %ld others are holding system sleep open." = "Der Mac hat nicht geschlafen — %@ und %ld weitere Apps verhindern den Ruhezustand.";
+"Could not launch pmset: %@" = "pmset konnte nicht gestartet werden: %@";
+"pmset exited with code %d" = "pmset wurde mit Code %d beendet";
+
+/* Menu: safety-rail reasons, localized at display (Core/SafetyRails.swift localizedReason) */
+"Mac is overheating (backpack guard)" = "Mac überhitzt (Rucksack-Schutz)";
+"Thermal pressure is high" = "Hohe thermische Last";
+"Safety guard" = "Schutzfunktion";
+"Paused by a safety rail" = "Von einer Schutzfunktion pausiert";
+"Battery critically low (%ld%%)" = "Akku kritisch niedrig (%ld %%)";
+"Battery below %ld%% floor" = "Akku unter %ld-%%-Grenze";
+
+/* Settings → Rest & Restart (Core/RestartAdvisor.swift, Core/RestDigest.swift, Models/RestEvent.swift) */
+"1 day" = "1 Tag";
+"%ld days" = "%ld Tagen";
+"%ld hours" = "%ld Stunden";
+"%ld min" = "%ld Min.";
+"Up %@ — fresh. Daily sleep is doing its job." = "Seit %@ an — frisch. Der tägliche Ruhezustand wirkt.";
+"Up %@ — a restart would freshen things up." = "Seit %@ an — ein Neustart würde guttun.";
+"Up %@ — a weekly restart is overdue." = "Seit %@ an — der wöchentliche Neustart ist überfällig.";
+"Up %@ — restart soon: macOS networking can fail near 50 days of uptime." = "Seit %@ an — bald neu starten: Nach rund 50 Tagen Laufzeit kann das Netzwerk von macOS ausfallen.";
+"Sleep pauses your Mac; a restart clears it. You're in good shape." = "Der Ruhezustand pausiert deinen Mac, ein Neustart räumt ihn auf. Alles im grünen Bereich.";
+"A restart clears memory leaks and caches, resets the network stack, and applies pending updates — things sleep can't do." = "Ein Neustart behebt Speicherlecks, leert Caches, setzt den Netzwerk-Stack zurück und installiert ausstehende Updates — das kann der Ruhezustand nicht.";
+"macOS has a ~49-day uptime limit where networking can stop working until you restart." = "macOS hat eine Laufzeitgrenze von ~49 Tagen, ab der das Netzwerk bis zum Neustart ausfallen kann.";
+"Last slept %@" = "Zuletzt geschlafen %@";
+"woken once" = "einmal aufgewacht";
+"woken %ld times" = "%ld-mal aufgewacht";
+"Decaffeinate stepped in once" = "Decaffeinate hat einmal eingegriffen";
+"Decaffeinate stepped in %ld times" = "Decaffeinate hat %ld-mal eingegriffen";
+"Forced to sleep" = "Schlafen erzwungen";
+"Slept" = "Geschlafen";
+"Woke" = "Aufgewacht";
+"Screen rested" = "Bildschirm aus";
+"Screen on" = "Bildschirm an";
+"Restarted" = "Neu gestartet";
+"Decaffeinate launched" = "Decaffeinate gestartet";
+
+/* Previously untabled: onboarding + CLI help (ledger 5 → 0) */
+"Enable notifications" = "Mitteilungen aktivieren";
+"Not now" = "Nicht jetzt";
+"Launch Decaffeinate at login" = "Decaffeinate beim Anmelden starten";
+"  Decaffeinate --preview        Open fixture UI (Sleep Now cannot sleep this Mac)" = "  Decaffeinate --preview        Öffnet die Oberfläche mit Beispieldaten („Jetzt schlafen“ legt diesen Mac nicht schlafen)";
+"  Decaffeinate --screenshots [dir]  Render UI PNGs from fixtures (no sleep)" = "  Decaffeinate --screenshots [dir]  Rendert UI-PNGs aus Beispieldaten (kein Ruhezustand)";
+
+/* Menu: hold detail — caffeinate explainer (Core/CaffeinateInvocation.swift) */
+"Auto-releases" = "Gibt frei";
+"system" = "das System";
+"display" = "den Bildschirm";
+"disk activity" = "die Festplattenaktivität";
+"Keeping the %@ awake until %@ (PID %d) finishes" = "Hält %@ wach, bis %@ (PID %d) fertig ist";
+"Keeping the %@ awake until process %d exits" = "Hält %@ wach, bis Prozess %d endet";
+"Keeping the %@ awake for up to %@" = "Hält %@ bis zu %@ wach";
+"Keeping the %@ awake while %@ runs" = "Hält %@ wach, solange %@ läuft";
+"Keeping the %@ awake" = "Hält %@ wach";

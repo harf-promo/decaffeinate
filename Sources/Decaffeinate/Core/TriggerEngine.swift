@@ -14,9 +14,9 @@ enum TriggerCondition: Codable, Equatable, Hashable, Sendable {
 
     var label: String {
         switch self {
-        case .appRunning(let name): return "While “\(name)” is running"
-        case .onACPower: return "While on AC power"
-        case .cpuAbove(let pct): return "While CPU is above \(pct)%"
+        case .appRunning(let name): return L10n.localized("While “%@” is running", name)
+        case .onACPower: return L10n.localized("While on AC power")
+        case .cpuAbove(let pct): return L10n.localized("While CPU is above %ld%%", pct)
         }
     }
 }
@@ -45,19 +45,28 @@ struct TriggerSignals: Equatable, Sendable {
 enum TriggerEngine {
     /// The reason of the first satisfied enabled rule, or `nil` if none apply.
     static func activeReason(rules: [TriggerRule], signals: TriggerSignals) -> String? {
+        activeMatch(rules: rules, signals: signals)?.reason
+    }
+
+    /// The first satisfied enabled rule and its user-facing (localized) reason.
+    /// Callers that need to know *which* rule is holding compare `rule.id`, never
+    /// the reason text, which varies by language.
+    static func activeMatch(rules: [TriggerRule], signals: TriggerSignals)
+        -> (rule: TriggerRule, reason: String)?
+    {
         for rule in rules where rule.enabled {
             switch rule.condition {
             case .appRunning(let name):
                 let needle = name.lowercased()
                 if !needle.isEmpty, signals.runningAppNames.contains(where: { $0.contains(needle) })
                 {
-                    return "“\(name)” is running"
+                    return (rule, L10n.localized("“%@” is running", name))
                 }
             case .onACPower:
-                if signals.onACPower { return "On AC power" }
+                if signals.onACPower { return (rule, L10n.localized("On AC power")) }
             case .cpuAbove(let pct):
                 if signals.cpuPercent >= Double(pct) {
-                    return "CPU is busy (\(Int(signals.cpuPercent))%)"
+                    return (rule, L10n.localized("CPU is busy (%ld%%)", Int(signals.cpuPercent)))
                 }
             }
         }

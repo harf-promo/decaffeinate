@@ -469,3 +469,112 @@
 
 /* The app name — a brand mark; intentionally identical in every language. */
 "Decaffeinate" = "Decaffeinate";
+
+/* v1.27 sweep — menu + Settings coverage (issue #4). */
+
+/* Menu: hold detail rows (Views/Components.swift) */
+"Why" = "Why";
+"Device" = "Device";
+"Started by" = "Started by";
+"Folder" = "Folder";
+"Terminal" = "Terminal";
+"Held for" = "Held for";
+"Holding since" = "Holding since";
+"Ends" = "Ends";
+"in %lds" = "in %lds";
+"Held by" = "Held by";
+"Real app" = "Real app";
+"Routed via" = "Routed via";
+"runningboardd (background app)" = "runningboardd (background app)";
+"This process" = "This process";
+"started %@" = "started %@";
+"Command" = "Command";
+"Where" = "Where";
+"Type" = "Type";
+"App context" = "App context";
+"System reason" = "System reason";
+"Assertion" = "Assertion";
+"PID" = "PID";
+
+/* Menu: hold lifetime (Core/HoldLifetime.swift) */
+"When %@ finishes" = "When %@ finishes";
+"When the watched task finishes" = "When the watched task finishes";
+"On a timer" = "On a timer";
+"On a timer (re-arms automatically)" = "On a timer (re-arms automatically)";
+"No timeout — held until released" = "No timeout — held until released";
+
+/* Menu: Allow-for durations (Models/Rule.swift); 30 minutes / 1 hour already tabled */
+"4 hours" = "4 hours";
+"Until tomorrow" = "Until tomorrow";
+
+/* Menu + Settings: trigger rules and reasons (Core/TriggerEngine.swift) */
+"While “%@” is running" = "While “%@” is running";
+"While CPU is above %ld%%" = "While CPU is above %ld%%";
+"“%@” is running" = "“%@” is running";
+"On AC power" = "On AC power";
+"CPU is busy (%ld%%)" = "CPU is busy (%ld%%)";
+
+/* Menu: status, errors, forced-sleep reasons (Core/AppState.swift, Core/SleepController.swift) */
+"Monitoring sleep" = "Monitoring sleep";
+"Sleep Now pressed" = "Sleep Now pressed";
+"Sleep Now pressed (confirmed during a call)" = "Sleep Now pressed (confirmed during a call)";
+"Watched work finished — putting Mac to sleep" = "Watched work finished — putting Mac to sleep";
+"Idle %ld min — putting Mac to sleep" = "Idle %ld min — putting Mac to sleep";
+"Idle %@ at ~0%% CPU — likely stale, safe to sleep" = "Idle %@ at ~0%% CPU — likely stale, safe to sleep";
+"The Mac didn’t sleep — an app is holding system sleep open." = "The Mac didn’t sleep — an app is holding system sleep open.";
+"The Mac didn’t sleep — %@ is holding system sleep open." = "The Mac didn’t sleep — %@ is holding system sleep open.";
+"The Mac didn’t sleep — %@ and 1 other are holding system sleep open." = "The Mac didn’t sleep — %@ and 1 other are holding system sleep open.";
+"The Mac didn’t sleep — %@ and %ld others are holding system sleep open." = "The Mac didn’t sleep — %@ and %ld others are holding system sleep open.";
+"Could not launch pmset: %@" = "Could not launch pmset: %@";
+"pmset exited with code %d" = "pmset exited with code %d";
+
+/* Menu: safety-rail reasons, localized at display (Core/SafetyRails.swift localizedReason) */
+"Mac is overheating (backpack guard)" = "Mac is overheating (backpack guard)";
+"Thermal pressure is high" = "Thermal pressure is high";
+"Safety guard" = "Safety guard";
+"Paused by a safety rail" = "Paused by a safety rail";
+"Battery critically low (%ld%%)" = "Battery critically low (%ld%%)";
+"Battery below %ld%% floor" = "Battery below %ld%% floor";
+
+/* Settings → Rest & Restart (Core/RestartAdvisor.swift, Core/RestDigest.swift, Models/RestEvent.swift) */
+"1 day" = "1 day";
+"%ld days" = "%ld days";
+"%ld hours" = "%ld hours";
+"%ld min" = "%ld min";
+"Up %@ — fresh. Daily sleep is doing its job." = "Up %@ — fresh. Daily sleep is doing its job.";
+"Up %@ — a restart would freshen things up." = "Up %@ — a restart would freshen things up.";
+"Up %@ — a weekly restart is overdue." = "Up %@ — a weekly restart is overdue.";
+"Up %@ — restart soon: macOS networking can fail near 50 days of uptime." = "Up %@ — restart soon: macOS networking can fail near 50 days of uptime.";
+"Sleep pauses your Mac; a restart clears it. You're in good shape." = "Sleep pauses your Mac; a restart clears it. You're in good shape.";
+"A restart clears memory leaks and caches, resets the network stack, and applies pending updates — things sleep can't do." = "A restart clears memory leaks and caches, resets the network stack, and applies pending updates — things sleep can't do.";
+"macOS has a ~49-day uptime limit where networking can stop working until you restart." = "macOS has a ~49-day uptime limit where networking can stop working until you restart.";
+"Last slept %@" = "Last slept %@";
+"woken once" = "woken once";
+"woken %ld times" = "woken %ld times";
+"Decaffeinate stepped in once" = "Decaffeinate stepped in once";
+"Decaffeinate stepped in %ld times" = "Decaffeinate stepped in %ld times";
+"Forced to sleep" = "Forced to sleep";
+"Slept" = "Slept";
+"Woke" = "Woke";
+"Screen rested" = "Screen rested";
+"Screen on" = "Screen on";
+"Restarted" = "Restarted";
+"Decaffeinate launched" = "Decaffeinate launched";
+
+/* Previously untabled: onboarding + CLI help (ledger 5 → 0) */
+"Enable notifications" = "Enable notifications";
+"Not now" = "Not now";
+"Launch Decaffeinate at login" = "Launch Decaffeinate at login";
+"  Decaffeinate --preview        Open fixture UI (Sleep Now cannot sleep this Mac)" = "  Decaffeinate --preview        Open fixture UI (Sleep Now cannot sleep this Mac)";
+"  Decaffeinate --screenshots [dir]  Render UI PNGs from fixtures (no sleep)" = "  Decaffeinate --screenshots [dir]  Render UI PNGs from fixtures (no sleep)";
+
+/* Menu: hold detail — caffeinate explainer (Core/CaffeinateInvocation.swift) */
+"Auto-releases" = "Auto-releases";
+"system" = "system";
+"display" = "display";
+"disk activity" = "disk activity";
+"Keeping the %@ awake until %@ (PID %d) finishes" = "Keeping the %@ awake until %@ (PID %d) finishes";
+"Keeping the %@ awake until process %d exits" = "Keeping the %@ awake until process %d exits";
+"Keeping the %@ awake for up to %@" = "Keeping the %@ awake for up to %@";
+"Keeping the %@ awake while %@ runs" = "Keeping the %@ awake while %@ runs";
+"Keeping the %@ awake" = "Keeping the %@ awake";

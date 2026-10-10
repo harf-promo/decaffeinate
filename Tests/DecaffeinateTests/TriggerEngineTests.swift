@@ -68,4 +68,14 @@ final class TriggerEngineTests: XCTestCase {
         let decoded = try JSONDecoder().decode([TriggerRule].self, from: data)
         XCTAssertEqual(decoded, rules)
     }
+
+    func testActiveMatchIdentifiesTheHoldingRule() {
+        let ac = TriggerRule(condition: .onACPower)
+        let cpu = TriggerRule(condition: .cpuAbove(50))
+        let match = TriggerEngine.activeMatch(rules: [cpu, ac], signals: signals(onAC: true))
+        XCTAssertEqual(match?.rule.id, ac.id, "settings badges the rule by id, not reason text")
+        XCTAssertEqual(
+            match?.reason,
+            TriggerEngine.activeReason(rules: [cpu, ac], signals: signals(onAC: true)))
+    }
 }

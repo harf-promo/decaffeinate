@@ -24,7 +24,7 @@ BASE = "en"
 # Keys the app looks up that no table defines. They render as their English key
 # text in every language. Keep in step with `untabledKeyLedger` in
 # Tests/DecaffeinateTests/LocalizationTests.swift.
-UNTABLED_LEDGER = 5
+UNTABLED_LEDGER = 0
 
 
 def unescape(text: str) -> str:

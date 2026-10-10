@@ -10,10 +10,10 @@ enum AllowDuration: CaseIterable, Hashable, Sendable {
 
     var label: String {
         switch self {
-        case .thirtyMinutes: return "30 minutes"
-        case .oneHour: return "1 hour"
-        case .fourHours: return "4 hours"
-        case .untilTomorrow: return "Until tomorrow"
+        case .thirtyMinutes: return L10n.localized("30 minutes")
+        case .oneHour: return L10n.localized("1 hour")
+        case .fourHours: return L10n.localized("4 hours")
+        case .untilTomorrow: return L10n.localized("Until tomorrow")
         }
     }
 

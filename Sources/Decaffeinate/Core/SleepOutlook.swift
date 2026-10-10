@@ -273,8 +273,8 @@ extension SleepOutlook {
         case .keepingAwake(.quietWindow):
             return L10n.localized("Quiet window \u{2014} auto-sleep paused")
         case .keepingAwake(.trigger(let r)): return L10n.localized("Trigger \u{2014} %@", r)
-        case .keepAwakePaused(let reason): return reason
-        case .protectiveSleep(let reason): return reason
+        case .keepAwakePaused(let reason): return SafetyRails.localizedReason(reason)
+        case .protectiveSleep(let reason): return SafetyRails.localizedReason(reason)
         }
     }
 
