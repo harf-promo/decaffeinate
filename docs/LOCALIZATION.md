@@ -79,7 +79,8 @@ reason text.
 > **Translation quality note:** the German table was machine-translated (by an
 > AI agent) in the v1.25 and v1.27 sweeps — natural and grammatically checked, but it
 > hasn't had a native-speaker pass. Treat it as a solid first draft; a
-> native-German review is a genuinely useful, low-effort contribution.
+> native-German review is a genuinely useful, low-effort contribution — see
+> [#21](https://github.com/harf-promo/decaffeinate/issues/21) (help wanted).
 
 > The tables are `.lproj/*.strings` rather than a `.xcstrings` String Catalog
 > because the plain `swift build` used here (and in CI / `build-app.sh`) doesn't
