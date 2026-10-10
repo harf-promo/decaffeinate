@@ -77,6 +77,9 @@ final class AppState: ObservableObject {
     private let displayReader: any DisplayTopologyReading
     private let inputProbe: any ExternalInputProbing
     private let sleepDisabledReader: any SleepDisabledReading
+    /// Sleep/wake/display transitions — NSWorkspace in production, scripted in
+    /// the sleep-simulation harness.
+    private let powerEvents: any SystemPowerEventSource
 
     /// Once a watched agent/build finishes, sleep this many seconds after the
     /// user is idle (a short grace instead of the full idle threshold).
@@ -167,7 +170,6 @@ final class AppState: ObservableObject {
     @Published private(set) var bootTime: Date?
 
     private var timer: Timer?
-    private var restObserverTokens: [NSObjectProtocol] = []
     /// When `tick()` last sampled the weekly awake-time accounting — the anchor
     /// for measuring the *actual* elapsed gap between ticks (never assumed to be
     /// exactly 1 s: the repeating `Timer` has a 0.25 s tolerance and can drift
@@ -280,6 +282,7 @@ final class AppState: ObservableObject {
         displayReader: any DisplayTopologyReading = DisplayTopologyReader(),
         inputProbe: any ExternalInputProbing = ExternalInputProbe(),
         sleepDisabledReader: any SleepDisabledReading = LiveSleepDisabledReader(),
+        powerEvents: any SystemPowerEventSource = WorkspacePowerEventSource(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.settingsStore = settingsStore
@@ -306,6 +309,7 @@ final class AppState: ObservableObject {
         self.displayReader = displayReader
         self.inputProbe = inputProbe
         self.sleepDisabledReader = sleepDisabledReader
+        self.powerEvents = powerEvents
         self.now = now
     }
 
@@ -497,9 +501,7 @@ final class AppState: ObservableObject {
     func shutDown() {
         timer?.invalidate()
         timer = nil
-        let center = NSWorkspace.shared.notificationCenter
-        restObserverTokens.forEach(center.removeObserver)
-        restObserverTokens.removeAll()
+        powerEvents.stop()
         caffeine.releaseAll()
     }
 
@@ -524,44 +526,35 @@ final class AppState: ObservableObject {
         settingsStore.defaults.set(boot, forKey: key)
     }
 
-    /// Observe the system's natural rest rhythm (public NSWorkspace events) and
-    /// log it. These are local AppKit callbacks, not user notifications.
-    private func registerRestObservers() {
-        guard restObserverTokens.isEmpty else { return }
-        let center = NSWorkspace.shared.notificationCenter
-        // willSleep routes to systemWillSleep() so forced-sleep confirmation
-        // and natural-sleep recording share one code path.
-        let willSleepToken = center.addObserver(
-            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.systemWillSleep()
-            }
+    /// Observe the system's natural rest rhythm (public NSWorkspace events, via
+    /// the `powerEvents` seam) and log it.
+    /// Internal (not private) so the sleep-simulation harness can attach its
+    /// scripted source without `start()`'s live 1 Hz timer.
+    func registerRestObservers() {
+        powerEvents.start { [weak self] event in self?.handlePowerEvent(event) }
+    }
+
+    /// Route one sleep/wake/display transition. willSleep goes to
+    /// systemWillSleep() so forced-sleep confirmation and natural-sleep
+    /// recording share one code path; the rest are logged to the rest timeline.
+    /// Internal (not private) so the sleep-simulation harness can play events in.
+    func handlePowerEvent(_ event: SystemPowerEvent) {
+        let kind: RestEvent.Kind
+        switch event {
+        case .willSleep:
+            systemWillSleep()
+            return
+        case .didWake: kind = .wake
+        case .screensDidSleep: kind = .displayOff
+        case .screensDidWake: kind = .displayOn
         }
-        restObserverTokens.append(willSleepToken)
-        let pairs: [(Notification.Name, RestEvent.Kind)] = [
-            (NSWorkspace.didWakeNotification, .wake),
-            (NSWorkspace.screensDidSleepNotification, .displayOff),
-            (NSWorkspace.screensDidWakeNotification, .displayOn),
-        ]
-        for (name, kind) in pairs {
-            let token = center.addObserver(forName: name, object: nil, queue: .main) {
-                [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    let wakeDate = self.now()
-                    self.restHistory.record(
-                        RestEvent(date: wakeDate, kind: kind, onBattery: self.power.onBattery))
-                    // Pair a wake with the most recent unmatched forced sleep so we
-                    // can measure how long the Mac actually stayed asleep.
-                    if kind == .wake {
-                        self.history.recordWakeDuration(at: wakeDate)
-                        self.systemDidWake()
-                    }
-                }
-            }
-            restObserverTokens.append(token)
+        let wakeDate = now()
+        restHistory.record(RestEvent(date: wakeDate, kind: kind, onBattery: power.onBattery))
+        // Pair a wake with the most recent unmatched forced sleep so we can
+        // measure how long the Mac actually stayed asleep.
+        if kind == .wake {
+            history.recordWakeDuration(at: wakeDate)
+            systemDidWake()
         }
     }
 

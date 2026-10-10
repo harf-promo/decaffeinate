@@ -153,7 +153,9 @@ reasons, notifications, human CLI) plus compare pages and a press kit.
   "needless wake avoided" estimate.
 - [ ] 🙋 **Localization** — more languages, and widening coverage beyond the
   seeded onboarding + About surfaces (see [`LOCALIZATION.md`](LOCALIZATION.md)).
-- [ ] 🙋 **More tests** — a sleep-simulation harness; broader coverage.
+- [ ] 🙋 **More tests** — broader coverage. The sleep-simulation harness
+  (`SleepSimulator` + `SleepSimulationTests`) is in; new idle/wake scenarios are
+  welcome there.
 
 ## Non-goals (for now)
 
