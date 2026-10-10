@@ -1,6 +1,6 @@
 /* Decaffeinate — German (Deutsch) seed translation.
    Machine-drafted; marked for a native-speaker pass. Corrections welcome —
-   see docs/LOCALIZATION.md. Keys are the English source text. */
+   see docs/LOCALIZATION.md and issue #21. Keys are the English source text. */
 
 "Welcome" = "Willkommen";
 "Skip" = "Überspringen";
@@ -471,7 +471,8 @@
 "Decaffeinate" = "Decaffeinate";
 
 /* v1.27 sweep — menu + Settings coverage (issue #4).
-   DRAFT: machine-translated, pending a native-speaker review. */
+   DRAFT: machine-translated, pending a native-speaker review —
+   https://github.com/harf-promo/decaffeinate/issues/21 */
 
 /* Menu: hold detail rows (Views/Components.swift) */
 "Why" = "Warum";

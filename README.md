@@ -250,7 +250,7 @@ Open areas where you can make a dent today:
 
 | Area | What's needed | Good for |
 | --- | --- | --- |
-| 🌍 **Localization** | More languages, and a native-speaker pass on the German draft | Anyone, anywhere |
+| 🌍 **Localization** | More languages, and a native-speaker pass on the German draft ([#21](https://github.com/harf-promo/decaffeinate/issues/21)) | Anyone, anywhere |
 | 🧪 **Sleep-simulation harness** | Deterministic HUD / guard / digest coverage under `swift test` | Swift devs |
 | 📝 **Docs & advocacy** | Guides, blog posts, demo videos | Writers & creators |
 | 🍺 **homebrew/cask-core** | Notability-gated submission (see [`docs/HOMEBREW-CORE.md`](docs/HOMEBREW-CORE.md)) | Homebrew folks |
