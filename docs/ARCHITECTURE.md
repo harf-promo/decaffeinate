@@ -149,6 +149,19 @@ shared mutable state, and the decision layer (`SafetyRails`, `ScheduleEngine`,
 `TriggerEngine`, `SleepOutlook`, `RestartAdvisor`, `HoldLifetime`) is pure —
 which is what makes the suite's 300+ tests possible without a GUI.
 
+### Sleep-simulation harness
+
+Every system source `AppState` reads sits behind a protocol in
+`Core/Protocols.swift`, plus `SystemPowerEventSource` (`Core/PowerEventSource.swift`)
+for the NSWorkspace sleep/wake/display stream. `Tests/DecaffeinateTests/SleepSimulator.swift`
+swaps all of them for fakes and plays scripted time into a real `AppState`: apps
+take and release assertions, the user walks away or comes back, `pmset sleepnow`
+is resolved the way the kernel would (sleep, unless a `PreventSystemSleep` hold
+aborts it), and the Mac wakes after a chosen interval. `SleepSimulationTests`
+asserts the firewall's decisions end to end — when pmset fires, what history
+records, which notifications post — without ever sleeping the machine. Add a
+scenario there before changing the idle/force-sleep/wake logic.
+
 ## Distribution
 
 Because Decaffeinate spawns `pmset` and reads system-wide telemetry, it cannot

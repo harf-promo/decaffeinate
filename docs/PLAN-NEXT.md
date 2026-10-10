@@ -7,7 +7,6 @@ everywhere (including the menu bar) plus `--preview`.
 
 - Native-speaker pass on the German draft
 - `TAP_REPO_TOKEN` so Homebrew tap tracks tags
-- Sleep-simulation harness under `swift test`
 - homebrew/cask-core once notable
 
 ## Non-goals (unchanged)
