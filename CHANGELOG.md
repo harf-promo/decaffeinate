@@ -4,6 +4,51 @@ All notable changes to Decaffeinate are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+On `main` since v1.26.2, not yet tagged — PRs #14–#20 and #22.
+
+### Changed
+- **Localized the rest of the menu and Settings** (#19). Hold-detail labels,
+  the `caffeinate` explainer, Allow-for durations, hold lifetimes, trigger
+  reasons, safety-rail reasons, the stale-holder verdict, Rest & Restart
+  advice, and forced-sleep history all resolve through `L10n`, with German
+  drafts awaiting a native-speaker pass (#21, linked from the docs in #22).
+  Safety-rail and stored forced-sleep reasons stay canonical English and are
+  localized at display, so older history translates too. Settings badges the
+  active trigger by rule ID instead of matching English text.
+
+### Fixed
+- **"Let my Mac sleep" now does** (#15). `decaffeinate://stop-awake` and the
+  Stop Keeping Awake intent end both the quiet window and the persistent
+  keep-awake, instead of answering "your Mac can sleep normally again" while
+  keep-awake still held it. The menu and Settings keep their separate, narrow
+  controls.
+- **Turning off new-blocker notifications no longer hides the firewall
+  queue** (#15). The in-menu Allow / Sleep-anyway queue is always built; only
+  the notification is gated.
+- **A Sleep Now that never happened is reported** (#15) with a notification
+  naming the holder, not just a line inside a popover that has already closed.
+- **`--mcp` exits non-zero when the server dies** (#15), and an unrecognised
+  `decaffeinate://` verb is logged instead of silently ignored.
+- Settings no longer points at a non-existent "Stay awake until…" menu item
+  (#15).
+- **The popover's hold list no longer overflows and clips** (#20). The pending
+  row's approval buttons and the "Sleep when it finishes" offer fall back via
+  `ViewThatFits`, so rows stay inside the 372 pt popover in English and German.
+
+### Developer
+- CI gates that can go red (#14): `HarfAdherenceTests` (exact-count design
+  ledgers), `LocalizationTests` (key parity across `.lproj` tables and
+  code-to-table coverage), `Scripts/check-l10n.sh` (the same localization
+  checks without Xcode), and a `--screenshots` harness that now fails loudly
+  and is rendered and uploaded by CI.
+- Sleep-simulation harness (#18): `SleepSimulator` drives a real `AppState`
+  through scripted time with fake assertions, idle, power, `pmset` and
+  sleep/wake events; `SleepSimulationTests` covers 12 end-to-end scenarios.
+- Light and dark preview screenshots preserved under `assets/preview/` (#16);
+  `AGENTS.md` no longer hard-codes a test count (#17).
+
 ## [1.26.2] — 2026-08-16
 
 The mark is a crescent + one Z everywhere — Dock, menu bar, in-app, GitHub README.

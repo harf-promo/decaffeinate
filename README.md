@@ -22,7 +22,7 @@
 
 ---
 
-> **Release status:** the latest tagged, notarized build is **v1.26.1**. `main` is **v1.26.2** — crescent-Z mark on Dock, menu bar, and README.
+> **Release status:** the latest tagged, notarized build is **v1.26.2** — crescent-Z mark on Dock, menu bar, and README. `main` is ahead of it with untagged work (localized menu + Settings, honesty fixes, popover clipping fix) — see [`CHANGELOG.md`](CHANGELOG.md) → *Unreleased*.
 
 ---
 
