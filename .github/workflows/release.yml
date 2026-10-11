@@ -15,27 +15,56 @@ on:
   push:
     tags: ["v*"]
 
+# Read-only by default; only the `release` job (GitHub Release upload + the
+# cask bump pushed to main) gets `contents: write`.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  # Skip the heavy build when the release already has a DMG (e.g. it was built
-  # and notarized locally and uploaded ahead of the tag). Keeps tag-triggered
-  # releases idempotent and lets a maintainer publish from a local notarized
-  # build without this workflow clobbering it.
+  # Skip the heavy build when the release already has a DMG *and* its Sparkle
+  # appcast (e.g. it was built and notarized locally and uploaded ahead of the
+  # tag). Keeps tag-triggered releases idempotent and lets a maintainer publish
+  # from a local notarized build without this workflow clobbering it.
   guard:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       skip: ${{ steps.check.outputs.skip }}
     steps:
+      - name: Tag must be on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Only ship commits that are already on main: a v* tag pushed on an
+          # unmerged branch must never be signed, notarized and published.
+          status="$(gh api "repos/${{ github.repository }}/compare/${GITHUB_SHA}...main" --jq .status)"
+          case "$status" in
+            identical|ahead)
+              echo "${GITHUB_REF_NAME} (${GITHUB_SHA}) is on main." ;;
+            *)
+              echo "::error::Tag ${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on main (compare status: ${status:-unknown}) — refusing to release."
+              exit 1 ;;
+          esac
+
       - id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
-               --json assets -q '.assets[].name' 2>/dev/null | grep -q '\.dmg$'; then
+          assets="$(gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
+                      --json assets -q '.assets[].name' 2>/dev/null || true)"
+          has_dmg=false; has_appcast=false
+          grep -q '\.dmg$' <<<"$assets" && has_dmg=true
+          grep -qx 'appcast\.xml' <<<"$assets" && has_appcast=true
+          if $has_dmg && $has_appcast; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Release ${GITHUB_REF_NAME} already has a DMG — skipping build."
+            echo "Release ${GITHUB_REF_NAME} already has a DMG and appcast.xml — skipping build."
+          elif $has_dmg; then
+            # Skipping here would publish a release with no appcast: SUFeedURL
+            # reads latest/download/appcast.xml, so every installed copy would
+            # stop seeing updates. Fail loudly instead.
+            echo "::error::Release ${GITHUB_REF_NAME} has a DMG but no appcast.xml — upload a signed appcast.xml (generate_appcast) or delete the DMG so this workflow builds both."
+            exit 1
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -45,11 +74,13 @@ jobs:
     needs: guard
     if: needs.guard.outputs.skip != 'true'
     runs-on: macos-15
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Select latest stable Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: latest-stable
 
@@ -118,6 +149,8 @@ jobs:
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
+          # Remove the decoded key even when notarytool/stapler fails.
+          trap 'rm -f /tmp/notary.p8' EXIT
           echo "$NOTARY_KEY_P8" | base64 --decode > /tmp/notary.p8
           DMG="$(ls build/Decaffeinate-*.dmg)"
           xcrun notarytool submit "$DMG" \
@@ -127,7 +160,6 @@ jobs:
             --wait
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
-          rm -f /tmp/notary.p8
 
       - name: Generate signed appcast (Sparkle)
         env:
@@ -207,7 +239,17 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           SHA="$(shasum -a 256 build/Decaffeinate-*.dmg | awk '{print $1}')"
           TAP_DIR="$(mktemp -d)"
-          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/harf-promo/homebrew-tap.git" "$TAP_DIR"
+          # Hand the token to git through a credential helper that reads it from
+          # the environment, so it never sits in a clone URL, argv or the tap's
+          # .git/config. The empty helper first clears inherited ones (e.g. the
+          # macOS keychain helper, which would otherwise store the token).
+          # shellcheck disable=SC2016 # $GH_TOKEN is expanded by git's helper shell
+          tap_git() {
+            git -c credential.helper= \
+                -c 'credential.helper=!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=${GH_TOKEN}"; }; f' \
+                "$@"
+          }
+          tap_git clone --depth 1 https://github.com/harf-promo/homebrew-tap.git "$TAP_DIR"
           sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" "$TAP_DIR/Casks/decaffeinate.rb"
           sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" "$TAP_DIR/Casks/decaffeinate.rb"
           cd "$TAP_DIR"
@@ -219,4 +261,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Casks/decaffeinate.rb
           git commit -m "chore: bump decaffeinate to ${GITHUB_REF_NAME}"
-          git push origin HEAD
+          tap_git push origin HEAD
