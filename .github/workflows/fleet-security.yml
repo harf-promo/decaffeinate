@@ -1,7 +1,7 @@
 # GENERATED for harf-promo/decaffeinate by fleet-kit shared/bin/fleet-security-workflow.py: do not edit here.
 # Source: wikithoughts/fleet-kit templates/github/fleet-security/ (template + repos.json "decaffeinate").
 # Change it there, then: fleet-security-workflow.py write decaffeinate --repo-dir <checkout>
-# fleet-security: template sha256:4bd5052a5a10 config sha256:c879f6aca1d2
+# fleet-security: template sha256:3bbbc50277c9 config sha256:c879f6aca1d2
 name: Fleet security
 
 # Secret scan (gitleaks) and workflow lint (actionlint + shellcheck), one
@@ -69,12 +69,15 @@ jobs:
           FULL: ${{ inputs.full-history }}
         run: |
           # .gitleaksignore (exact reviewed fingerprints) is read from the repo root.
+          # Every mode passes --log-opts: gitleaks' default is `git log --all`, which on a
+          # persistent self-hosted checkout includes stale refs/remotes/pull/* heads.
           args=(detect --source . --redact --no-banner --exit-code 1)
           if [ -f .gitleaks.toml ]; then args+=(--config .gitleaks.toml); fi
           zero=0000000000000000000000000000000000000000
           if [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ]; then
             [ "$FULL" != false ] || { echo 'full-history=false: nothing to scan'; exit 0; }
             echo "Full history of $GITHUB_REF ($GITHUB_SHA)"
+            args+=("--log-opts=${GITHUB_SHA}")
           elif [[ "$BASE" =~ ^[0-9a-f]{40}$ && "$BASE" != "$zero" ]] && git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
             [ -n "$(git rev-list "${BASE}..${GITHUB_SHA}")" ] || { echo "::error::empty range ${BASE}..${GITHUB_SHA}"; exit 1; }
             args+=("--log-opts=${BASE}..${GITHUB_SHA}")
@@ -84,6 +87,7 @@ jobs:
           else
             # A branch's first push or a rewritten before-SHA: scan everything.
             echo "No usable push base; full history of $GITHUB_SHA"
+            args+=("--log-opts=${GITHUB_SHA}")
           fi
           "$FLEET_GITLEAKS" "${args[@]}"
   actionlint:
