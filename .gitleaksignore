@@ -1,0 +1,6 @@
+# Reviewed gitleaks findings in decaffeinate main history (2026-10-21, gitleaks 8.30.1, generated
+# fleet-security workflow). Exact commit:file:rule:line fingerprints only, so other lines,
+# commits and detectors stay scanned. None of these is a credential.
+
+# UserDefaults key name, not a secret.
+b250437925eb4a47ef9e916a8ba7a1fd122d354a:Sources/Decaffeinate/Core/AppState.swift:generic-api-key:108
