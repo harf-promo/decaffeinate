@@ -1,0 +1,123 @@
+# GENERATED for harf-promo/decaffeinate by fleet-kit shared/bin/fleet-security-workflow.py: do not edit here.
+# Source: wikithoughts/fleet-kit templates/github/fleet-security/ (template + repos.json "decaffeinate").
+# Change it there, then: fleet-security-workflow.py write decaffeinate --repo-dir <checkout>
+# fleet-security: template sha256:4bd5052a5a10 config sha256:c879f6aca1d2
+name: Fleet security
+
+# Secret scan (gitleaks) and workflow lint (actionlint + shellcheck), one
+# self-contained copy per repo: no reusable-workflow call, so private repos of
+# any owner can run it. Every tool is a pinned release binary checked against
+# its SHA-256 before use. Push and pull_request scan only the new commits; the
+# weekly schedule and a manual run scan the checked-out ref's whole history.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '11 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      full-history:
+        description: Scan the selected ref's whole history (false skips the secret scan).
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fleet-security-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  GITLEAKS_VERSION: '8.30.1'
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  ACTIONLINT_VERSION: '1.7.12'
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+  SHELLCHECK_VERSION: '0.11.0'
+  SHELLCHECK_SHA256: b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+
+jobs:
+  gitleaks:
+    name: gitleaks (fleet)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A commit range needs both ends, including a secret added and removed
+          # inside one PR.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare pinned gitleaks
+        run: |
+          # Job-unique directory: a self-hosted runner keeps /tmp between jobs.
+          bin=$(mktemp -d "$RUNNER_TEMP/fleet-gitleaks.XXXXXX")
+          curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$bin/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $bin/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$bin/gitleaks.tar.gz" -C "$bin" gitleaks
+          echo "FLEET_GITLEAKS=$bin/gitleaks" >> "$GITHUB_ENV"
+
+      - name: Run gitleaks
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          FULL: ${{ inputs.full-history }}
+        run: |
+          # .gitleaksignore (exact reviewed fingerprints) is read from the repo root.
+          args=(detect --source . --redact --no-banner --exit-code 1)
+          if [ -f .gitleaks.toml ]; then args+=(--config .gitleaks.toml); fi
+          zero=0000000000000000000000000000000000000000
+          if [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ]; then
+            [ "$FULL" != false ] || { echo 'full-history=false: nothing to scan'; exit 0; }
+            echo "Full history of $GITHUB_REF ($GITHUB_SHA)"
+          elif [[ "$BASE" =~ ^[0-9a-f]{40}$ && "$BASE" != "$zero" ]] && git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            [ -n "$(git rev-list "${BASE}..${GITHUB_SHA}")" ] || { echo "::error::empty range ${BASE}..${GITHUB_SHA}"; exit 1; }
+            args+=("--log-opts=${BASE}..${GITHUB_SHA}")
+          elif [ "$EVENT" = pull_request ]; then
+            echo "::error::pull request base '${BASE}' is not a reachable commit"
+            exit 1
+          else
+            # A branch's first push or a rewritten before-SHA: scan everything.
+            echo "No usable push base; full history of $GITHUB_SHA"
+          fi
+          "$FLEET_GITLEAKS" "${args[@]}"
+  actionlint:
+    name: actionlint (fleet)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare pinned actionlint and shellcheck
+        run: |
+          bin=$(mktemp -d "$RUNNER_TEMP/fleet-actionlint.XXXXXX")
+          curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$bin/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $bin/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$bin/actionlint.tar.gz" -C "$bin" actionlint
+          curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$bin/shellcheck.tar.gz" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.gz"
+          echo "${SHELLCHECK_SHA256}  $bin/shellcheck.tar.gz" | sha256sum -c -
+          tar -xzf "$bin/shellcheck.tar.gz" -C "$bin" --strip-components=1 "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+          echo "FLEET_LINT_BIN=$bin" >> "$GITHUB_ENV"
+
+      - name: Run actionlint
+        env:
+          # Warnings and errors only; info/style notes are not a gate.
+          SHELLCHECK_OPTS: --severity=warning
+        run: |
+          args=(-color -pyflakes= "-shellcheck=$FLEET_LINT_BIN/shellcheck")
+          # A repo's own .github/actionlint.yaml wins; otherwise declare the
+          # self-hosted runner labels this repo's workflows use.
+          if [ ! -f .github/actionlint.yaml ] && [ ! -f .github/actionlint.yml ]; then
+            printf 'self-hosted-runner:\n  labels: %s\n' '["wikiclaw-1"]' > "$FLEET_LINT_BIN/actionlint.yaml"
+            args+=(-config-file "$FLEET_LINT_BIN/actionlint.yaml")
+          fi
+          "$FLEET_LINT_BIN/actionlint" "${args[@]}"
