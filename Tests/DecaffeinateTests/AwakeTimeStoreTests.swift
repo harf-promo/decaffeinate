@@ -188,6 +188,84 @@ final class AwakeTimeStoreTests: XCTestCase {
         XCTAssertEqual(b.entries[0].seconds, 42, accuracy: 0.01)
     }
 
+    // MARK: Throttled persistence
+
+    private func persistedSeconds(_ defaults: UserDefaults) throws -> [TimeInterval] {
+        guard let data = defaults.data(forKey: "DecaffeinateAwakeTime.v1") else { return [] }
+        return try JSONDecoder().decode([AwakeTimeEntry].self, from: data).map(\.seconds)
+    }
+
+    func testRecordsWithinTheIntervalAreNotPersistedUntilItElapses() throws {
+        let suite = "decaf.awaketime.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AwakeTimeStore(defaults: defaults)
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        store.record(appName: "Zoom", seconds: 1, date: t0)
+        XCTAssertEqual(try persistedSeconds(defaults), [1], "the first record is written out")
+        store.record(appName: "Zoom", seconds: 1, date: t0.addingTimeInterval(1))
+        store.record(appName: "Zoom", seconds: 1, date: t0.addingTimeInterval(2))
+        XCTAssertEqual(store.entries[0].seconds, 3, accuracy: 0.01, "memory is always current")
+        XCTAssertEqual(
+            try persistedSeconds(defaults), [1], "but UserDefaults is not rewritten per tick")
+        store.record(
+            appName: "Zoom", seconds: 1,
+            date: t0.addingTimeInterval(AwakeTimeStore.persistInterval))
+        XCTAssertEqual(try persistedSeconds(defaults), [4])
+    }
+
+    func testFlushPersistsPendingChanges() throws {
+        let suite = "decaf.awaketime.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AwakeTimeStore(defaults: defaults)
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        store.record(appName: "Zoom", seconds: 1, date: t0)
+        store.record(appName: "Zoom", seconds: 1, date: t0.addingTimeInterval(1))
+        XCTAssertEqual(try persistedSeconds(defaults), [1])
+        store.flush()
+        XCTAssertEqual(try persistedSeconds(defaults), [2])
+        let reloaded = AwakeTimeStore(defaults: defaults)
+        XCTAssertEqual(reloaded.entries[0].seconds, 2, accuracy: 0.01)
+    }
+
+    func testDayRolloverPersistsImmediately() throws {
+        let suite = "decaf.awaketime.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AwakeTimeStore(defaults: defaults)
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        store.record(appName: "Zoom", seconds: 1, date: t0)
+        store.record(appName: "Zoom", seconds: 1, date: t0.addingTimeInterval(1))
+        let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: t0)!
+        store.record(appName: "Zoom", seconds: 5, date: nextDay)
+        XCTAssertEqual(try persistedSeconds(defaults).sorted(), [2, 5])
+    }
+
+    func testClearPersistsImmediately() throws {
+        let suite = "decaf.awaketime.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AwakeTimeStore(defaults: defaults)
+        store.record(appName: "Zoom", seconds: 1, date: Date())
+        store.clear()
+        XCTAssertEqual(try persistedSeconds(defaults), [])
+    }
+
+    func testPruneRunsWhenTheDayChanges() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        let calendar = Calendar.current
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        store.record(appName: "Zoom", seconds: 1, date: now)
+        // The out-of-window entry survives its own (earlier-day) record and is
+        // dropped when the next record changes the day back.
+        let longAgo = calendar.date(byAdding: .day, value: -30, to: now)!
+        store.record(appName: "OldApp", seconds: 1, date: longAgo)
+        store.record(appName: "Zoom", seconds: 1, date: now)
+        XCTAssertEqual(store.entries.map(\.appName), ["Zoom"])
+    }
+
     func testCorruptDataDecodesToEmpty() {
         let suite = "decaf.awaketime.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

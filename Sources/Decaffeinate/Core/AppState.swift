@@ -506,6 +506,7 @@ final class AppState: ObservableObject {
         timer = nil
         powerEvents.stop()
         caffeine.releaseAll()
+        awakeTime.flush()
     }
 
     // MARK: Rest tracking
