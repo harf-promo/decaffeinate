@@ -77,7 +77,8 @@ struct PowerSourceReader {
         guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else {
             return .unknown
         }
-        let providing = IOPSGetProvidingPowerSourceType(blob)?.takeRetainedValue() as String?
+        // A Get-rule call: the returned CFString is a constant the caller does not own.
+        let providing = IOPSGetProvidingPowerSourceType(blob)?.takeUnretainedValue() as String?
         let sources = (IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef]) ?? []
         let descriptions: [[String: Any]] = sources.compactMap {
             IOPSGetPowerSourceDescription(blob, $0)?.takeUnretainedValue() as? [String: Any]
