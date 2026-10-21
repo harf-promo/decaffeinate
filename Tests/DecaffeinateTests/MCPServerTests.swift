@@ -64,4 +64,36 @@ final class MCPServerTests: XCTestCase {
     func testUnknownToolIsNil() {
         XCTAssertNil(MCPServer.parseAction(name: "delete_everything", arguments: nil))
     }
+
+    // MARK: sleep_if_idle safety rails (T4 / F4)
+
+    func testSleepIfIdleReplyLeavesAwakeWithTheReason() {
+        XCTAssertEqual(
+            MCPServer.sleepIfIdleHoldMessage(
+                verdict: .leaveAwake(reason: "Microphone is in use (likely a call)"),
+                idleSeconds: 900, threshold: 300),
+            "Not sleeping — leaving this Mac awake: Microphone is in use (likely a call)")
+    }
+
+    func testSleepIfIdleReplyForRecentActivityAndForSleep() {
+        XCTAssertEqual(
+            MCPServer.sleepIfIdleHoldMessage(
+                verdict: .stillActive, idleSeconds: 12, threshold: 300),
+            "Active 12s ago (< 300s) — leaving this Mac awake.")
+        XCTAssertNil(
+            MCPServer.sleepIfIdleHoldMessage(verdict: .sleep, idleSeconds: 900, threshold: 300),
+            "nil means go ahead and sleep")
+    }
+
+    func testSleepIfIdleVerdictFromAMicrophoneHoldIsLeaveAwake() {
+        let mic = Fixtures.assertion(
+            pid: 900, process: "coreaudiod", bundle: nil, resources: ["audio-in"])
+        let verdict = CLI.sleepIfIdleVerdict(
+            idleSeconds: 900, threshold: 300, assertions: [mic],
+            power: PowerSnapshot(onBattery: false, charge: 1.0, isCharging: false),
+            thermalState: .nominal, settings: DecaffeinateSettings())
+        let message = MCPServer.sleepIfIdleHoldMessage(
+            verdict: verdict, idleSeconds: 900, threshold: 300)
+        XCTAssertEqual(message?.hasPrefix("Not sleeping — leaving this Mac awake: "), true)
+    }
 }

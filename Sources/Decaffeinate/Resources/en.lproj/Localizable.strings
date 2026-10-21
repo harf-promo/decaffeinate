@@ -136,6 +136,7 @@
 "🛟  %@ — released the keep-awake hold." = "🛟  %@ — released the keep-awake hold.";
 "✓  Done — this Mac can sleep again." = "✓  Done — this Mac can sleep again.";
 "☕️  Active %ds ago (< %ds) — leaving this Mac awake." = "☕️  Active %ds ago (< %ds) — leaving this Mac awake.";
+"☕️  Idle %ds ≥ %ds, but leaving awake: %@" = "☕️  Idle %ds ≥ %ds, but leaving awake: %@";
 "😴  Idle %ds ≥ %ds — putting this Mac to sleep now…" = "😴  Idle %ds ≥ %ds — putting this Mac to sleep now…";
 "⚠️  Hook will run %@ — move Decaffeinate to /Applications for a stable path." = "⚠️  Hook will run %@ — move Decaffeinate to /Applications for a stable path.";
 "✗ Couldn't read %@ — left it untouched." = "✗ Couldn't read %@ — left it untouched.";

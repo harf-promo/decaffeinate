@@ -183,14 +183,14 @@ final class MCPServer {
                     isError: true)
             }
         case .sleepIfIdle(let seconds):
-            let idle = IdleMonitor().secondsSinceLastInput()
-            guard CLI.shouldSleep(idleSeconds: idle, threshold: seconds) else {
-                return .init(
-                    content: [
-                        MCPServer.contentText(
-                            "Active \(Int(idle))s ago (< \(seconds)s) — leaving this Mac awake.")
-                    ],
-                    isError: false)
+            // Same gate as `--sleep-if-idle`: HID idle time AND the safety rails
+            // (call, backup, update, media) — an agent's end-of-turn call must not
+            // sleep the Mac mid-call.
+            let (verdict, idle) = CLI.currentSleepIfIdleVerdict(threshold: seconds)
+            if let message = MCPServer.sleepIfIdleHoldMessage(
+                verdict: verdict, idleSeconds: idle, threshold: seconds)
+            {
+                return .init(content: [MCPServer.contentText(message)], isError: false)
             }
             switch SleepController().sleepNow() {
             case .success:
@@ -234,6 +234,21 @@ final class MCPServer {
             self?.engine.releaseAll()
         }
         return "Keeping this Mac awake for \(clamped) min (or until released / the session ends)."
+    }
+
+    /// The reply for a `sleep_if_idle` call that must NOT sleep, or nil to sleep.
+    /// Pure so the MCP tool's safety-rail gate is unit-testable.
+    nonisolated static func sleepIfIdleHoldMessage(
+        verdict: CLI.SleepIfIdleVerdict, idleSeconds: TimeInterval, threshold: Int
+    ) -> String? {
+        switch verdict {
+        case .sleep:
+            return nil
+        case .stillActive:
+            return "Active \(Int(idleSeconds))s ago (< \(threshold)s) — leaving this Mac awake."
+        case .leaveAwake(let reason):
+            return "Not sleeping — leaving this Mac awake: \(reason)"
+        }
     }
 
     private func railDropReason() -> String? {
