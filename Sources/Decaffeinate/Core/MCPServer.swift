@@ -238,7 +238,7 @@ final class MCPServer {
 
     /// The reply for a `sleep_if_idle` call that must NOT sleep, or nil to sleep.
     /// Pure so the MCP tool's safety-rail gate is unit-testable.
-    static func sleepIfIdleHoldMessage(
+    nonisolated static func sleepIfIdleHoldMessage(
         verdict: CLI.SleepIfIdleVerdict, idleSeconds: TimeInterval, threshold: Int
     ) -> String? {
         switch verdict {
