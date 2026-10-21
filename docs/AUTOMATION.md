@@ -50,6 +50,19 @@ open "decaffeinate://keep-awake?minutes=90"
 open "decaffeinate://stop-awake"
 ```
 
+Any local process (or a web page, once you tick a browser's "always allow")
+can open a custom-scheme URL, so the two destructive verbs are **opt-in**:
+
+- `sleep-now` and `stop-awake` do **nothing** until you turn on
+  **Settings → Automation → URL scheme → Allow URL-scheme actions** (off by
+  default; the app logs "Ignoring decaffeinate:// …" when one is blocked).
+- Even when allowed, `decaffeinate://sleep-now` keeps the in-call guard: with the
+  microphone live it raises the "Sleep anyway?" confirmation in the menu instead
+  of sleeping the Mac mid-call. (The CLI, App Intents and MCP `sleep_now` are
+  explicit, user-wired calls and stay immediate.)
+- `keep-awake` only ever holds the Mac awake behind the safety rails, so it is
+  not gated.
+
 ## Agent hooks (Claude Code, Codex, Cursor, …)
 
 The most common ask in the agentic era is *"let my Mac sleep once the agent is

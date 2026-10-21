@@ -17,6 +17,8 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(s.decaffeinateEnabled)
         XCTAssertEqual(s.idleThresholdMinutes, 10, accuracy: 0.001)
         XCTAssertFalse(s.autoSleepWhenAgentFinishes)
+        XCTAssertFalse(
+            s.allowURLSchemeActions, "URL-scheme sleep/stop must stay off for existing users")
         XCTAssertFalse(s.hasSeenAwakeExplainer)
         XCTAssertEqual(s.restartRecommendationDays, 7)
         XCTAssertFalse(

@@ -1985,14 +1985,63 @@ final class AppStateTests: XCTestCase {
     }
 
     func testSleepNowSkipsCallConfirmationWhenNotRequired() {
-        // The non-interactive automation entry point (URL scheme) — no one is
-        // present to answer a confirmation dialog, so it bypasses the guard.
+        // The explicit opt-out of the call guard (the URL scheme no longer uses
+        // it — see the applyAutomationURL tests below).
         let h = makeHarness(); defer { h.cleanup() }
         h.scanner.assertions = [micHold()]
         h.state.tick()
         h.state.sleepNow(requireCallConfirmation: false)
         XCTAssertEqual(h.sleeper.callCount, 1, "non-interactive callers bypass the call guard")
         XCTAssertFalse(h.state.pendingCallSleepConfirmation)
+    }
+
+    // MARK: decaffeinate:// URL scheme gating (T3 / F3)
+
+    func testURLSleepNowIsInertByDefault() {
+        let h = makeHarness(); defer { h.cleanup() }
+        XCTAssertFalse(h.state.settings.allowURLSchemeActions, "opt-in setting defaults off")
+        XCTAssertFalse(h.state.applyAutomationURL(.sleepNow))
+        XCTAssertEqual(h.sleeper.callCount, 0, "a URL must not sleep the Mac unless opted in")
+        XCTAssertFalse(h.state.pendingCallSleepConfirmation)
+    }
+
+    func testURLStopAwakeIsInertByDefault() {
+        let h = makeHarness { $0.caffeinateEnabled = true }; defer { h.cleanup() }
+        XCTAssertFalse(h.state.applyAutomationURL(.stopAwake))
+        XCTAssertTrue(
+            h.state.settings.caffeinateEnabled, "a URL must not drop the user's keep-awake")
+    }
+
+    func testURLKeepAwakeIsNotGated() {
+        let h = makeHarness(); defer { h.cleanup() }
+        XCTAssertTrue(h.state.applyAutomationURL(.keepAwake(minutes: 15)))
+        XCTAssertNotNil(h.state.quietUntil, "keep-awake only ever holds awake, so it still works")
+    }
+
+    func testURLSleepNowSleepsWhenOptedInAndNoCall() {
+        let h = makeHarness { $0.allowURLSchemeActions = true }; defer { h.cleanup() }
+        XCTAssertTrue(h.state.applyAutomationURL(.sleepNow))
+        XCTAssertEqual(h.sleeper.callCount, 1)
+    }
+
+    func testURLSleepNowKeepsTheCallGuardWhenOptedIn() {
+        let h = makeHarness { $0.allowURLSchemeActions = true }; defer { h.cleanup() }
+        h.scanner.assertions = [micHold()]
+        h.state.tick()  // refresh appState.assertions with the live mic hold
+        XCTAssertTrue(h.state.applyAutomationURL(.sleepNow))
+        XCTAssertEqual(h.sleeper.callCount, 0, "must not sleep mid-call from a URL")
+        XCTAssertTrue(
+            h.state.pendingCallSleepConfirmation, "the mid-call guard raises the confirmation")
+    }
+
+    func testURLStopAwakeReleasesWhenOptedIn() {
+        let h = makeHarness {
+            $0.allowURLSchemeActions = true
+            $0.caffeinateEnabled = true
+        }
+        defer { h.cleanup() }
+        XCTAssertTrue(h.state.applyAutomationURL(.stopAwake))
+        XCTAssertFalse(h.state.settings.caffeinateEnabled)
     }
 
     // MARK: Failed-sleep culprit naming (v1.22)

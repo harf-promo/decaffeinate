@@ -157,6 +157,13 @@ struct DecaffeinateSettings: Codable, Equatable, Sendable {
     /// Start Decaffeinate automatically at login.
     var launchAtLogin: Bool = false
 
+    /// Let `decaffeinate://sleep-now` and `decaffeinate://stop-awake` act. Off by
+    /// default: any local process, or a web page after a browser "always allow",
+    /// can open a custom-scheme URL, so the verbs that sleep the Mac or drop your
+    /// keep-awake stay inert until you opt in. `keep-awake` (it only ever holds
+    /// the Mac awake, behind the safety rails) is not gated.
+    var allowURLSchemeActions: Bool = false
+
     init() {}
 }
 
@@ -188,6 +195,9 @@ extension DecaffeinateSettings {
         if let v = try c.decodeIfPresent([TriggerRule].self, forKey: .triggers) { triggers = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autoSleepWhenAgentFinishes) {
             autoSleepWhenAgentFinishes = v
+        }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .allowURLSchemeActions) {
+            allowURLSchemeActions = v
         }
         if let v = try c.decodeIfPresent(Int.self, forKey: .batteryFloorPercent) {
             batteryFloorPercent = v

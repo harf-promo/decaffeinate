@@ -9,10 +9,13 @@ import Foundation
 ///     decaffeinate://keep-awake?minutes=30
 ///     decaffeinate://stop-awake
 ///
-/// `sleep-now` is applied via `AppState.sleepNow(requireCallConfirmation:
-/// false)` in `DecaffeinateApp`'s `application(_:open:)` — a fire-and-forget
-/// automation call has no one to answer a "you appear to be on a call"
-/// confirmation, so it deliberately skips that guard and stays immediate.
+/// Actions are applied by `AppState.applyAutomationURL(_:)`. Any local process
+/// (or a web page, after a browser "always allow") can open a custom-scheme URL,
+/// so the destructive verbs (`sleep-now`, `stop-awake`) are inert unless the
+/// user turns on Settings → "Allow URL-scheme actions", and `sleep-now` still
+/// honours the in-call guard (a live microphone raises the "Sleep anyway?"
+/// confirmation instead of sleeping). `keep-awake` only holds the Mac awake
+/// behind the safety rails, so it is not gated.
 enum AutomationURL {
     static let scheme = "decaffeinate"
 
@@ -20,6 +23,24 @@ enum AutomationURL {
         case sleepNow
         case keepAwake(minutes: Int)
         case stopAwake
+
+        /// Verbs that sleep the Mac or drop the user's keep-awake: gated behind
+        /// the opt-in `allowURLSchemeActions` setting.
+        var isDestructive: Bool {
+            switch self {
+            case .sleepNow, .stopAwake: return true
+            case .keepAwake: return false
+            }
+        }
+
+        /// The URL verb, for logs.
+        var verb: String {
+            switch self {
+            case .sleepNow: return "sleep-now"
+            case .stopAwake: return "stop-awake"
+            case .keepAwake: return "keep-awake"
+            }
+        }
     }
 
     /// Parse a URL into an action, or `nil` if it isn't a recognized command.

@@ -123,16 +123,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         MainActor.assumeIsolated {
             for url in urls {
-                switch AutomationURL.parse(url) {
-                case .sleepNow:
-                    // Non-interactive automation call (Shortcuts, a script) —
-                    // no one is present to answer a "you appear to be on a
-                    // call" confirmation, so this skips that guard and stays
-                    // immediate, like the CLI / App Intents / MCP sleep_now.
-                    AppState.shared.sleepNow(requireCallConfirmation: false)
-                case .keepAwake(let minutes): AppState.shared.stayAwake(forMinutes: minutes)
-                case .stopAwake: AppState.shared.releaseAllKeepAwake()
-                case .none:
+                if let action = AutomationURL.parse(url) {
+                    AppState.shared.applyAutomationURL(action)
+                } else {
                     // Silently ignoring an unrecognised verb makes a typo in a
                     // Shortcut indistinguishable from a working automation.
                     AppLog.engine.error(

@@ -583,6 +583,18 @@ private struct AutomationSettings: View {
                 .settingsCaption()
             }
 
+            Section(L10n.localized("URL scheme")) {
+                Toggle(
+                    L10n.localized("Allow URL-scheme actions"),
+                    isOn: $store.settings.allowURLSchemeActions)
+                Text(
+                    L10n.localized(
+                        "Let decaffeinate:// links sleep your Mac (sleep-now) or end keep-awake (stop-awake). Off by default: any app on this Mac, or a web page you allow, can open a URL. Sleep-now still asks first if you appear to be on a call. Starting a keep-awake hold (keep-awake) always works."
+                    )
+                )
+                .settingsCaption()
+            }
+
             // Marked "Advanced" — the audit called this the single most
             // behavior-altering toggle in the app, and it used to look like
             // any other switch on the page.
