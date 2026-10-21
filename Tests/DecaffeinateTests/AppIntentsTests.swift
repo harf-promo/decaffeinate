@@ -86,4 +86,10 @@ final class AppIntentsTests: XCTestCase {
         XCTAssertNil(parse("decaffeinate://frobnicate"))
         XCTAssertNil(parse("https://sleep-now"))
     }
+
+    func testAutomationURLDestructiveVerbs() {
+        XCTAssertTrue(AutomationURL.Action.sleepNow.isDestructive)
+        XCTAssertTrue(AutomationURL.Action.stopAwake.isDestructive)
+        XCTAssertFalse(AutomationURL.Action.keepAwake(minutes: 5).isDestructive)
+    }
 }

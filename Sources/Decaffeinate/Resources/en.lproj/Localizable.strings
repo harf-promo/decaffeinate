@@ -350,6 +350,9 @@
 "AI agents" = "AI agents";
 "Auto-sleep when a watched agent finishes" = "Auto-sleep when a watched agent finishes";
 "When an AI agent (Claude Code, Cursor…) keeps the Mac awake until its task is done, watch it automatically and sleep once it finishes. Otherwise the menu just offers a one-click watch." = "When an AI agent (Claude Code, Cursor…) keeps the Mac awake until its task is done, watch it automatically and sleep once it finishes. Otherwise the menu just offers a one-click watch.";
+"URL scheme" = "URL scheme";
+"Allow URL-scheme actions" = "Allow URL-scheme actions";
+"Let decaffeinate:// links sleep your Mac (sleep-now) or end keep-awake (stop-awake). Off by default: any app on this Mac, or a web page you allow, can open a URL. Sleep-now still asks first if you appear to be on a call. Starting a keep-awake hold (keep-awake) always works." = "Let decaffeinate:// links sleep your Mac (sleep-now) or end keep-awake (stop-awake). Off by default: any app on this Mac, or a web page you allow, can open a URL. Sleep-now still asks first if you appear to be on a call. Starting a keep-awake hold (keep-awake) always works.";
 "Let Decaffeinate decide every sleep" = "Let Decaffeinate decide every sleep";
 "Decaffeinate becomes the only thing that decides when your Mac sleeps — macOS won't idle-sleep on its own. If Decaffeinate ever quits, normal sleep resumes automatically." = "Decaffeinate becomes the only thing that decides when your Mac sleeps — macOS won't idle-sleep on its own. If Decaffeinate ever quits, normal sleep resumes automatically.";
 "Take full control of sleep" = "Take full control of sleep";

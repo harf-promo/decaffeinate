@@ -569,17 +569,41 @@ final class AppState: ObservableObject {
     /// app's "never cuts off calls" promise, so this surfaces a confirmation
     /// (`pendingCallSleepConfirmation`) instead and waits for
     /// `confirmSleepDuringCall()`. `requireCallConfirmation` is false only for
-    /// the `decaffeinate://sleep-now` URL scheme (see `DecaffeinateApp`'s
-    /// `application(_:open:)`) — a fire-and-forget automation call with no one
-    /// to answer a confirmation dialog, mirroring the CLI / App Intents / MCP
-    /// `sleep_now` entry points, which bypass `AppState` entirely and stay
-    /// immediate for the same reason (see the comments at each).
+    /// callers that have no one to answer a confirmation (none of the
+    /// interactive paths, and no longer the `decaffeinate://` URL scheme, which
+    /// goes through `applyAutomationURL(_:)` and keeps the guard on).
     func sleepNow(requireCallConfirmation: Bool = true) {
         if requireCallConfirmation, SafetyRails.isMicrophoneActive(assertions) {
             pendingCallSleepConfirmation = true
             return
         }
         forceSleep(reason: "Sleep Now pressed", bypassCooldown: true, userInitiated: true)
+    }
+
+    /// Apply a parsed `decaffeinate://` URL (see `DecaffeinateApp`'s
+    /// `application(_:open:)`). Any local process, or a web page after a browser
+    /// "always allow", can open such a URL, so:
+    /// - the destructive verbs (`sleep-now`, `stop-awake`) do nothing unless
+    ///   Settings → "Allow URL-scheme actions" is on (default off);
+    /// - when `sleep-now` is allowed it still honours the in-call guard — with
+    ///   the microphone live it raises the "Sleep anyway?" confirmation rather
+    ///   than sleeping the Mac mid-call.
+    /// Returns whether the URL was acted on (or, for `sleep-now` during a call,
+    /// held for confirmation); false when it was blocked by the opt-in.
+    @discardableResult
+    func applyAutomationURL(_ action: AutomationURL.Action) -> Bool {
+        if action.isDestructive, !settings.allowURLSchemeActions {
+            AppLog.engine.notice(
+                "Ignoring decaffeinate:// \(action.verb, privacy: .public): URL-scheme actions are off in Settings"
+            )
+            return false
+        }
+        switch action {
+        case .sleepNow: sleepNow(requireCallConfirmation: true)
+        case .keepAwake(let minutes): stayAwake(forMinutes: minutes)
+        case .stopAwake: releaseAllKeepAwake()
+        }
+        return true
     }
 
     /// Force the sleep the call guard held back, after the user confirms
