@@ -345,6 +345,65 @@ enum CLI {
         Int(idleSeconds) >= threshold
     }
 
+    /// Why a sleep-if-idle request (CLI `--sleep-if-idle` and MCP `sleep_if_idle`)
+    /// should NOT put the Mac to sleep, or `.sleep` if it may.
+    enum SleepIfIdleVerdict: Equatable {
+        /// Idle long enough and no safety rail objects.
+        case sleep
+        /// The user was active more recently than the threshold.
+        case stillActive
+        /// Idle long enough, but a safety rail holds sleep off (microphone/call,
+        /// Time Machine backup, macOS update, active media).
+        case leaveAwake(reason: String)
+    }
+
+    /// The decision behind `--sleep-if-idle` / MCP `sleep_if_idle`: the HID idle
+    /// gate first, then the same `SafetyRails` hold-off reasons the GUI's idle
+    /// engine honours, evaluated from the same assertion snapshot `--scan` uses.
+    /// A turn-end hook must not sleep the Mac mid-call or mid-backup just because
+    /// the user is hands-off. Pure so both entry points are unit-testable.
+    static func sleepIfIdleVerdict(
+        idleSeconds: TimeInterval,
+        threshold: Int,
+        assertions: [PowerAssertion],
+        power: PowerSnapshot,
+        thermalState: ProcessInfo.ThermalState,
+        settings: DecaffeinateSettings
+    ) -> SleepIfIdleVerdict {
+        guard shouldSleep(idleSeconds: idleSeconds, threshold: threshold) else {
+            return .stillActive
+        }
+        let decision = SafetyRails.evaluate(
+            assertions: assertions,
+            power: power,
+            thermalState: thermalState,
+            idleSeconds: idleSeconds,
+            whitelistedAwakeAppNames: [],
+            settings: settings)
+        if let reason = decision.holdForceSleepReasons.first {
+            return .leaveAwake(reason: reason)
+        }
+        return .sleep
+    }
+
+    /// Gathers the live inputs for `sleepIfIdleVerdict` (shared by the CLI verb and
+    /// the MCP tool). Excludes this process's own assertions.
+    @MainActor
+    static func currentSleepIfIdleVerdict(threshold: Int) -> (
+        verdict: SleepIfIdleVerdict, idleSeconds: TimeInterval
+    ) {
+        let idle = IdleMonitor().secondsSinceLastInput()
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let verdict = sleepIfIdleVerdict(
+            idleSeconds: idle,
+            threshold: threshold,
+            assertions: TelemetryEngine().scan().filter { $0.pid != ownPID },
+            power: PowerSourceReader().snapshot(),
+            thermalState: ProcessInfo.processInfo.thermalState,
+            settings: SettingsStore().settings)
+        return (verdict, idle)
+    }
+
     /// The idle threshold following `--sleep-if-idle`: the first Int-parseable
     /// token after the flag, else `fallback`. This tolerates the trailing JSON blob
     /// Codex appends to its `notify` program (a non-numeric arg → fallback), so the
@@ -371,14 +430,24 @@ enum CLI {
 
     @MainActor
     private static func runSleepIfIdle(threshold: Int) {
-        let idle = IdleMonitor().secondsSinceLastInput()
-        guard shouldSleep(idleSeconds: idle, threshold: threshold) else {
+        let (verdict, idle) = currentSleepIfIdleVerdict(threshold: threshold)
+        switch verdict {
+        case .stillActive:
             // Exit 0: a Stop hook fires every turn, so "still busy" is expected, not
             // an error.
             print(
                 L10n.localized(
                     "☕️  Active %ds ago (< %ds) — leaving this Mac awake.", Int(idle), threshold))
             return
+        case .leaveAwake(let reason):
+            // Also exit 0: a safety rail (call, backup, update, media) holding the
+            // Mac awake is the hook working as intended.
+            print(
+                L10n.localized(
+                    "☕️  Idle %ds ≥ %ds, but leaving awake: %@", Int(idle), threshold, reason))
+            return
+        case .sleep:
+            break
         }
         switch SleepController().sleepNow() {
         case .success:

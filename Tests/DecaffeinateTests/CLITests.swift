@@ -50,6 +50,64 @@ final class CLITests: XCTestCase {
         XCTAssertFalse(CLI.shouldSleep(idleSeconds: 299, threshold: 300))
     }
 
+    // MARK: --sleep-if-idle / MCP sleep_if_idle safety rails (T4 / F4)
+
+    private func verdict(
+        idle: TimeInterval = 900, threshold: Int = 300,
+        assertions: [PowerAssertion] = [],
+        settings: DecaffeinateSettings = DecaffeinateSettings()
+    ) -> CLI.SleepIfIdleVerdict {
+        CLI.sleepIfIdleVerdict(
+            idleSeconds: idle, threshold: threshold, assertions: assertions,
+            power: PowerSnapshot(onBattery: false, charge: 1.0, isCharging: false),
+            thermalState: .nominal, settings: settings)
+    }
+
+    func testSleepIfIdleSleepsWhenIdleAndNothingObjects() {
+        XCTAssertEqual(verdict(), .sleep)
+    }
+
+    func testSleepIfIdleStaysAwakeWhenActive() {
+        XCTAssertEqual(verdict(idle: 10), .stillActive)
+    }
+
+    func testSleepIfIdleLeavesAwakeDuringACall() {
+        let mic = Fixtures.assertion(
+            pid: 900, process: "coreaudiod", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, resources: ["audio-in"])
+        guard case .leaveAwake(let reason) = verdict(assertions: [mic]) else {
+            return XCTFail("a hands-off call must not be slept through")
+        }
+        XCTAssertTrue(reason.localizedCaseInsensitiveContains("microphone"), reason)
+    }
+
+    func testSleepIfIdleHonoursTheUserTurningTheCallGuardOff() {
+        let mic = Fixtures.assertion(
+            pid: 900, process: "coreaudiod", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, resources: ["audio-in"])
+        var relaxed = DecaffeinateSettings()
+        relaxed.pauseForActiveCall = false
+        relaxed.pauseForActiveMedia = false
+        XCTAssertEqual(verdict(assertions: [mic], settings: relaxed), .sleep)
+    }
+
+    func testSleepIfIdleLeavesAwakeDuringTimeMachine() {
+        let backup = Fixtures.assertion(
+            pid: 55, process: "backupd", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, name: "com.apple.backupd")
+        guard case .leaveAwake(let reason) = verdict(assertions: [backup]) else {
+            return XCTFail("a Time Machine backup must hold the hook's sleep off")
+        }
+        XCTAssertTrue(reason.contains("Time Machine"), reason)
+    }
+
+    func testSleepIfIdleIdleGateWinsOverRails() {
+        let mic = Fixtures.assertion(
+            pid: 900, process: "coreaudiod", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, resources: ["audio-in"])
+        XCTAssertEqual(verdict(idle: 10, assertions: [mic]), .stillActive)
+    }
+
     func testIdleThresholdParsesNumberAfterFlag() {
         let args = ["Decaffeinate", "--sleep-if-idle", "600"]
         XCTAssertEqual(CLI.idleThreshold(after: 1, in: args, default: 300), 600)

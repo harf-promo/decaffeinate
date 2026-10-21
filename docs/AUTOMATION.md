@@ -14,7 +14,7 @@ Decaffeinate --why-awake            # same as --scan; add --json for structured 
 Decaffeinate --scan                 # what's keeping this Mac awake, in detail
 Decaffeinate --provenance           # …traced to the window / agent / project
 Decaffeinate --sleep-now            # sleep now (exit non-zero if it couldn't launch)
-Decaffeinate --sleep-if-idle 300    # sleep ONLY if idle ≥ 300 s (for turn-end hooks)
+Decaffeinate --sleep-if-idle 300    # sleep ONLY if idle ≥ 300 s and no call/backup/update/media hold (turn-end hooks)
 Decaffeinate --display-off          # turn the display off, keep the system running
 Decaffeinate --keep-awake 60        # hold awake 60 min (honours the safety rails), then release
 Decaffeinate --diagnose             # settings + rules + scan, for a bug report
@@ -82,10 +82,15 @@ Decaffeinate --uninstall-hook        # clean removal, any time
 ```
 
 This writes a **turn-end hook** that runs `Decaffeinate --sleep-if-idle 300` —
-so the Mac sleeps at the end of a turn **only if you've also been idle ≥ 5 min**.
-That makes it safe for interactive sessions, not just overnight runs: while
-you're actively working, the hook is a no-op. The gating lives in Decaffeinate,
-so there's no wrapper script to maintain.
+so the Mac sleeps at the end of a turn **only if you've also been idle ≥ 5 min
+and no safety rail objects**. While you're actively working the hook is a
+no-op, and when you're hands-off but the Mac is on a call (microphone live), in
+the middle of a Time Machine backup or a macOS update, or playing media (per
+your Settings → Safety toggles), it leaves the Mac awake and prints
+`leaving awake: <reason>` (exit 0). The gating lives in Decaffeinate, so
+there's no wrapper script to maintain. Two of the in-app idle engine's holds are
+not applied to the hook or the MCP tool yet: an app allowed to keep the Mac awake
+by your rules, and the active-hours schedule.
 
 - **Claude Code** → a `Stop` hook in `~/.claude/settings.json`. Every other key,
   matcher, and hook you have is preserved; re-installing never duplicates.
@@ -143,7 +148,8 @@ can control sleep directly during a session. Register it with your client, e.g.:
 Tools: **`whats_keeping_awake`** (the `--status --json` shape),
 **`keep_awake`** `{minutes}` (a safety-railed hold that releases when the time
 elapses or the session ends), **`release_keep_awake`**, **`sleep_now`**, and
-**`sleep_if_idle`** `{seconds}`. The hold lives in the server process, so the
+**`sleep_if_idle`** `{seconds}` (same gate as the hook: idle time plus the safety
+rails; replies `Not sleeping — leaving this Mac awake: <reason>` instead of sleeping when one applies). The hold lives in the server process, so the
 kernel releases it automatically when your client closes the session.
 
 > "Sleep when I finish" is deliberately **not** an MCP tool — a server has no
