@@ -22,6 +22,28 @@ final class HookInstallerTests: XCTestCase {
         ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]) ?? [:]
     }
 
+    // MARK: Shell quoting (B-052)
+
+    func testHookCommandLeavesSafePathBare() {
+        XCTAssertEqual(
+            HookInstaller.claudeHookCommand(binaryPath: bin, seconds: 5), "\(bin) --sleep-if-idle 5"
+        )
+    }
+
+    func testHookCommandQuotesPathWithSpaceAndSingleQuote() {
+        let path = "/Users/o'brien/My Apps/Decaffeinate.app/Contents/MacOS/Decaffeinate"
+        let expected =
+            "'/Users/o'\\''brien/My Apps/Decaffeinate.app/Contents/MacOS/Decaffeinate' --sleep-if-idle 5"
+        XCTAssertEqual(HookInstaller.claudeHookCommand(binaryPath: path, seconds: 5), expected)
+        XCTAssertEqual(HookInstaller.cursorHookCommand(binaryPath: path, seconds: 5), expected)
+        XCTAssertTrue(HookInstaller.isDecaffeinateHookCommand(expected))
+    }
+
+    func testShellQuoteNeutralisesMetacharacters() {
+        XCTAssertEqual(HookInstaller.shellQuote("a$(x);b"), "'a$(x);b'")
+        XCTAssertEqual(HookInstaller.shellQuote(""), "''")
+    }
+
     // MARK: Claude Code (settings.json)
 
     func testInstallIntoNilCreatesStopHook() {

@@ -40,7 +40,9 @@ sigtermSource.setEventHandler {
 sigtermSource.resume()
 
 let xpcService = LidHelperXPCService(service: service)
-let listenerDelegate = LidHelperListenerDelegate(exportedObject: xpcService)
+let listenerDelegate = LidHelperListenerDelegate(
+    exportedObject: xpcService,
+    clientRequirement: ClientRequirement.requirementString(teamID: ClientRequirement.ownTeamID()))
 
 // Matches the `MachServices` key in
 // Resources/com.harfpromo.Decaffeinate.LidHelper.plist.
