@@ -1,0 +1,30 @@
+# Generated from fleet-kit templates/github/dependabot (base + swift /).
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Baghdad
+    open-pull-requests-limit: 2
+    labels: [dependencies]
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: swift
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Baghdad
+    open-pull-requests-limit: 2
+    labels: [dependencies]
+    groups:
+      swift-minor-patch:
+        update-types: [minor, patch]
