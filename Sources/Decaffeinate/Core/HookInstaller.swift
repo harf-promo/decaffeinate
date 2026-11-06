@@ -65,7 +65,17 @@ enum HookInstaller {
     /// The Stop-hook command we manage. JSON has no comments, so our identity is
     /// the command itself: it contains both `--sleep-if-idle` and `Decaffeinate`.
     static func claudeHookCommand(binaryPath: String, seconds: Int) -> String {
-        "\(binaryPath) --sleep-if-idle \(seconds)"
+        "\(shellQuote(binaryPath)) --sleep-if-idle \(seconds)"
+    }
+
+    /// POSIX-shell quoting: bare when only safe characters, otherwise single-quoted
+    /// with embedded `'` written as `'\''`.
+    static func shellQuote(_ s: String) -> String {
+        let safe = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@%+=:,./_-"
+        )
+        if !s.isEmpty, s.unicodeScalars.allSatisfy({ safe.contains($0) }) { return s }
+        return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     /// Path-tolerant so a moved `.app` is still recognized on uninstall/re-install.
@@ -261,7 +271,7 @@ enum HookInstaller {
     // MARK: - Cursor (~/.cursor/hooks.json, user-level only)
 
     static func cursorHookCommand(binaryPath: String, seconds: Int) -> String {
-        "\(binaryPath) --sleep-if-idle \(seconds)"
+        "\(shellQuote(binaryPath)) --sleep-if-idle \(seconds)"
     }
 
     /// Add/refresh our `stop` hook, preserving every other key and hook.
