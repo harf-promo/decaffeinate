@@ -1,7 +1,7 @@
 # GENERATED for harf-promo/decaffeinate by fleet-kit shared/bin/fleet-security-workflow.py: do not edit here.
 # Source: wikithoughts/fleet-kit templates/github/fleet-security/ (template + repos.json "decaffeinate").
 # Change it there, then: fleet-security-workflow.py write decaffeinate --repo-dir <checkout>
-# fleet-security: template sha256:3bbbc50277c9 config sha256:c879f6aca1d2
+# fleet-security: template sha256:57379d447990 config sha256:4d32c72b5628
 name: Fleet security
 
 # Secret scan (gitleaks) and workflow lint (actionlint + shellcheck), one
@@ -52,13 +52,31 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Restore pinned gitleaks archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fleet-tool-cache/gitleaks-${{ env.GITLEAKS_VERSION }}-${{ env.GITLEAKS_SHA256 }}
+          key: fleet-gitleaks-${{ runner.os }}-${{ env.GITLEAKS_VERSION }}-${{ env.GITLEAKS_SHA256 }}
+
       - name: Prepare pinned gitleaks
         run: |
           # Job-unique directory: a self-hosted runner keeps /tmp between jobs.
           bin=$(mktemp -d "$RUNNER_TEMP/fleet-gitleaks.XXXXXX")
-          curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$bin/gitleaks.tar.gz" \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "${GITLEAKS_SHA256}  $bin/gitleaks.tar.gz" | sha256sum -c -
+          cache="$RUNNER_TEMP/fleet-tool-cache/gitleaks-${GITLEAKS_VERSION}-${GITLEAKS_SHA256}"
+          mkdir -p "$cache"
+          if [ ! -f "$cache/gitleaks.tar.gz" ]; then
+            curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$cache/gitleaks.tar.gz.tmp" \
+              "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+            mv "$cache/gitleaks.tar.gz.tmp" "$cache/gitleaks.tar.gz"
+          fi
+          if ! printf '%s  %s\n' "$GITLEAKS_SHA256" "$cache/gitleaks.tar.gz" | sha256sum -c -; then
+            rm -f "$cache/gitleaks.tar.gz" "$cache/gitleaks.tar.gz.tmp"
+            curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$cache/gitleaks.tar.gz.tmp" \
+              "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+            mv "$cache/gitleaks.tar.gz.tmp" "$cache/gitleaks.tar.gz"
+            printf '%s  %s\n' "$GITLEAKS_SHA256" "$cache/gitleaks.tar.gz" | sha256sum -c -
+          fi
+          cp "$cache/gitleaks.tar.gz" "$bin/gitleaks.tar.gz"
           tar -xzf "$bin/gitleaks.tar.gz" -C "$bin" gitleaks
           echo "FLEET_GITLEAKS=$bin/gitleaks" >> "$GITHUB_ENV"
 
@@ -99,16 +117,51 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Restore pinned actionlint archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fleet-tool-cache/actionlint-${{ env.ACTIONLINT_VERSION }}-${{ env.ACTIONLINT_SHA256 }}
+          key: fleet-actionlint-${{ runner.os }}-${{ env.ACTIONLINT_VERSION }}-${{ env.ACTIONLINT_SHA256 }}
+
+      - name: Restore pinned shellcheck archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fleet-tool-cache/shellcheck-${{ env.SHELLCHECK_VERSION }}-${{ env.SHELLCHECK_SHA256 }}
+          key: fleet-shellcheck-${{ runner.os }}-${{ env.SHELLCHECK_VERSION }}-${{ env.SHELLCHECK_SHA256 }}
+
       - name: Prepare pinned actionlint and shellcheck
         run: |
           bin=$(mktemp -d "$RUNNER_TEMP/fleet-actionlint.XXXXXX")
-          curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$bin/actionlint.tar.gz" \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          echo "${ACTIONLINT_SHA256}  $bin/actionlint.tar.gz" | sha256sum -c -
+          actionlint_cache="$RUNNER_TEMP/fleet-tool-cache/actionlint-${ACTIONLINT_VERSION}-${ACTIONLINT_SHA256}"
+          shellcheck_cache="$RUNNER_TEMP/fleet-tool-cache/shellcheck-${SHELLCHECK_VERSION}-${SHELLCHECK_SHA256}"
+          mkdir -p "$actionlint_cache" "$shellcheck_cache"
+          if [ ! -f "$actionlint_cache/actionlint.tar.gz" ]; then
+            curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$actionlint_cache/actionlint.tar.gz.tmp" \
+              "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+            mv "$actionlint_cache/actionlint.tar.gz.tmp" "$actionlint_cache/actionlint.tar.gz"
+          fi
+          if ! printf '%s  %s\n' "$ACTIONLINT_SHA256" "$actionlint_cache/actionlint.tar.gz" | sha256sum -c -; then
+            rm -f "$actionlint_cache/actionlint.tar.gz" "$actionlint_cache/actionlint.tar.gz.tmp"
+            curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$actionlint_cache/actionlint.tar.gz.tmp" \
+              "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+            mv "$actionlint_cache/actionlint.tar.gz.tmp" "$actionlint_cache/actionlint.tar.gz"
+            printf '%s  %s\n' "$ACTIONLINT_SHA256" "$actionlint_cache/actionlint.tar.gz" | sha256sum -c -
+          fi
+          cp "$actionlint_cache/actionlint.tar.gz" "$bin/actionlint.tar.gz"
           tar -xzf "$bin/actionlint.tar.gz" -C "$bin" actionlint
-          curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$bin/shellcheck.tar.gz" \
-            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.gz"
-          echo "${SHELLCHECK_SHA256}  $bin/shellcheck.tar.gz" | sha256sum -c -
+          if [ ! -f "$shellcheck_cache/shellcheck.tar.gz" ]; then
+            curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$shellcheck_cache/shellcheck.tar.gz.tmp" \
+              "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.gz"
+            mv "$shellcheck_cache/shellcheck.tar.gz.tmp" "$shellcheck_cache/shellcheck.tar.gz"
+          fi
+          if ! printf '%s  %s\n' "$SHELLCHECK_SHA256" "$shellcheck_cache/shellcheck.tar.gz" | sha256sum -c -; then
+            rm -f "$shellcheck_cache/shellcheck.tar.gz" "$shellcheck_cache/shellcheck.tar.gz.tmp"
+            curl --retry 3 --connect-timeout 15 --max-time 120 -sSfL -o "$shellcheck_cache/shellcheck.tar.gz.tmp" \
+              "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.gz"
+            mv "$shellcheck_cache/shellcheck.tar.gz.tmp" "$shellcheck_cache/shellcheck.tar.gz"
+            printf '%s  %s\n' "$SHELLCHECK_SHA256" "$shellcheck_cache/shellcheck.tar.gz" | sha256sum -c -
+          fi
+          cp "$shellcheck_cache/shellcheck.tar.gz" "$bin/shellcheck.tar.gz"
           tar -xzf "$bin/shellcheck.tar.gz" -C "$bin" --strip-components=1 "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
           echo "FLEET_LINT_BIN=$bin" >> "$GITHUB_ENV"
 
