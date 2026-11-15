@@ -1,12 +1,53 @@
 import Foundation
 
+/// A JSON string literal for `string` (slashes unescaped).
+private func jsonQuoted(_ string: String) -> String {
+    let data = try? JSONSerialization.data(
+        withJSONObject: string, options: [.fragmentsAllowed, .withoutEscapingSlashes])
+    return data.map { String(decoding: $0, as: UTF8.self) } ?? "\"\""
+}
+
 /// A new JSON value to splice into a document. Only what the hook installer
 /// writes: strings, integers, objects and arrays.
-indirect enum JSONNode {
-    case string(String)
-    case int(Int)
-    case object([(key: String, value: JSONNode)])
-    case array([JSONNode])
+///
+/// Deliberately **not** a recursive enum: a value is a closure that renders itself
+/// for a given layout, so there is no self-referential type. (An `indirect enum` with
+/// an array-of-tuples case hit a "circular reference" in the Xcode 26.3 compiler.)
+struct JSONNode {
+    /// Renders the value; `base` is the indentation of the line it starts on.
+    let render: (_ base: String, _ unit: String, _ multiline: Bool) -> String
+
+    static func string(_ value: String) -> JSONNode {
+        JSONNode { _, _, _ in jsonQuoted(value) }
+    }
+
+    static func int(_ value: Int) -> JSONNode {
+        JSONNode { _, _, _ in String(value) }
+    }
+
+    static func object(_ members: [(String, JSONNode)]) -> JSONNode {
+        JSONNode { base, unit, multiline in
+            if members.isEmpty { return "{}" }
+            let inner = base + unit
+            let parts = members.map {
+                jsonQuoted($0.0) + ": " + $0.1.render(inner, unit, multiline)
+            }
+            return multiline
+                ? "{\n" + parts.map { inner + $0 }.joined(separator: ",\n") + "\n" + base + "}"
+                : "{" + parts.joined(separator: ", ") + "}"
+        }
+    }
+
+    static func array(_ elements: [JSONNode]) -> JSONNode {
+        JSONNode { base, unit, multiline in
+            if elements.isEmpty { return "[]" }
+            let inner = base + unit
+            let parts = elements.map { $0.render(inner, unit, multiline) }
+            return multiline
+                ? "[\n" + parts.map { inner + $0 }.joined(separator: ",\n") + "\n" + base + "]"
+                : "[" + parts.joined(separator: ", ") + "]"
+        }
+    }
 }
 
 /// A minimal, byte-preserving editor for JSON *text*.
@@ -37,37 +78,7 @@ struct JSONTextEditor {
 
     /// A fresh document: `node` as the root, ending in a newline.
     static func render(root node: JSONNode) -> Data {
-        Data((render(node, base: "", unit: "  ", multiline: true) + "\n").utf8)
-    }
-
-    private static func quoted(_ string: String) -> String {
-        let data = try? JSONSerialization.data(
-            withJSONObject: string, options: [.fragmentsAllowed, .withoutEscapingSlashes])
-        return data.map { String(decoding: $0, as: UTF8.self) } ?? "\"\""
-    }
-
-    private static func render(_ node: JSONNode, base: String, unit: String, multiline: Bool)
-        -> String
-    {
-        let inner = base + unit
-        switch node {
-        case .string(let s): return quoted(s)
-        case .int(let n): return String(n)
-        case .object(let members):
-            if members.isEmpty { return "{}" }
-            let parts = members.map {
-                "\(quoted($0.key)): \(render($0.value, base: inner, unit: unit, multiline: multiline))"
-            }
-            return multiline
-                ? "{\n" + parts.map { inner + $0 }.joined(separator: ",\n") + "\n" + base + "}"
-                : "{" + parts.joined(separator: ", ") + "}"
-        case .array(let elements):
-            if elements.isEmpty { return "[]" }
-            let parts = elements.map { render($0, base: inner, unit: unit, multiline: multiline) }
-            return multiline
-                ? "[\n" + parts.map { inner + $0 }.joined(separator: ",\n") + "\n" + base + "]"
-                : "[" + parts.joined(separator: ", ") + "]"
-        }
+        Data((node.render("", "  ", true) + "\n").utf8)
     }
 
     // MARK: Edits
@@ -81,9 +92,8 @@ struct JSONTextEditor {
             into: container, items: items.map { ($0.keyStart, $0.value.end) },
             open: "{", close: "}"
         ) { layout in
-            "\(Self.quoted(key)): "
-                + Self.render(
-                    value, base: layout.base, unit: layout.unit, multiline: layout.multiline)
+            jsonQuoted(key) + ": "
+                + value.render(layout.base, layout.unit, layout.multiline)
         }
     }
 
@@ -95,7 +105,7 @@ struct JSONTextEditor {
         return insert(
             into: container, items: items.map { ($0.start, $0.end) }, open: "[", close: "]"
         ) { layout in
-            Self.render(value, base: layout.base, unit: layout.unit, multiline: layout.multiline)
+            value.render(layout.base, layout.unit, layout.multiline)
         }
     }
 
