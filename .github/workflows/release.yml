@@ -202,26 +202,6 @@ jobs:
             gh release upload "${GITHUB_REF_NAME}" build/appcast.xml --clobber
           fi
 
-      - name: Bump the canonical cask (this repo)
-        run: |
-          # Keeps Casks/decaffeinate.rb from lagging the tag the way it did
-          # through 1.13.0 → 1.20.0 (7 releases of manual-bump drift). This is
-          # the repo's own mirror copy; the live tap is bumped in the next step.
-          VERSION="${GITHUB_REF_NAME#v}"
-          SHA="$(shasum -a 256 build/Decaffeinate-*.dmg | awk '{print $1}')"
-          sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" Casks/decaffeinate.rb
-          sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" Casks/decaffeinate.rb
-          if git diff --quiet -- Casks/decaffeinate.rb; then
-            echo "Cask already at $VERSION — nothing to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/decaffeinate.rb
-          git commit -m "chore: bump cask to ${GITHUB_REF_NAME} [skip ci]"
-          # The checkout is at the tag (detached HEAD) — push explicitly to main.
-          git push origin HEAD:main
-
       - name: Mirror the cask into the Homebrew tap
         env:
           GH_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
@@ -231,7 +211,9 @@ jobs:
           # Needs a fine-grained PAT with contents:write on the tap repo, saved
           # as the TAP_REPO_TOKEN secret (docs/DISTRIBUTION.md). Skips cleanly,
           # loudly, if that secret isn't configured — it's optional, not required
-          # for this workflow to succeed.
+          # for this workflow to succeed. It runs before the in-repo bump below:
+          # the tap is the copy Homebrew reads, so nothing that can go wrong with
+          # main may stand between a published release and `brew upgrade`.
           if [ -z "$GH_TOKEN" ]; then
             echo "::warning::TAP_REPO_TOKEN not set — skipping tap mirror. Bump harf-promo/homebrew-tap's Casks/decaffeinate.rb by hand (see docs/DISTRIBUTION.md)."
             exit 0
@@ -250,6 +232,12 @@ jobs:
                 "$@"
           }
           tap_git clone --depth 1 https://github.com/harf-promo/homebrew-tap.git "$TAP_DIR"
+          CURRENT="$(sed -n 's/^ *version "\([^"]*\)".*/\1/p' "$TAP_DIR/Casks/decaffeinate.rb" | head -n 1)"
+          if [ "$CURRENT" != "$VERSION" ] \
+            && [ "$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -n 1)" = "$CURRENT" ]; then
+            echo "::warning::The tap's cask is at $CURRENT, newer than ${GITHUB_REF_NAME} — not downgrading it."
+            exit 0
+          fi
           sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" "$TAP_DIR/Casks/decaffeinate.rb"
           sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" "$TAP_DIR/Casks/decaffeinate.rb"
           cd "$TAP_DIR"
@@ -262,3 +250,43 @@ jobs:
           git add Casks/decaffeinate.rb
           git commit -m "chore: bump decaffeinate to ${GITHUB_REF_NAME}"
           tap_git push origin HEAD
+
+      - name: Bump the canonical cask (this repo)
+        run: |
+          # Keeps Casks/decaffeinate.rb from lagging the tag the way it did
+          # through 1.13.0 → 1.20.0 (7 releases of manual-bump drift). This is
+          # the repo's own mirror copy; the live tap is bumped in the step above.
+          #
+          # The guard job accepts a tag that is *behind* main, and this checkout
+          # sits at the tag, so a commit made here would be a non-fast-forward the
+          # moment main has moved. Bump on top of the current main instead, and
+          # retry if main moves again between the fetch and the push.
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA="$(shasum -a 256 build/Decaffeinate-*.dmg | awk '{print $1}')"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4 5; do
+            git fetch --no-tags origin main
+            git switch --detach FETCH_HEAD
+            CURRENT="$(sed -n 's/^ *version "\([^"]*\)".*/\1/p' Casks/decaffeinate.rb | head -n 1)"
+            if [ "$CURRENT" != "$VERSION" ] \
+              && [ "$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -n 1)" = "$CURRENT" ]; then
+              echo "::warning::main's cask is at $CURRENT, newer than ${GITHUB_REF_NAME} — not downgrading it."
+              exit 0
+            fi
+            sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" Casks/decaffeinate.rb
+            sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" Casks/decaffeinate.rb
+            if git diff --quiet -- Casks/decaffeinate.rb; then
+              echo "Cask already at $VERSION — nothing to commit."
+              exit 0
+            fi
+            git add Casks/decaffeinate.rb
+            git commit -m "chore: bump cask to ${GITHUB_REF_NAME} [skip ci]"
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "::warning::Push to main was rejected (attempt $attempt) — main moved; retrying on the new tip."
+            sleep $((attempt * 3))
+          done
+          echo "::error::Could not push the cask bump to main after 5 attempts. The DMG, appcast and tap are already published; bump Casks/decaffeinate.rb on main by hand."
+          exit 1

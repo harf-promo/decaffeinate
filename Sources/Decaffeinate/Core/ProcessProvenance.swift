@@ -53,6 +53,15 @@ struct ProcessProvenance: Hashable, Sendable {
 }
 
 extension ProcessProvenance {
+    /// Whether this hold's provenance traces back to a known AI agent (Claude Code…).
+    var isAgentSession: Bool {
+        if originKind == .agentHost { return true }
+        return AgentRegistry.identify(
+            originApp: originDisplayName,
+            bundleID: originApp?.bundleIdentifier,
+            processNames: parentChain.map(\.name))?.isAIAgent == true
+    }
+
     /// Map a holder's argv to a friendly agent/tool name when we can be confident
     /// (never guesses from a bare interpreter name alone).
     static func friendlyAgentName(argv: [String]) -> String? {

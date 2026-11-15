@@ -77,11 +77,11 @@ brew install --cask decaffeinate
 ```
 
 **Per-release tap mirror — now automated by `release.yml`:**
-1. **This repo's `Casks/decaffeinate.rb`** is bumped and committed to `main`
-   automatically by the `Bump the canonical cask` step, right after the DMG
-   uploads — `version` + `sha256` (read straight from the freshly-built DMG),
-   no manual commit needed anymore.
-2. **The separate `harf-promo/homebrew-tap` repo** is bumped by the `Mirror the
+The two bumps run in this order, so nothing about `main` can stand between a
+published release and `brew upgrade`. Neither downgrades a cask that is already
+newer than the tag (a tag pushed for an older commit).
+
+1. **The separate `harf-promo/homebrew-tap` repo** is bumped by the `Mirror the
    cask into the Homebrew tap` step — but only if the **`TAP_REPO_TOKEN`**
    repository secret is set (a fine-grained GitHub PAT scoped to `Contents:
    write` on `harf-promo/homebrew-tap` only). Without it, that step logs a
@@ -90,6 +90,12 @@ brew install --cask decaffeinate
    `brew upgrade --cask decaffeinate` will see the new version. The `url` line
    interpolates `#{version}` so it re-resolves automatically — only `version`
    and `sha256` ever need changing, in either repo.
+2. **This repo's `Casks/decaffeinate.rb`** is bumped and committed to `main`
+   automatically by the `Bump the canonical cask` step — `version` + `sha256`
+   (read straight from the freshly-built DMG), no manual commit needed. The
+   commit is made on top of the *current* `main`, not on the tagged commit, so it
+   still lands when `main` has moved on since the tag (a Dependabot merge, say);
+   a push that loses a race is retried.
 
 > **Note:** `SUFeedURL` uses `/releases/latest/download/` which resolves to the
 > latest **non-prerelease, non-draft** GitHub release. Never mark a production

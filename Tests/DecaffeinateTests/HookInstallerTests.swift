@@ -143,6 +143,220 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertNil(HookInstaller.installClaudeHook(into: weird2, binaryPath: bin, seconds: 300))
     }
 
+    // MARK: Minimal JSON edits (M2): never reformat the user's file
+
+    /// A hand-written settings file: 4-space indent, non-sorted keys, numbers a
+    /// `JSONSerialization` round trip would rewrite (`0.1` → `0.10000000000000001`).
+    private let handWritten = """
+        {
+            "zeta": 0.1,
+            "alpha": 1.0e2,
+            "big": 12345678901234567890,
+            "permissions": {
+                "allow": ["Bash"]
+            },
+            "url": "https://example.com/a/b"
+        }
+
+        """
+
+    func testInstallKeepsTheUsersNumbersKeyOrderAndLayout() throws {
+        let out = try XCTUnwrap(
+            HookInstaller.installClaudeHook(
+                into: Data(handWritten.utf8), binaryPath: bin, seconds: 300))
+        let text = String(decoding: out, as: UTF8.self)
+        XCTAssertTrue(text.contains("\"zeta\": 0.1,"), "0.1 must not become 0.10000000000000001")
+        XCTAssertTrue(text.contains("\"alpha\": 1.0e2,"), "number lexeme preserved")
+        XCTAssertTrue(text.contains("12345678901234567890"), "big integer preserved")
+        XCTAssertTrue(text.contains("https://example.com/a/b"), "slashes not escaped")
+        XCTAssertTrue(
+            text.contains("    \"permissions\": {\n        \"allow\": [\"Bash\"]\n    },"),
+            "untouched members keep their exact bytes")
+        XCTAssertLessThan(
+            text.range(of: "zeta")!.lowerBound, text.range(of: "alpha")!.lowerBound,
+            "key order is the user's, not sorted")
+        XCTAssertEqual(stopCommands(out).count, 1)
+        XCTAssertTrue(text.hasSuffix("    }\n}\n"), "trailing bytes preserved")
+    }
+
+    func testInstallThenUninstallRestoresTheOriginalBytes() throws {
+        let original = Data(handWritten.utf8)
+        let installed = try XCTUnwrap(
+            HookInstaller.installClaudeHook(into: original, binaryPath: bin, seconds: 300))
+        XCTAssertNotEqual(installed, original)
+        XCTAssertEqual(HookInstaller.uninstallClaudeHook(from: installed), original)
+    }
+
+    func testReinstallOfAHandWrittenFileIsByteStable() throws {
+        let first = try XCTUnwrap(
+            HookInstaller.installClaudeHook(
+                into: Data(handWritten.utf8), binaryPath: bin, seconds: 300))
+        let second = HookInstaller.installClaudeHook(into: first, binaryPath: bin, seconds: 300)
+        XCTAssertEqual(second, first)
+    }
+
+    func testUninstallKeepsNumbersWhenOtherHooksRemain() throws {
+        let input = """
+            {"ratio": 0.1, "hooks": {"Stop": [{"matcher": "Foo", "hooks": [{"type": "command", "command": "echo hi"}]}]}}
+            """
+        let installed = try XCTUnwrap(
+            HookInstaller.installClaudeHook(into: Data(input.utf8), binaryPath: bin, seconds: 300))
+        let removed = try XCTUnwrap(HookInstaller.uninstallClaudeHook(from: installed))
+        XCTAssertEqual(String(decoding: removed, as: UTF8.self), input)
+    }
+
+    func testUninstallRemovesOnlyOurEntryFromASharedGroup() throws {
+        let ours = HookInstaller.claudeHookCommand(binaryPath: bin, seconds: 300)
+        let input = """
+            {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo hi"}, {"type": "command", "command": "\(ours)"}]}]}}
+            """
+        let removed = try XCTUnwrap(HookInstaller.uninstallClaudeHook(from: Data(input.utf8)))
+        XCTAssertEqual(stopCommands(removed), ["echo hi"])
+        XCTAssertEqual(
+            String(decoding: removed, as: UTF8.self),
+            """
+            {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}
+            """)
+    }
+
+    func testInstallKeepsAForeignEntrySharingAGroupWithOurOldHook() throws {
+        let old = HookInstaller.claudeHookCommand(binaryPath: bin, seconds: 120)
+        let input = """
+            {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo hi"}, {"type": "command", "command": "\(old)"}]}]}}
+            """
+        let out = try XCTUnwrap(
+            HookInstaller.installClaudeHook(into: Data(input.utf8), binaryPath: bin, seconds: 300))
+        let cmds = stopCommands(out)
+        XCTAssertTrue(cmds.contains("echo hi"), "a foreign hook is never dropped with ours")
+        XCTAssertEqual(cmds.filter { $0.contains("--sleep-if-idle") }.count, 1)
+        XCTAssertTrue(cmds.contains { $0.contains("--sleep-if-idle 300") })
+    }
+
+    func testInstallEditsACompactSingleLineFileCompactly() throws {
+        let input = "{\"ratio\":0.1}"
+        let out = try XCTUnwrap(
+            HookInstaller.installClaudeHook(into: Data(input.utf8), binaryPath: bin, seconds: 300))
+        let text = String(decoding: out, as: UTF8.self)
+        XCTAssertTrue(text.hasPrefix("{\"ratio\":0.1, \"hooks\""), text)
+        XCTAssertFalse(text.contains("\n"), "a one-line file stays one line")
+        XCTAssertEqual(stopCommands(out).count, 1)
+    }
+
+    func testCursorEditsKeepNumbersAndRoundTripBytes() throws {
+        let input = """
+            {
+              "version": 1,
+              "scale": 0.1,
+              "hooks": {
+                "stop": [{ "command": "echo hi" }]
+              }
+            }
+
+            """
+        let installed = try XCTUnwrap(
+            HookInstaller.installCursorHook(
+                into: Data(input.utf8), binaryPath: bin, seconds: 300))
+        XCTAssertTrue(String(decoding: installed, as: UTF8.self).contains("\"scale\": 0.1,"))
+        XCTAssertEqual(cursorStopCommands(installed).count, 2)
+        let removed = HookInstaller.uninstallCursorHook(from: installed)
+        XCTAssertEqual(removed.map { String(decoding: $0, as: UTF8.self) }, input)
+    }
+
+    // MARK: Writing through symlinks (M2)
+
+    private func makeTempDir() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("decaf-hook-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        return dir
+    }
+
+    private func mode(of url: URL) throws -> Int {
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attrs[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+
+    private func isSymlink(_ url: URL) -> Bool {
+        (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+    }
+
+    func testAtomicWriteThroughASymlinkUpdatesTheTargetAndKeepsTheLink() throws {
+        let dir = try makeTempDir()
+        let target = dir.appendingPathComponent("real.json")
+        let link = dir.appendingPathComponent("settings.json")
+        try Data("{}".utf8).write(to: target)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: target.path)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+        try HookInstaller.atomicWrite(Data("{\"a\": 1}".utf8), to: link)
+
+        XCTAssertTrue(isSymlink(link), "the symlink must survive an install")
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "{\"a\": 1}")
+        XCTAssertEqual(try mode(of: target), 0o600, "the target's mode is preserved")
+    }
+
+    func testAtomicWriteFollowsARelativeSymlinkChain() throws {
+        let dir = try makeTempDir()
+        let dotfiles = dir.appendingPathComponent("dotfiles", isDirectory: true)
+        let home = dir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: dotfiles, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        let target = dotfiles.appendingPathComponent("claude.json")
+        try Data("old".utf8).write(to: target)
+        try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: target.path)
+        let hop = dotfiles.appendingPathComponent("hop.json")
+        try FileManager.default.createSymbolicLink(
+            atPath: hop.path, withDestinationPath: "claude.json")
+        let link = home.appendingPathComponent("settings.json")
+        try FileManager.default.createSymbolicLink(
+            atPath: link.path, withDestinationPath: "../dotfiles/hop.json")
+
+        try HookInstaller.atomicWrite(Data("new".utf8), to: link)
+
+        XCTAssertTrue(isSymlink(link))
+        XCTAssertTrue(isSymlink(hop))
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "new")
+        XCTAssertEqual(try mode(of: target), 0o640)
+    }
+
+    func testAtomicWriteCreatesTheTargetOfADanglingSymlink() throws {
+        let dir = try makeTempDir()
+        let target = dir.appendingPathComponent("missing/real.json")
+        let link = dir.appendingPathComponent("settings.json")
+        try FileManager.default.createSymbolicLink(
+            atPath: link.path, withDestinationPath: target.path)
+
+        try HookInstaller.atomicWrite(Data("x".utf8), to: link)
+
+        XCTAssertTrue(isSymlink(link))
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "x")
+    }
+
+    func testAtomicWriteKeepsThePlainFileMode() throws {
+        let dir = try makeTempDir()
+        let file = dir.appendingPathComponent("settings.json")
+        try Data("{}".utf8).write(to: file)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+
+        try HookInstaller.atomicWrite(Data("{\"a\": 2}".utf8), to: file)
+
+        XCTAssertEqual(try mode(of: file), 0o600)
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "{\"a\": 2}")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        XCTAssertEqual(leftovers, ["settings.json"], "no temp file left behind")
+    }
+
+    func testAtomicWriteRefusesASymlinkLoop() throws {
+        let dir = try makeTempDir()
+        let a = dir.appendingPathComponent("a.json")
+        let b = dir.appendingPathComponent("b.json")
+        try FileManager.default.createSymbolicLink(atPath: a.path, withDestinationPath: b.path)
+        try FileManager.default.createSymbolicLink(atPath: b.path, withDestinationPath: a.path)
+        XCTAssertThrowsError(try HookInstaller.atomicWrite(Data("x".utf8), to: a))
+        XCTAssertTrue(isSymlink(a), "a loop is never replaced with a regular file")
+    }
+
     // MARK: Codex (config.toml notify)
 
     func testCodexInstallIntoEmptyAddsMarkedNotify() {
