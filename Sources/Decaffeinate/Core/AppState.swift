@@ -967,14 +967,7 @@ final class AppState: ObservableObject {
 
     /// Whether a hold's provenance traces back to a known AI agent (Claude Code…).
     func isAgentSession(_ assertion: PowerAssertion) -> Bool {
-        guard let provenance = provenanceResolver.provenance(for: assertion.pid) else {
-            return false
-        }
-        if provenance.originKind == .agentHost { return true }
-        return AgentRegistry.identify(
-            originApp: provenance.originDisplayName,
-            bundleID: provenance.originApp?.bundleIdentifier,
-            processNames: provenance.parentChain.map(\.name))?.isAIAgent == true
+        provenanceResolver.provenance(for: assertion.pid)?.isAgentSession == true
     }
 
     private func isAlive(_ pid: pid_t) -> Bool {
@@ -1138,7 +1131,7 @@ final class AppState: ObservableObject {
         caffeine.update(
             keepSystemAwake: wantsAwake,
             keepDisplayAwake: wantsDisplayAwake,
-            reason: "Decaffeinate keep-awake"
+            reason: CLI.appHoldReason
         )
 
         // 2) Firewall: surface newly-seen, unclassified blockers.

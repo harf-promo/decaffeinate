@@ -352,23 +352,39 @@ enum CLI {
         case sleep
         /// The user was active more recently than the threshold.
         case stillActive
-        /// Idle long enough, but a safety rail holds sleep off (microphone/call,
-        /// Time Machine backup, macOS update, active media).
+        /// Idle long enough, but something holds sleep off: a safety rail
+        /// (microphone/call, Time Machine backup, macOS update, active media), the
+        /// user's own keep-awake hold, or another agent session that is mid-task.
         case leaveAwake(reason: String)
     }
+
+    /// Process names whose power assertion is a *user-requested* keep-awake hold:
+    /// Decaffeinate's own (`--keep-awake`, the menu toggle, MCP `keep_awake`) and
+    /// the system `caffeinate` tool. `pmset sleepnow` overrides assertions, so the
+    /// hook has to honour them itself.
+    static let keepAwakeHolderNames: Set<String> = ["decaffeinate", "caffeinate"]
+
+    /// The assertion name the GUI app's engine registers (`AppState.tick`).
+    static let appHoldReason = "Decaffeinate keep-awake"
 
     /// The decision behind `--sleep-if-idle` / MCP `sleep_if_idle`: the HID idle
     /// gate first, then the same `SafetyRails` hold-off reasons the GUI's idle
     /// engine honours, evaluated from the same assertion snapshot `--scan` uses.
     /// A turn-end hook must not sleep the Mac mid-call or mid-backup just because
-    /// the user is hands-off. Pure so both entry points are unit-testable.
+    /// the user is hands-off. It must not sleep through the user's keep-awake hold
+    /// or another agent session's work either (the app's own engine suppresses
+    /// force-sleep for both). A keep-awake hold only counts while the safety rails
+    /// still permit it (`dropKeepAwakeReasons` empty), exactly as in the engine.
+    /// Pure so both entry points are unit-testable.
     static func sleepIfIdleVerdict(
         idleSeconds: TimeInterval,
         threshold: Int,
         assertions: [PowerAssertion],
         power: PowerSnapshot,
         thermalState: ProcessInfo.ThermalState,
-        settings: DecaffeinateSettings
+        settings: DecaffeinateSettings,
+        otherAgentSessions: [String] = [],
+        ownSessionHolders: Set<pid_t> = []
     ) -> SleepIfIdleVerdict {
         guard shouldSleep(idleSeconds: idleSeconds, threshold: threshold) else {
             return .stillActive
@@ -383,7 +399,111 @@ enum CLI {
         if let reason = decision.holdForceSleepReasons.first {
             return .leaveAwake(reason: reason)
         }
+        guard !decision.shouldDropKeepAwake else { return .sleep }
+        if settings.caffeinateEnabled {
+            return .leaveAwake(reason: "Keep Awake is on")
+        }
+        // Strict takeover keeps the GUI's own assertion up permanently (it is how
+        // Decaffeinate takes idle-sleep over from macOS), so under that mode the GUI
+        // hold carries no "the user wants this awake" signal and is not counted.
+        let strictTakeover = settings.strictTakeoverMode && settings.decaffeinateEnabled
+        if let hold = assertions.first(where: {
+            $0.kind != .other && keepAwakeHolderNames.contains($0.processName.lowercased())
+                && !(strictTakeover && $0.name == appHoldReason)
+                && !ownSessionHolders.contains($0.pid)
+        }) {
+            return .leaveAwake(reason: "Keep-awake hold by \(hold.processName) (pid \(hold.pid))")
+        }
+        if !otherAgentSessions.isEmpty {
+            return .leaveAwake(
+                reason:
+                    "Another agent session is active (\(otherAgentSessions.joined(separator: ", ")))"
+            )
+        }
         return .sleep
+    }
+
+    /// Labels for agent sessions other than the caller's own that currently hold the
+    /// Mac awake (Claude Code keeps a `caffeinate` assertion up while it works). A
+    /// holder belongs to the caller's session when it is, or descends from,
+    /// `ownSessionRoot`, the nearest non-shell ancestor of this process. Pure: the
+    /// provenance lookup is injected.
+    nonisolated static func otherAgentSessionNames(
+        assertions: [PowerAssertion],
+        ownSessionRoot: pid_t?,
+        provenance: (pid_t) -> ProcessProvenance?
+    ) -> [String] {
+        var names: [String] = []
+        var seen: Set<pid_t> = []
+        for assertion in assertions where assertion.blocksSystemSleep {
+            guard seen.insert(assertion.pid).inserted,
+                let found = provenance(assertion.pid),
+                found.isAgentSession || isAgentExecutable(found.holderName)
+            else { continue }
+            if let root = ownSessionRoot,
+                assertion.pid == root || found.parentChain.contains(where: { $0.pid == root })
+            {
+                continue
+            }
+            let who = found.originDisplayName ?? assertion.processName
+            names.append(found.projectLabel.map { "\(who) \($0)" } ?? who)
+        }
+        return names
+    }
+
+    /// True when `name` is the executable of a known AI agent itself, e.g.
+    /// `grok-1.0.77-macos-aarch64`, which holds its own "agent turn in progress"
+    /// assertion rather than spawning `caffeinate`. Matches on the registry's process
+    /// names as a prefix so versioned binary names still count.
+    nonisolated static func isAgentExecutable(_ name: String) -> Bool {
+        let lowered = name.lowercased()
+        return AgentRegistry.all.contains { identity in
+            identity.isAIAgent && identity.processNames.contains { lowered.hasPrefix($0) }
+        }
+    }
+
+    /// `caffeinate` holds that the calling agent session itself keeps up while it
+    /// works (Claude Code wraps its turns in one): `caffeinate` processes whose direct
+    /// parent is `ownSessionRoot`. A `caffeinate` an agent starts on purpose runs under
+    /// the agent's shell, so it is a child of that shell and still counts.
+    nonisolated static func ownSessionWrapperPIDs(
+        assertions: [PowerAssertion],
+        ownSessionRoot: pid_t?,
+        provenance: (pid_t) -> ProcessProvenance?
+    ) -> Set<pid_t> {
+        guard let root = ownSessionRoot else { return [] }
+        var pids: Set<pid_t> = []
+        for assertion in assertions where assertion.processName.lowercased() == "caffeinate" {
+            if let found = provenance(assertion.pid), found.parentChain.first?.pid == root {
+                pids.insert(assertion.pid)
+            }
+        }
+        return pids
+    }
+
+    /// The nearest non-shell ancestor of this process: the agent CLI that ran the
+    /// hook (`sh -c` wrappers are skipped). Nil when the walk finds nothing, or when
+    /// that ancestor is a terminal, editor or other GUI app: a hand-run from a terminal
+    /// has no agent session of its own, so nothing is "mine".
+    @MainActor
+    private static func ownSessionRoot(
+        introspector: any ProcessIntrospecting = LiveProcessIntrospector()
+    ) -> pid_t? {
+        var current = getppid()
+        var depth = 0
+        while current > 1, depth < 16, let facts = introspector.facts(for: current) {
+            if !OriginRegistry.isShell(facts.name) {
+                if facts.isRegularApp
+                    || OriginRegistry.classify(name: facts.name, bundleID: facts.bundleID) != nil
+                {
+                    return nil
+                }
+                return current
+            }
+            current = facts.ppid
+            depth += 1
+        }
+        return nil
     }
 
     /// Gathers the live inputs for `sleepIfIdleVerdict` (shared by the CLI verb and
@@ -394,13 +514,22 @@ enum CLI {
     ) {
         let idle = IdleMonitor().secondsSinceLastInput()
         let ownPID = ProcessInfo.processInfo.processIdentifier
+        let assertions = TelemetryEngine().scan().filter { $0.pid != ownPID }
+        let resolver = ProcessProvenanceResolver()
+        let root = ownSessionRoot()
         let verdict = sleepIfIdleVerdict(
             idleSeconds: idle,
             threshold: threshold,
-            assertions: TelemetryEngine().scan().filter { $0.pid != ownPID },
+            assertions: assertions,
             power: PowerSourceReader().snapshot(),
             thermalState: ProcessInfo.processInfo.thermalState,
-            settings: SettingsStore().settings)
+            settings: SettingsStore().settings,
+            otherAgentSessions: otherAgentSessionNames(
+                assertions: assertions, ownSessionRoot: root,
+                provenance: { resolver.provenance(for: $0) }),
+            ownSessionHolders: ownSessionWrapperPIDs(
+                assertions: assertions, ownSessionRoot: root,
+                provenance: { resolver.provenance(for: $0) }))
         return (verdict, idle)
     }
 

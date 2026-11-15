@@ -19,6 +19,23 @@ On `main` since v1.26.2, not yet tagged — PRs #14–#20 and #22.
   active trigger by rule ID instead of matching English text.
 
 ### Fixed
+- **`--sleep-if-idle` no longer sleeps the Mac through a keep-awake hold or
+  another agent's work.** The turn-end hook (and MCP `sleep_if_idle`) now leaves
+  the Mac awake while Keep Awake is on, while a `Decaffeinate`/`caffeinate`
+  assertion holds it, and while a different agent session holds it awake
+  (`pmset sleepnow` overrides assertions, so the hook has to check). A hold
+  dropped by the battery or thermal rail no longer counts.
+- **`--install-hook` / `--uninstall-hook` edit the file you have, not a copy.**
+  A symlinked `settings.json` (dotfiles repo, managed install) is written
+  through instead of being replaced by a regular file, the target's permission
+  bits are kept, and the Claude/Cursor JSON is edited in place, so key order,
+  indentation and numbers (`0.1` no longer becomes `0.10000000000000001`)
+  survive. Our entry is also removed alone from a hook group it shares with
+  yours, rather than taking the group with it.
+- **A release no longer ends red when `main` has moved past the tag.** The
+  Homebrew tap is bumped before this repo's cask, and the in-repo cask bump now
+  commits on top of the current `main` (with retries) instead of on the tagged
+  commit; neither step downgrades a newer cask.
 - **"Let my Mac sleep" now does** (#15). `decaffeinate://stop-awake` and the
   Stop Keeping Awake intent end both the quiet window and the persistent
   keep-awake, instead of answering "your Mac can sleep normally again" while
