@@ -198,13 +198,21 @@ enum HookInstaller {
         return placed ? editor.data : nil
     }
 
+    /// True only for a file that decodes as UTF-8 and holds nothing but whitespace.
+    /// Data that does not decode (UTF-16, or a stray Latin-1 byte) is present but
+    /// unreadable, never blank: treating it as blank would replace the user's whole
+    /// settings file with a fresh one holding only our hook.
     private static func isBlank(_ data: Data) -> Bool {
-        (String(data: data, encoding: .utf8) ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard let text = String(data: data, encoding: .utf8) else { return false }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Parse a settings file, or nil when it is not a UTF-8 JSON object. The text
+    /// editor splices raw UTF-8 bytes, so a UTF-16 file (which `JSONSerialization`
+    /// would accept) is refused here as well, keeping the "left untouched" branch.
     private static func parseObject(_ data: Data) -> [String: Any]? {
-        (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard String(data: data, encoding: .utf8) != nil else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
     /// Delete our hook entries (and any group or key they leave empty, when `prune`)

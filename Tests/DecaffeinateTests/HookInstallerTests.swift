@@ -563,6 +563,63 @@ final class HookInstallerTests: XCTestCase {
             "never overwrite a file we can't parse")
     }
 
+    // MARK: Undecodable settings (DC-1)
+
+    /// A settings file that is not valid UTF-8 (UTF-16, or one stray Latin-1 byte)
+    /// used to read as "blank" and was replaced by a file holding only our hook.
+    /// It is present-but-unreadable: every editor must return nil ("left untouched").
+    private var undecodableFiles: [(name: String, data: Data)] {
+        [
+            (
+                "UTF-16 with BOM",
+                "{\"permissions\":{\"allow\":[\"Bash\"]}}".data(using: .utf16)!
+            ),
+            (
+                "UTF-16 whitespace only",
+                " \n ".data(using: .utf16)!
+            ),
+            (
+                "stray Latin-1 byte",
+                Data(
+                    [UInt8]("{\"note\":\"caf".utf8) + [0xE9]
+                        + [UInt8]("\",\"permissions\":{}}".utf8))
+            ),
+            ("lone invalid byte", Data([0xE9])),
+        ]
+    }
+
+    func testClaudeEditorsRefuseUndecodableFile() {
+        for file in undecodableFiles {
+            XCTAssertNil(
+                HookInstaller.installClaudeHook(into: file.data, binaryPath: bin, seconds: 300),
+                "install must not overwrite: \(file.name)")
+            XCTAssertNil(
+                HookInstaller.uninstallClaudeHook(from: file.data),
+                "uninstall must not overwrite: \(file.name)")
+        }
+    }
+
+    func testCursorEditorsRefuseUndecodableFile() {
+        for file in undecodableFiles {
+            XCTAssertNil(
+                HookInstaller.installCursorHook(into: file.data, binaryPath: bin, seconds: 300),
+                "install must not overwrite: \(file.name)")
+            XCTAssertNil(
+                HookInstaller.uninstallCursorHook(from: file.data),
+                "uninstall must not overwrite: \(file.name)")
+        }
+    }
+
+    func testEmptyAndWhitespaceUTF8StillCountAsBlank() {
+        for text in ["", "  \n\t "] {
+            let data = Data(text.utf8)
+            XCTAssertNotNil(
+                HookInstaller.installClaudeHook(into: data, binaryPath: bin, seconds: 300))
+            XCTAssertNotNil(
+                HookInstaller.installCursorHook(into: data, binaryPath: bin, seconds: 300))
+        }
+    }
+
     func testCursorInstallRefusesUnexpectedStopShape() {
         let weird = Data("{\"hooks\":{\"stop\":\"oops\"}}".utf8)
         XCTAssertNil(HookInstaller.installCursorHook(into: weird, binaryPath: bin, seconds: 300))
