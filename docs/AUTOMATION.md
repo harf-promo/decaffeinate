@@ -90,10 +90,12 @@ your Settings → Safety toggles), it leaves the Mac awake and prints
 `leaving awake: <reason>` (exit 0). It also leaves the Mac awake while **you have
 asked for it to stay awake** (Keep Awake in the menu or Settings, `Decaffeinate
 --keep-awake`, MCP `keep_awake`, or a running `caffeinate`) and while **another
-agent session is working** (a different Claude Code / Cursor / Codex session
-holding the Mac awake, which the hook detects through its power assertion). A
-keep-awake hold stops counting once a safety rail (battery floor, thermal guard)
-drops it, exactly as in the app. The gating lives in Decaffeinate, so there's no
+agent session is working** (a different Claude Code, Cursor, Windsurf or Aider
+session holding the Mac awake, which the hook detects through its power
+assertion; the session that fired the hook never blocks itself). A keep-awake
+hold stops counting once a safety rail (battery floor, thermal guard) drops it,
+exactly as in the app, and that includes another agent's hold and an external
+`caffeinate`. The gating lives in Decaffeinate, so there's no
 wrapper script to maintain. Not applied to the hook or the MCP tool yet: an app
 allowed to keep the Mac awake by your rules, the active-hours schedule, the quiet
 window and triggers (while Strict takeover is on), and an agent session that

@@ -383,7 +383,8 @@ enum CLI {
         power: PowerSnapshot,
         thermalState: ProcessInfo.ThermalState,
         settings: DecaffeinateSettings,
-        otherAgentSessions: [String] = []
+        otherAgentSessions: [String] = [],
+        ownSessionHolders: Set<pid_t> = []
     ) -> SleepIfIdleVerdict {
         guard shouldSleep(idleSeconds: idleSeconds, threshold: threshold) else {
             return .stillActive
@@ -409,6 +410,7 @@ enum CLI {
         if let hold = assertions.first(where: {
             $0.kind != .other && keepAwakeHolderNames.contains($0.processName.lowercased())
                 && !(strictTakeover && $0.name == appHoldReason)
+                && !ownSessionHolders.contains($0.pid)
         }) {
             return .leaveAwake(reason: "Keep-awake hold by \(hold.processName) (pid \(hold.pid))")
         }
@@ -435,7 +437,8 @@ enum CLI {
         var seen: Set<pid_t> = []
         for assertion in assertions where assertion.blocksSystemSleep {
             guard seen.insert(assertion.pid).inserted,
-                let found = provenance(assertion.pid), found.isAgentSession
+                let found = provenance(assertion.pid),
+                found.isAgentSession || isAgentExecutable(found.holderName)
             else { continue }
             if let root = ownSessionRoot,
                 assertion.pid == root || found.parentChain.contains(where: { $0.pid == root })
@@ -448,8 +451,40 @@ enum CLI {
         return names
     }
 
+    /// True when `name` is the executable of a known AI agent itself, e.g.
+    /// `grok-1.0.77-macos-aarch64`, which holds its own "agent turn in progress"
+    /// assertion rather than spawning `caffeinate`. Matches on the registry's process
+    /// names as a prefix so versioned binary names still count.
+    nonisolated static func isAgentExecutable(_ name: String) -> Bool {
+        let lowered = name.lowercased()
+        return AgentRegistry.all.contains { identity in
+            identity.isAIAgent && identity.processNames.contains { lowered.hasPrefix($0) }
+        }
+    }
+
+    /// `caffeinate` holds that the calling agent session itself keeps up while it
+    /// works (Claude Code wraps its turns in one): `caffeinate` processes whose direct
+    /// parent is `ownSessionRoot`. A `caffeinate` an agent starts on purpose runs under
+    /// the agent's shell, so it is a child of that shell and still counts.
+    nonisolated static func ownSessionWrapperPIDs(
+        assertions: [PowerAssertion],
+        ownSessionRoot: pid_t?,
+        provenance: (pid_t) -> ProcessProvenance?
+    ) -> Set<pid_t> {
+        guard let root = ownSessionRoot else { return [] }
+        var pids: Set<pid_t> = []
+        for assertion in assertions where assertion.processName.lowercased() == "caffeinate" {
+            if let found = provenance(assertion.pid), found.parentChain.first?.pid == root {
+                pids.insert(assertion.pid)
+            }
+        }
+        return pids
+    }
+
     /// The nearest non-shell ancestor of this process: the agent CLI that ran the
-    /// hook (`sh -c` wrappers are skipped). Nil when the walk finds nothing.
+    /// hook (`sh -c` wrappers are skipped). Nil when the walk finds nothing, or when
+    /// that ancestor is a terminal, editor or other GUI app: a hand-run from a terminal
+    /// has no agent session of its own, so nothing is "mine".
     @MainActor
     private static func ownSessionRoot(
         introspector: any ProcessIntrospecting = LiveProcessIntrospector()
@@ -457,7 +492,14 @@ enum CLI {
         var current = getppid()
         var depth = 0
         while current > 1, depth < 16, let facts = introspector.facts(for: current) {
-            if !OriginRegistry.isShell(facts.name) { return current }
+            if !OriginRegistry.isShell(facts.name) {
+                if facts.isRegularApp
+                    || OriginRegistry.classify(name: facts.name, bundleID: facts.bundleID) != nil
+                {
+                    return nil
+                }
+                return current
+            }
             current = facts.ppid
             depth += 1
         }
@@ -474,6 +516,7 @@ enum CLI {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let assertions = TelemetryEngine().scan().filter { $0.pid != ownPID }
         let resolver = ProcessProvenanceResolver()
+        let root = ownSessionRoot()
         let verdict = sleepIfIdleVerdict(
             idleSeconds: idle,
             threshold: threshold,
@@ -482,7 +525,10 @@ enum CLI {
             thermalState: ProcessInfo.processInfo.thermalState,
             settings: SettingsStore().settings,
             otherAgentSessions: otherAgentSessionNames(
-                assertions: assertions, ownSessionRoot: ownSessionRoot(),
+                assertions: assertions, ownSessionRoot: root,
+                provenance: { resolver.provenance(for: $0) }),
+            ownSessionHolders: ownSessionWrapperPIDs(
+                assertions: assertions, ownSessionRoot: root,
                 provenance: { resolver.provenance(for: $0) }))
         return (verdict, idle)
     }

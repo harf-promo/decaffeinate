@@ -196,6 +196,69 @@ final class CLITests: XCTestCase {
         XCTAssertEqual(names.count, 1, "only session B counts as another session: \(names)")
     }
 
+    func testSleepIfIdleIgnoresTheCallersOwnWrapperButNotAnotherSessions() {
+        let own = Fixtures.assertion(pid: 100, process: "caffeinate", bundle: nil)
+        let other = Fixtures.assertion(pid: 200, process: "caffeinate", bundle: nil)
+        func run(_ assertions: [PowerAssertion]) -> CLI.SleepIfIdleVerdict {
+            CLI.sleepIfIdleVerdict(
+                idleSeconds: 900, threshold: 300, assertions: assertions,
+                power: PowerSnapshot(onBattery: false, charge: 1.0, isCharging: false),
+                thermalState: .nominal, settings: DecaffeinateSettings(),
+                ownSessionHolders: [100])
+        }
+        XCTAssertEqual(run([own]), .sleep, "this session's own caffeinate must not block its hook")
+        guard case .leaveAwake = run([own, other]) else {
+            return XCTFail("another session's caffeinate still holds the Mac awake")
+        }
+    }
+
+    func testOwnSessionWrapperIsOnlyADirectChildOfTheSessionRoot() {
+        func provenance(_ pid: pid_t, chain: [pid_t]) -> ProcessProvenance {
+            ProcessProvenance(
+                holderPid: pid, holderName: "caffeinate", holderArgv: ["caffeinate"],
+                parentChain: chain.map { ProcessLink(pid: $0, name: "x") }, originApp: nil,
+                originKind: .agentHost, ttyName: nil, cwd: nil, originCommand: nil,
+                sessionLabel: nil)
+        }
+        let wrapper = Fixtures.assertion(pid: 100, process: "caffeinate", bundle: nil)
+        let deliberate = Fixtures.assertion(pid: 101, process: "caffeinate", bundle: nil)
+        let foreign = Fixtures.assertion(pid: 102, process: "caffeinate", bundle: nil)
+        let notCaffeinate = Fixtures.assertion(pid: 103, process: "Decaffeinate", bundle: nil)
+        let chains: [pid_t: [pid_t]] = [
+            100: [50, 5], 101: [70, 50, 5], 102: [60, 5], 103: [50, 5],
+        ]
+        let all = [wrapper, deliberate, foreign, notCaffeinate]
+        XCTAssertEqual(
+            CLI.ownSessionWrapperPIDs(
+                assertions: all, ownSessionRoot: 50,
+                provenance: { provenance($0, chain: chains[$0] ?? []) }),
+            [100], "only the session's direct caffeinate child is its own wrapper")
+        XCTAssertTrue(
+            CLI.ownSessionWrapperPIDs(
+                assertions: all, ownSessionRoot: nil,
+                provenance: { provenance($0, chain: chains[$0] ?? []) }
+            ).isEmpty, "no session root (a hand-run from a terminal) excludes nothing")
+    }
+
+    func testOtherAgentSessionsCountAnAgentHoldingItsOwnAssertion() {
+        // `pmset -g assertions` shows grok holding "agent turn in progress" itself.
+        let own = ProcessProvenance(
+            holderPid: 400, holderName: "grok-1.0.77-macos-aarch64",
+            holderArgv: ["grok-1.0.77-macos-aarch64"],
+            parentChain: [ProcessLink(pid: 77, name: "zsh")], originApp: nil,
+            originKind: .terminal, ttyName: nil, cwd: nil, originCommand: nil, sessionLabel: nil)
+        let hold = Fixtures.assertion(
+            pid: 400, process: "grok-1.0.77-macos-aarch64", bundle: nil,
+            type: AssertionType.noIdleSleep, name: "grok: agent turn in progress")
+        XCTAssertEqual(
+            CLI.otherAgentSessionNames(
+                assertions: [hold], ownSessionRoot: 50, provenance: { _ in own }
+            ).count, 1)
+        XCTAssertTrue(CLI.isAgentExecutable("claude"))
+        XCTAssertFalse(CLI.isAgentExecutable("zsh"))
+        XCTAssertFalse(CLI.isAgentExecutable("node"), "node is a tool, not an AI agent")
+    }
+
     func testOtherAgentSessionsIgnoreNonAgentHolders() {
         let plain = ProcessProvenance(
             holderPid: 300, holderName: "caffeinate", holderArgv: ["caffeinate"],

@@ -267,7 +267,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for attempt in 1 2 3 4 5; do
             git fetch --no-tags origin main
-            git switch --detach FETCH_HEAD
+            # --discard-changes: the "Set version from tag" step edited the tracked
+            # Resources/Info.plist, and a plain switch would abort if main touched it
+            # too. Nothing tracked is needed any more (the SHA is already computed).
+            git switch --detach --discard-changes FETCH_HEAD
             CURRENT="$(sed -n 's/^ *version "\([^"]*\)".*/\1/p' Casks/decaffeinate.rb | head -n 1)"
             if [ "$CURRENT" != "$VERSION" ] \
               && [ "$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -n 1)" = "$CURRENT" ]; then
