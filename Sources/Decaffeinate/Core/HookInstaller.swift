@@ -210,8 +210,11 @@ enum HookInstaller {
     /// Parse a settings file, or nil when it is not a UTF-8 JSON object. The text
     /// editor splices raw UTF-8 bytes, so a UTF-16 file (which `JSONSerialization`
     /// would accept) is refused here as well, keeping the "left untouched" branch.
+    /// UTF-16 without a BOM holding ASCII JSON is itself valid UTF-8 (every other byte
+    /// is NUL) and `JSONSerialization` auto-detects it, so a NUL byte is refused too:
+    /// JSON text never contains a raw NUL.
     private static func parseObject(_ data: Data) -> [String: Any]? {
-        guard String(data: data, encoding: .utf8) != nil else { return nil }
+        guard String(data: data, encoding: .utf8) != nil, !data.contains(0) else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 

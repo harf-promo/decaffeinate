@@ -568,6 +568,8 @@ final class HookInstallerTests: XCTestCase {
     /// A settings file that is not valid UTF-8 (UTF-16, or one stray Latin-1 byte)
     /// used to read as "blank" and was replaced by a file holding only our hook.
     /// It is present-but-unreadable: every editor must return nil ("left untouched").
+    /// BOM-less UTF-16 of ASCII JSON is also valid UTF-8 (every other byte is NUL), and
+    /// `JSONSerialization` auto-detects it, so it must be refused on the NUL bytes.
     private var undecodableFiles: [(name: String, data: Data)] {
         [
             (
@@ -577,6 +579,18 @@ final class HookInstallerTests: XCTestCase {
             (
                 "UTF-16 whitespace only",
                 " \n ".data(using: .utf16)!
+            ),
+            (
+                "UTF-16LE without BOM",
+                "{\"permissions\":{\"allow\":[\"Bash\"]}}".data(using: .utf16LittleEndian)!
+            ),
+            (
+                "UTF-16BE without BOM",
+                "{\"permissions\":{\"allow\":[\"Bash\"]}}".data(using: .utf16BigEndian)!
+            ),
+            (
+                "UTF-16LE without BOM, whitespace only",
+                " \n ".data(using: .utf16LittleEndian)!
             ),
             (
                 "stray Latin-1 byte",
