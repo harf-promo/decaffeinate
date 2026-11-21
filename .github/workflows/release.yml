@@ -125,6 +125,8 @@ jobs:
           CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
           CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
         run: |
+          # Remove the decoded signing certificate even when import or keychain setup fails.
+          trap 'rm -f /tmp/cert.p12' EXIT
           KEYCHAIN_PASSWORD="$(uuidgen)"
           echo "$CERT_P12" | base64 --decode > /tmp/cert.p12
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
