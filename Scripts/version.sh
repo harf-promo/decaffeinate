@@ -22,8 +22,23 @@
 #   1.10.1  → 1010001   (1010001 > 1010000 ✓)
 #   2.0.0   → 2000000
 #
-# Pre-release suffixes on patch (e.g. "1.10.1-beta1") are stripped before
-# arithmetic so they don't cause parse errors.
+# Releases are plain MAJOR.MINOR.PATCH only (validate_release_version). A
+# pre-release tag would become the `latest` release — the Sparkle feed and the
+# cask — and "1.2.3-beta1" would get the same CFBundleVersion as "1.2.3", so
+# Sparkle would never move beta users to the final build. Components are read
+# in base 10, so "1.08.0" is 1008000, not an octal error.
+
+# Succeeds only for vMAJOR.MINOR.PATCH / MAJOR.MINOR.PATCH with minor and patch
+# below 1000 (the formula's radix).
+validate_release_version() {
+    local v="${1#v}"
+    # Digit bounds keep 10#… arithmetic far from overflow and the build
+    # number at most 999_999_999.
+    [[ "$v" =~ ^[0-9]{1,3}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || return 1
+    local major minor patch
+    IFS='.' read -r major minor patch <<< "$v"
+    (( 10#$minor < 1000 && 10#$patch < 1000 ))
+}
 
 bundle_version_from_marketing() {
     local v="${1:?bundle_version_from_marketing requires a version argument}"
@@ -32,8 +47,8 @@ bundle_version_from_marketing() {
     # Split on '.' — we only need the first three components.
     local major minor patch_raw patch
     IFS='.' read -r major minor patch_raw <<< "$v"
-    # Strip a pre-release suffix from patch (e.g. "0-beta1" → "0").
+    # Strip any trailing non-digits from patch; callers validate first.
     patch="${patch_raw%%[^0-9]*}"
-    # Arithmetic (bash integer context; empty/missing components default to 0).
-    echo $(( ${major:-0} * 1000000 + ${minor:-0} * 1000 + ${patch:-0} ))
+    # Base-10 arithmetic; empty/missing components default to 0.
+    echo $(( 10#${major:-0} * 1000000 + 10#${minor:-0} * 1000 + 10#${patch:-0} ))
 }

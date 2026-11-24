@@ -112,8 +112,12 @@ holds no power assertion.
   Same refuse / idempotent / preserve rules as Claude.
 
 `--uninstall-hook` removes only Decaffeinate's entry (matched by that marker /
-the command signature `--sleep-if-idle` + `Decaffeinate`) and leaves everything
-else untouched.
+a command whose executable is named `Decaffeinate`, followed directly by
+`--sleep-if-idle` and the seconds) and leaves everything else untouched,
+including your own wrapper scripts that merely mention both.
+
+The idle threshold has a 30-second floor: `--sleep-if-idle 0` (or a negative
+value) is treated as `--sleep-if-idle 30`.
 
 Prefer to do it by hand? The Claude Code form is:
 
@@ -155,9 +159,11 @@ can control sleep directly during a session. Register it with your client, e.g.:
 ```
 
 Tools: **`whats_keeping_awake`** (the `--status --json` shape),
-**`keep_awake`** `{minutes}` (a safety-railed hold that releases when the time
-elapses or the session ends), **`release_keep_awake`**, **`sleep_now`**, and
-**`sleep_if_idle`** `{seconds}` (same gate as the hook: idle time plus the safety
+**`keep_awake`** `{minutes}` (required; a safety-railed hold that releases when
+the time elapses or the session ends; if a rail ends it early,
+`whats_keeping_awake` reports why in `keepAwakeReleasedReason`),
+**`release_keep_awake`**, **`sleep_now`**, and **`sleep_if_idle`** `{seconds}`
+(at least 30; a lower value is raised to 30 and the reply says so; same gate as the hook: idle time plus the safety
 rails; replies `Not sleeping — leaving this Mac awake: <reason>` instead of sleeping when one applies). The hold lives in the server process, so the
 kernel releases it automatically when your client closes the session.
 

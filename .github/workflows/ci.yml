@@ -22,10 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Select latest stable Xcode
+      # Pinned so the release job (release.yml, same pin) builds with the Xcode
+      # CI last passed on. Bump both files together.
+      - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: latest-stable
+          xcode-version: '26.3'
 
       - name: Toolchain
         run: |
@@ -37,6 +39,12 @@ jobs:
 
       - name: Cask sanity (brew style)
         run: brew style Casks/decaffeinate.rb
+
+      - name: Shell scripts (shellcheck + release helper tests)
+        run: |
+          command -v shellcheck >/dev/null || brew install shellcheck
+          shellcheck Scripts/*.sh
+          ./Scripts/test-release-scripts.sh
 
       - name: Build
         run: swift build -v

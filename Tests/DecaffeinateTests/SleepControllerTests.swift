@@ -31,4 +31,21 @@ final class SleepControllerTests: XCTestCase {
             return XCTFail("a missing executable must surface as .launchFailed")
         }
     }
+
+    /// M5: the default controller refuses the system `pmset` under XCTest, so a
+    /// test that forgets to inject a fake sleeper cannot sleep the machine.
+    func testRealControllerRefusesSystemPmsetUnderXCTest() {
+        // Check the detector first: if it were false, the call below would
+        // really sleep this machine, so stop before making it.
+        guard SleepController.isRunningUnderTests else {
+            return XCTFail("XCTest detection failed; not calling the real controller")
+        }
+        XCTAssertEqual(SleepController().pmsetURL, SleepController.systemPmsetURL)
+        guard case .failure(.launchFailed) = SleepController().sleepNow() else {
+            return XCTFail("the real controller launched pmset under XCTest")
+        }
+        guard case .failure(.launchFailed) = SleepController().displayOffNow() else {
+            return XCTFail("the real controller launched pmset under XCTest")
+        }
+    }
 }

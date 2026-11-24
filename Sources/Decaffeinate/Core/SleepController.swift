@@ -26,8 +26,15 @@ struct SleepController {
         }
     }
 
+    /// The real `pmset`. Kept as a constant so `run(arguments:)` can tell a
+    /// test stub apart from the system binary.
+    static let systemPmsetURL = URL(fileURLWithPath: "/usr/bin/pmset")
+
+    /// True when XCTest is loaded into this process (`swift test`, Xcode).
+    static let isRunningUnderTests = NSClassFromString("XCTestCase") != nil
+
     /// The executable we shell out to. Overridable so tests can point at a stub.
-    var pmsetURL = URL(fileURLWithPath: "/usr/bin/pmset")
+    var pmsetURL = SleepController.systemPmsetURL
 
     /// Sleep the whole machine now.
     @discardableResult
@@ -44,6 +51,13 @@ struct SleepController {
     }
 
     private func run(arguments: [String]) -> Result<Void, SleepError> {
+        // A test that builds `AppState` without injecting a fake sleeper gets
+        // this default controller; refuse the real binary there, so a stray
+        // `tick()` in a test can never put the developer's Mac or the CI
+        // runner to sleep. A stub `pmsetURL` still runs, for SleepControllerTests.
+        if pmsetURL == Self.systemPmsetURL, Self.isRunningUnderTests {
+            return .failure(.launchFailed("disabled under tests"))
+        }
         let process = Process()
         process.executableURL = pmsetURL
         process.arguments = arguments

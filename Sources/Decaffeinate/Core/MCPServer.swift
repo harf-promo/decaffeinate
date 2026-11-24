@@ -10,6 +10,8 @@ enum MCPAction: Equatable {
     case sleepNow
     case sleepIfIdle(seconds: Int)
     case clamshellStatus
+    /// A known tool called without an argument it requires; the message names it.
+    case invalidArguments(String)
 }
 
 /// A Model Context Protocol server (`Decaffeinate --mcp`, stdio JSON-RPC) so an
@@ -26,8 +28,26 @@ enum MCPAction: Equatable {
 @MainActor
 final class MCPServer {
 
-    private let engine = CaffeineEngine()
+    private let engine: any KeepAwakeControlling
     private var keepAwakeTask: Task<Void, Never>?
+    private let railCheck: @MainActor () -> String?
+    private let pollNanoseconds: UInt64
+
+    /// Why a safety rail ended the last `keep_awake` hold early, reported by
+    /// `whats_keeping_awake` until a new hold starts or the client releases it.
+    private(set) var keepAwakeReleasedReason: String?
+
+    /// `engine`, `railCheck` and `pollNanoseconds` are seams for tests; the app
+    /// uses the defaults (a real `CaffeineEngine`, the live rails, 5 s polling).
+    init(
+        engine: any KeepAwakeControlling = CaffeineEngine(),
+        railCheck: (@MainActor () -> String?)? = nil,
+        pollNanoseconds: UInt64 = 5 * 1_000_000_000
+    ) {
+        self.engine = engine
+        self.railCheck = railCheck ?? MCPServer.liveRailDropReason
+        self.pollNanoseconds = pollNanoseconds
+    }
 
     /// Build the server, register handlers, serve stdio until the client
     /// disconnects, then release the hold (also guaranteed by process exit).
@@ -137,11 +157,13 @@ final class MCPServer {
         case "release_keep_awake": return .releaseKeepAwake
         case "sleep_now": return .sleepNow
         case "keep_awake":
-            guard let minutes = arguments?["minutes"]?.intValue else { return nil }
+            guard let minutes = arguments?["minutes"]?.intValue else {
+                return .invalidArguments("Missing required argument: minutes (integer).")
+            }
             return .keepAwake(minutes: minutes)
         case "sleep_if_idle":
-            return .sleepIfIdle(
-                seconds: arguments?["seconds"]?.intValue ?? HookInstaller.defaultIdleSeconds)
+            let requested = arguments?["seconds"]?.intValue ?? HookInstaller.defaultIdleSeconds
+            return .sleepIfIdle(seconds: HookInstaller.clampedIdleSeconds(requested))
         case "clamshell_status": return .clamshellStatus
         default:
             return nil
@@ -157,6 +179,8 @@ final class MCPServer {
                 content: [MCPServer.contentText("Unknown tool: \(params.name)")], isError: true)
         }
         switch action {
+        case .invalidArguments(let message):
+            return .init(content: [MCPServer.contentText(message)], isError: true)
         case .status:
             return .init(content: [MCPServer.contentText(currentStatusJSON())], isError: false)
         case .keepAwake(let minutes):
@@ -164,6 +188,7 @@ final class MCPServer {
                 content: [MCPServer.contentText(startKeepAwake(minutes: minutes))], isError: false)
         case .releaseKeepAwake:
             keepAwakeTask?.cancel()
+            keepAwakeReleasedReason = nil
             engine.releaseAll()
             return .init(
                 content: [MCPServer.contentText("Released the keep-awake hold.")], isError: false)
@@ -186,17 +211,20 @@ final class MCPServer {
             // Same gate as `--sleep-if-idle`: HID idle time AND the safety rails
             // (call, backup, update, media) — an agent's end-of-turn call must not
             // sleep the Mac mid-call.
+            let note = MCPServer.idleFloorNote(
+                requested: params.arguments?["seconds"]?.intValue, used: seconds)
             let (verdict, idle) = CLI.currentSleepIfIdleVerdict(threshold: seconds)
             if let message = MCPServer.sleepIfIdleHoldMessage(
                 verdict: verdict, idleSeconds: idle, threshold: seconds)
             {
-                return .init(content: [MCPServer.contentText(message)], isError: false)
+                return .init(content: [MCPServer.contentText(note + message)], isError: false)
             }
             switch SleepController().sleepNow() {
             case .success:
                 return .init(
                     content: [
-                        MCPServer.contentText("Idle \(Int(idle))s ≥ \(seconds)s — sleeping now.")
+                        MCPServer.contentText(
+                            note + "Idle \(Int(idle))s ≥ \(seconds)s — sleeping now.")
                     ],
                     isError: false)
             case .failure(let error):
@@ -213,27 +241,42 @@ final class MCPServer {
     /// Engage the keep-awake hold now (refusing under a safety rail) and schedule
     /// an auto-release after `minutes`, re-checking the rails every few seconds —
     /// the async analogue of the `--keep-awake` foreground loop.
-    private func startKeepAwake(minutes: Int) -> String {
+    ///
+    /// When a rail ends the hold early, the reason is kept in
+    /// `keepAwakeReleasedReason` and reported by `whats_keeping_awake`, so the
+    /// client can tell its hold is gone.
+    func startKeepAwake(minutes: Int) -> String {
         let clamped = min(max(minutes, 1), 24 * 60)
-        if let reason = railDropReason() {
+        if let reason = railCheck() {
             return "Not keeping awake — \(reason)."
         }
         keepAwakeTask?.cancel()
+        keepAwakeReleasedReason = nil
         engine.update(
             keepSystemAwake: true, keepDisplayAwake: false, reason: "Decaffeinate MCP keep_awake")
         let deadline = Date().addingTimeInterval(TimeInterval(clamped) * 60)
+        let poll = pollNanoseconds
         keepAwakeTask = Task { @MainActor [weak self] in
             while Date() < deadline {
-                try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: poll)
                 if Task.isCancelled { return }
-                if self?.railDropReason() != nil {
-                    self?.engine.releaseAll()
+                guard let self else { return }
+                if let reason = self.railCheck() {
+                    self.keepAwakeReleasedReason = reason
+                    self.engine.releaseAll()
                     return
                 }
             }
             self?.engine.releaseAll()
         }
         return "Keeping this Mac awake for \(clamped) min (or until released / the session ends)."
+    }
+
+    /// A prefix for the `sleep_if_idle` reply when the requested threshold was
+    /// raised to the floor, or "" when it was used as given.
+    nonisolated static func idleFloorNote(requested: Int?, used: Int) -> String {
+        guard let requested, requested != used else { return "" }
+        return "Requested \(requested)s is below the \(used)s minimum; using \(used)s. "
     }
 
     /// The reply for a `sleep_if_idle` call that must NOT sleep, or nil to sleep.
@@ -251,7 +294,7 @@ final class MCPServer {
         }
     }
 
-    private func railDropReason() -> String? {
+    private static func liveRailDropReason() -> String? {
         CLI.keepAwakeSafetyDropReason(
             power: PowerSourceReader().snapshot(),
             thermalState: ProcessInfo.processInfo.thermalState,
@@ -259,7 +302,7 @@ final class MCPServer {
     }
 
     private func currentStatusJSON() -> String {
-        StatusReport.from(
+        var report = StatusReport.from(
             version: AppInfo.version, now: Date(),
             ownPID: ProcessInfo.processInfo.processIdentifier,
             assertions: TelemetryEngine().scan(),
@@ -267,7 +310,9 @@ final class MCPServer {
             thermal: ProcessInfo.processInfo.thermalState,
             idleSeconds: IdleMonitor().secondsSinceLastInput(),
             uptimeSeconds: SystemStateReader().bootTime().map { Date().timeIntervalSince($0) }
-        ).jsonString()
+        )
+        report.keepAwakeReleasedReason = keepAwakeReleasedReason
+        return report.jsonString()
     }
 
     /// Read-only clamshell readiness — same reads `CLI --clamshell-status`

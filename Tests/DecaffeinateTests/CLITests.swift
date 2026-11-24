@@ -276,6 +276,14 @@ final class CLITests: XCTestCase {
         XCTAssertEqual(CLI.idleThreshold(after: 1, in: args, default: 300), 600)
     }
 
+    /// L3: `--sleep-if-idle 0` / `-1` would make the idle gate always pass.
+    func testIdleThresholdRaisesZeroAndNegativeToTheFloor() {
+        for raw in ["0", "-1", "30"] {
+            let args = ["Decaffeinate", "--sleep-if-idle", raw]
+            XCTAssertEqual(CLI.idleThreshold(after: 1, in: args, default: 300), 30, raw)
+        }
+    }
+
     func testIdleThresholdFallsBackWhenFlagAlone() {
         let args = ["Decaffeinate", "--sleep-if-idle"]
         XCTAssertEqual(CLI.idleThreshold(after: 1, in: args, default: 300), 300)

@@ -5,9 +5,9 @@
 # checked into the repo deliberately — it travels with `git pull`, so it
 # applies on the VPS and on a Mac clone alike without separate setup.
 #
-# Why fetch: on 2026-08-24, a VPS session's local `main` was silently 1
-# commit behind `origin/main` because nothing had re-fetched since another
-# host merged a PR. See the `vps-mac-git-sync-practice` memory note.
+# Why fetch: on 2026-08-24, a session's local `main` was silently 1 commit
+# behind `origin/main` because nothing had re-fetched since another host
+# merged a PR.
 #
 # Why v2 (same day): fetching alone updates the refs but says nothing —
 # the agent still has to remember to check. A SessionStart hook's plain

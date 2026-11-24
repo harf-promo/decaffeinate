@@ -39,6 +39,60 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(HookInstaller.isDecaffeinateHookCommand(expected))
     }
 
+    // MARK: Hook identity (L2)
+
+    func testIdentityRecognisesEveryShapeWeWrote() {
+        // Current (quoted when needed), bare, and the pre-1.26 unquoted path with spaces.
+        XCTAssertTrue(HookInstaller.isDecaffeinateHookCommand("\(bin) --sleep-if-idle 300"))
+        XCTAssertTrue(HookInstaller.isDecaffeinateHookCommand("Decaffeinate --sleep-if-idle 300"))
+        XCTAssertTrue(
+            HookInstaller.isDecaffeinateHookCommand(
+                "'/Users/a b/Decaffeinate.app/Contents/MacOS/Decaffeinate' --sleep-if-idle 60"))
+        XCTAssertTrue(
+            HookInstaller.isDecaffeinateHookCommand(
+                "/Users/a b/My Apps/Decaffeinate.app/Contents/MacOS/Decaffeinate --sleep-if-idle 60"
+            ))
+        XCTAssertTrue(
+            HookInstaller.isDecaffeinateHookCommand("/opt/apps/Decaffeinate --sleep-if-idle"))
+    }
+
+    func testIdentityRejectsUserCommandsThatOnlyMentionBothStrings() {
+        let notOurs = [
+            "~/bin/my-wrapper.sh --sleep-if-idle 300 # calls Decaffeinate",
+            "bash -c 'Decaffeinate --sleep-if-idle 300'",
+            "notify-me Decaffeinate --sleep-if-idle 300",
+            "/usr/local/bin/decaffeinate-logger --sleep-if-idle 300 --app Decaffeinate",
+            "/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --scan",
+            "echo Decaffeinate; ./other --sleep-if-idle 1",
+            "'/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --sleep-if-idle 300",
+            // The review's own case: one word before the verb, mentioning
+            // Decaffeinate only in a directory name. Pins the executable-name
+            // check (lastPathComponent == "Decaffeinate").
+            "/Users/me/Decaffeinate-hooks/notify.sh --sleep-if-idle 300",
+            "/Users/me/Decaffeinate/notify.sh --sleep-if-idle 300",
+        ]
+        for command in notOurs {
+            XCTAssertFalse(HookInstaller.isDecaffeinateHookCommand(command), command)
+        }
+    }
+
+    func testUninstallKeepsAUserWrapperThatMentionsBothStrings() {
+        let wrapper = "~/bin/notify.sh --sleep-if-idle 300 # wraps Decaffeinate"
+        let settings = """
+            {"hooks":{"Stop":[{"hooks":[{"type":"command","command":"\(wrapper)"}]}]}}
+            """
+        let installed = HookInstaller.installClaudeHook(
+            into: Data(settings.utf8), binaryPath: bin, seconds: 300)!
+        let cmds = stopCommands(installed)
+        XCTAssertTrue(cmds.contains(wrapper), "install must not replace the user's wrapper")
+        XCTAssertEqual(cmds.count, 2)
+
+        let removed = HookInstaller.uninstallClaudeHook(from: installed)!
+        XCTAssertEqual(
+            stopCommands(removed), [wrapper],
+            "uninstall removes only our hook and keeps the user's wrapper")
+    }
+
     func testShellQuoteNeutralisesMetacharacters() {
         XCTAssertEqual(HookInstaller.shellQuote("a$(x);b"), "'a$(x);b'")
         XCTAssertEqual(HookInstaller.shellQuote(""), "''")

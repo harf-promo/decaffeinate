@@ -31,4 +31,12 @@ cask "decaffeinate" do
     "~/Library/Preferences/com.harfpromo.Decaffeinate.plist",
     "~/Library/Saved Application State/com.harfpromo.Decaffeinate.savedState",
   ]
+
+  # `--install-hook` writes turn-end hooks into the user's agent configs; a cask
+  # cannot edit those safely, so say how to remove them before uninstalling.
+  caveats <<~EOS
+    If you installed agent hooks with `Decaffeinate --install-hook`, remove them
+    before uninstalling, or they will point at a deleted app:
+      /Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --uninstall-hook
+  EOS
 end
