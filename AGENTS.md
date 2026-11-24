@@ -40,7 +40,8 @@ Layout:
 - `Scripts/` — `check-l10n.sh` (localization key check without Xcode) and release
   tooling: `version.sh` (derives CFBundleVersion: major×1_000_000
   + minor×1_000 + patch — do **not** reintroduce `GITHUB_RUN_NUMBER` coupling),
-  `build-app.sh` (produces the `.app` bundle), `make-dmg.sh`, `generate-icon.sh`
+  `build-app.sh` (produces the `.app` bundle), `make-dmg.sh`, `generate-icon.sh`,
+  `bump-cask.sh` (release cask edit), `test-release-scripts.sh` (its tests)
 - `Casks/decaffeinate.rb` — the **canonical copy** of the Homebrew cask; the live tap
   is the separate repo `harf-promo/homebrew-tap`, mirrored automatically by
   `release.yml` on a tag push
@@ -48,7 +49,8 @@ Layout:
   `PHASE-B-SPIKE.md`, `PREVIEW.md`, `AUTOMATION.md`, `ROADMAP.md`, `PRESS-KIT.md`,
   `HOMEBREW-CORE.md`, `WIDGET-SPIKE.md`, `PLAN-NEXT.md`
 - `.github/workflows/ci.yml` (macos-15: `swift-format` lint, cask style, build, test,
-  `--scan` smoke, `.app` bundle, `--screenshots` render, on push/PR to `main`) and `release.yml` (sign/notarize/publish DMG + cask bump, on a
+  shellcheck + release script tests, `--scan` smoke, `.app` bundle, `--screenshots`
+  render, on push/PR to `main`) and `release.yml` (sign/notarize/publish DMG + cask bump, on a
   `v*` tag push)
 
 ## Commands
@@ -65,6 +67,7 @@ swift format lint --strict --recursive --configuration .swift-format Sources Tes
 brew style Casks/decaffeinate.rb   # cask sanity — also a CI gate
 swift run Decaffeinate --scan       # headless power-assertion scan — CI smoke test
 ./Scripts/build-app.sh               # produce the .app bundle — also a CI step
+shellcheck Scripts/*.sh && ./Scripts/test-release-scripts.sh   # CI shell gate
 ```
 
 **Release flow** (tag-triggered, `release.yml`):

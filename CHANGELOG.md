@@ -36,6 +36,22 @@ On `main` since v1.26.2, not yet tagged — PRs #14–#20 and #22.
   Homebrew tap is bumped before this repo's cask, and the in-repo cask bump now
   commits on top of the current `main` (with retries) instead of on the tagged
   commit; neither step downgrades a newer cask.
+- **`--sleep-if-idle` and MCP `sleep_if_idle` never sleep a Mac idle for
+  under 30 s.** A zero, negative or tiny threshold is raised to that floor
+  instead of meaning "sleep now".
+- **MCP `keep_awake` without `minutes` says the argument is missing**
+  instead of reporting an unknown tool. When a safety rail releases
+  keep-awake, `whats_keeping_awake` says why (`keepAwakeReleasedReason`).
+- **`--uninstall-hook` removes only hooks it installed**, recognised by the
+  Decaffeinate executable they run, so your own wrapper script that mentions
+  Decaffeinate stays.
+- **Removing hooks before uninstalling.** The Homebrew cask now tells you to
+  run `--uninstall-hook` first, so agent configs don't keep hooks that point
+  at a deleted app.
+- **Releases.** Tags must be plain `vMAJOR.MINOR.PATCH` (a pre-release tag
+  would reuse the final build number and Sparkle would never offer the
+  final); a release stays a draft until its DMG, checksums and appcast are
+  all uploaded; the cask bump fails loudly if it can't edit the cask.
 - **"Let my Mac sleep" now does** (#15). `decaffeinate://stop-awake` and the
   Stop Keeping Awake intent end both the quiet window and the persistent
   keep-awake, instead of answering "your Mac can sleep normally again" while

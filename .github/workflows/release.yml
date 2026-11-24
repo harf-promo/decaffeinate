@@ -56,6 +56,9 @@ jobs:
           if [ "$is_draft" = "true" ]; then
             # A draft is a release a previous run left unfinished (it is
             # published only once every asset is up): rebuild and finish it.
+            # A read-only token may not see drafts at all; then both views
+            # fail, no assets are found, and the else branch below also
+            # builds. This branch makes that outcome explicit either way.
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "Release ${GITHUB_REF_NAME} is still a draft — building and publishing it."
             exit 0
@@ -221,7 +224,9 @@ jobs:
           # it is missing anyway this upload fails, and nothing is published.
           gh release upload "${GITHUB_REF_NAME}" \
             build/Decaffeinate-*.dmg build/SHA256SUMS.txt build/appcast.xml --clobber
-          gh release edit "${GITHUB_REF_NAME}" --draft=false
+          # --latest: SUFeedURL reads latest/download/appcast.xml, so the
+          # published release must be the one GitHub serves as latest.
+          gh release edit "${GITHUB_REF_NAME}" --draft=false --latest
 
       - name: Mirror the cask into the Homebrew tap
         env:
