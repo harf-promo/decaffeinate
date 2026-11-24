@@ -29,7 +29,8 @@ expect_build 1.08.09 1008009
 for good in 1.2.3 v1.2.3 v10.999.999 1.08.0; do
     validate_release_version "$good" || fail "validate_release_version rejected $good"
 done
-for bad in 1.2.3-beta1 v1.2.3-rc.1 1.2.3.4 1.2 v1 "" 1.1000.0 1.2.1000 x1.2.3 "1.2.3 "; do
+for bad in 1.2.3-beta1 v1.2.3-rc.1 1.2.3.4 1.2 v1 "" 1.1000.0 1.2.1000 x1.2.3 "1.2.3 " \
+    1000.0.0 1.00001.0 99999999999999999999.0.0; do
     if validate_release_version "$bad"; then
         fail "validate_release_version accepted '$bad'"
     fi

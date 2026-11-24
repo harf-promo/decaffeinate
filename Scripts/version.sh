@@ -32,7 +32,9 @@
 # below 1000 (the formula's radix).
 validate_release_version() {
     local v="${1#v}"
-    [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+    # Digit bounds keep 10#… arithmetic far from overflow and the build
+    # number at most 999_999_999.
+    [[ "$v" =~ ^[0-9]{1,3}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || return 1
     local major minor patch
     IFS='.' read -r major minor patch <<< "$v"
     (( 10#$minor < 1000 && 10#$patch < 1000 ))

@@ -51,26 +51,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          is_draft="$(gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
-                        --json isDraft -q '.isDraft' 2>/dev/null || true)"
-          if [ "$is_draft" = "true" ]; then
-            # A draft is a release a previous run left unfinished (it is
-            # published only once every asset is up): rebuild and finish it.
-            # A read-only token may not see drafts at all; then both views
-            # fail, no assets are found, and the else branch below also
-            # builds. This branch makes that outcome explicit either way.
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Release ${GITHUB_REF_NAME} is still a draft — building and publishing it."
-            exit 0
-          fi
-          assets="$(gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
-                      --json assets -q '.assets[].name' 2>/dev/null || true)"
-          has_dmg=false; has_appcast=false
-          grep -q '\.dmg$' <<<"$assets" && has_dmg=true
-          grep -qx 'appcast\.xml' <<<"$assets" && has_appcast=true
+          release="$(gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
+                       --json isDraft,assets -q '"draft=\(.isDraft)", (.assets[].name)' 2>/dev/null || true)"
+          has_dmg=false; has_appcast=false; is_draft=false
+          grep -q '\.dmg$' <<<"$release" && has_dmg=true
+          grep -qx 'appcast\.xml' <<<"$release" && has_appcast=true
+          grep -qx 'draft=true' <<<"$release" && is_draft=true
           if $has_dmg && $has_appcast; then
+            # Published or draft: a release that already has both assets was
+            # prepared by hand (header comment) and is never rebuilt or
+            # clobbered here. A draft one stays a draft for the maintainer.
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Release ${GITHUB_REF_NAME} already has a DMG and appcast.xml — skipping build."
+            echo "Release ${GITHUB_REF_NAME} already has a DMG and appcast.xml (draft: ${is_draft}) — skipping build."
+          elif $is_draft; then
+            # A draft missing an asset is one a previous run left unfinished
+            # (this workflow publishes only once every asset is up). It is not
+            # public, so rebuilding and finishing it is safe. A read-only token
+            # may not see drafts at all; then nothing is found and the else
+            # branch below builds too.
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Release ${GITHUB_REF_NAME} is an unfinished draft — building and publishing it."
           elif $has_dmg; then
             # Skipping here would publish a release with no appcast: SUFeedURL
             # reads latest/download/appcast.xml, so every installed copy would
@@ -215,7 +215,9 @@ jobs:
           # enough to ship. Create it as a DRAFT and publish only once the DMG,
           # checksums and appcast are all up: a public release without its
           # appcast makes latest/download/appcast.xml a 404 for every installed
-          # copy. A failed upload leaves a draft, which the guard job rebuilds.
+          # copy. A failed upload leaves a draft, which the guard job rebuilds;
+          # a draft that already holds the DMG and appcast (say the publish
+          # edit below failed) is skipped there and published by hand.
           if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release create "${GITHUB_REF_NAME}" --draft \
               --title "${GITHUB_REF_NAME}" --generate-notes
@@ -224,9 +226,17 @@ jobs:
           # it is missing anyway this upload fails, and nothing is published.
           gh release upload "${GITHUB_REF_NAME}" \
             build/Decaffeinate-*.dmg build/SHA256SUMS.txt build/appcast.xml --clobber
-          # --latest: SUFeedURL reads latest/download/appcast.xml, so the
-          # published release must be the one GitHub serves as latest.
-          gh release edit "${GITHUB_REF_NAME}" --draft=false --latest
+          # SUFeedURL reads latest/download/appcast.xml, so a new release must
+          # become "latest" — but re-running an older tag must not, or every
+          # installed copy would be pointed at the older appcast.
+          LATEST_TAG="$(gh release view --json tagName -q .tagName 2>/dev/null || true)"
+          if [ -z "$LATEST_TAG" ] || [ "$(printf '%s\n%s\n' "${LATEST_TAG#v}" "${GITHUB_REF_NAME#v}" \
+                | sort -V | tail -n 1)" = "${GITHUB_REF_NAME#v}" ]; then
+            gh release edit "${GITHUB_REF_NAME}" --draft=false --latest
+          else
+            echo "::notice::${GITHUB_REF_NAME} is older than the latest release ${LATEST_TAG} — publishing without marking it latest."
+            gh release edit "${GITHUB_REF_NAME}" --draft=false --latest=false
+          fi
 
       - name: Mirror the cask into the Homebrew tap
         env:

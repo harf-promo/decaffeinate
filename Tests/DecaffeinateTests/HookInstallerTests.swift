@@ -65,6 +65,11 @@ final class HookInstallerTests: XCTestCase {
             "/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --scan",
             "echo Decaffeinate; ./other --sleep-if-idle 1",
             "'/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate --sleep-if-idle 300",
+            // The review's own case: one word before the verb, mentioning
+            // Decaffeinate only in a directory name. Pins the executable-name
+            // check (lastPathComponent == "Decaffeinate").
+            "/Users/me/Decaffeinate-hooks/notify.sh --sleep-if-idle 300",
+            "/Users/me/Decaffeinate/notify.sh --sleep-if-idle 300",
         ]
         for command in notOurs {
             XCTAssertFalse(HookInstaller.isDecaffeinateHookCommand(command), command)
@@ -81,6 +86,11 @@ final class HookInstallerTests: XCTestCase {
         let cmds = stopCommands(installed)
         XCTAssertTrue(cmds.contains(wrapper), "install must not replace the user's wrapper")
         XCTAssertEqual(cmds.count, 2)
+
+        let removed = HookInstaller.uninstallClaudeHook(from: installed)!
+        XCTAssertEqual(
+            stopCommands(removed), [wrapper],
+            "uninstall removes only our hook and keeps the user's wrapper")
     }
 
     func testShellQuoteNeutralisesMetacharacters() {
