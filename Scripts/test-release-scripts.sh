@@ -61,6 +61,10 @@ if "$here/bump-cask.sh" "$tmp/shape.rb" 1.2.3 "$sha" 2>/dev/null; then
     fail "bump-cask.sh accepted a cask whose version/sha256 lines it could not edit"
 fi
 
+# The real cask must stay editable, so a reshaped cask fails CI, not a release.
+cp "$here/../Casks/decaffeinate.rb" "$tmp/real.rb"
+"$here/bump-cask.sh" "$tmp/real.rb" 9.8.7 "$sha" || fail "bump-cask.sh cannot edit Casks/decaffeinate.rb"
+
 if "$here/bump-cask.sh" "$tmp/ok.rb" 1.2.3 "not-a-sha" 2>/dev/null; then
     fail "bump-cask.sh accepted a malformed sha256"
 fi
