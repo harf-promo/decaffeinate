@@ -273,6 +273,25 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(h.state.mug, .caffeinated)
     }
 
+    func testStopKeepingAwakeReleasesTheHoldOnTheNextTick() {
+        // The menu's "Stop keeping awake" only flips the setting; the 1 s engine tick
+        // reconciles the assertion. A quiet window is a separate hold with its own
+        // "Cancel quiet window" control, so it keeps holding until cancelled.
+        let h = makeHarness { $0.caffeinateEnabled = true }; defer { h.cleanup() }
+        h.state.tick()
+        XCTAssertTrue(h.caffeine.holdingSystem)
+
+        h.settings.settings.caffeinateEnabled = false
+        h.state.tick()
+        XCTAssertFalse(h.caffeine.holdingSystem, "turning Keep Awake off must release the hold")
+        XCTAssertNotEqual(h.state.mug, .caffeinated)
+
+        h.state.stayAwake(forMinutes: 30)
+        XCTAssertTrue(h.caffeine.holdingSystem)
+        h.state.clearQuietWindow()
+        XCTAssertFalse(h.caffeine.holdingSystem, "cancelling the quiet window must release it")
+    }
+
     func testMenuBarCountdownFollowsSettingAndState() {
         let h = makeHarness {
             $0.idleThresholdMinutes = 10; $0.showMenuBarCountdown = true

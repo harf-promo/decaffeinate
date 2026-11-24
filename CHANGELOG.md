@@ -25,6 +25,11 @@ On `main` since v1.26.2, not yet tagged — PRs #14–#20 and #22.
   assertion holds it, and while a different agent session holds it awake
   (`pmset sleepnow` overrides assertions, so the hook has to check). A hold
   dropped by the battery or thermal rail no longer counts.
+- **A Keep Awake setting left on after the app quits no longer blocks
+  `--sleep-if-idle`.** The setting survives in preferences when the app is
+  closed or crashes, but nothing holds the Mac awake then. The hook (and MCP
+  `sleep_if_idle`) now counts Keep Awake only while the running app holds its
+  own assertion, instead of answering "Keep Awake is on" indefinitely.
 - **`--install-hook` / `--uninstall-hook` edit the file you have, not a copy.**
   A symlinked `settings.json` (dotfiles repo, managed install) is written
   through instead of being replaced by a regular file, the target's permission
