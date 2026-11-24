@@ -101,6 +101,12 @@ newer than the tag (a tag pushed for an older commit).
 > latest **non-prerelease, non-draft** GitHub release. Never mark a production
 > release tag as prerelease or draft — if you do, `latest` will point at the
 > previous release and in-app updates will stop working until you un-mark it.
+> The workflow itself creates a new release as a **draft** and publishes it
+> only after the DMG, `SHA256SUMS.txt` and `appcast.xml` are all uploaded; a run
+> that fails midway leaves a draft, and re-running the workflow finishes it.
+> Release tags must be plain `vMAJOR.MINOR.PATCH` — the workflow rejects
+> `v1.2.3-beta1`, since a suffixed tag would share a `CFBundleVersion` with the
+> final build.
 
 Submitting to **homebrew/cask core** later removes the `brew trust` step (and
 requires the pinned `sha256` + notarized artifact we already produce).

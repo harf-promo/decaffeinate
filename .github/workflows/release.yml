@@ -51,6 +51,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          is_draft="$(gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
+                        --json isDraft -q '.isDraft' 2>/dev/null || true)"
+          if [ "$is_draft" = "true" ]; then
+            # A draft is a release a previous run left unfinished (it is
+            # published only once every asset is up): rebuild and finish it.
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Release ${GITHUB_REF_NAME} is still a draft — building and publishing it."
+            exit 0
+          fi
           assets="$(gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" \
                       --json assets -q '.assets[].name' 2>/dev/null || true)"
           has_dmg=false; has_appcast=false
@@ -78,11 +87,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Keep the write token out of .git/config while build scripts and
+          # SwiftPM run; only the cask-bump push below gets it, explicitly.
+          persist-credentials: false
 
-      - name: Select latest stable Xcode
+      # Pinned to the Xcode that ci.yml runs, so a signed release is never built
+      # by a toolchain CI has not passed on. Bump both files together.
+      - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: latest-stable
+          xcode-version: '26.3'
 
       - name: Preflight — all signing secrets present?
         env:
@@ -110,11 +125,14 @@ jobs:
       - name: Set version from tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$'; then
-            echo "::error::Tag '${GITHUB_REF_NAME}' is not a valid version (expected vMAJOR.MINOR.PATCH)."
+          source Scripts/version.sh
+          # Plain vMAJOR.MINOR.PATCH only: a pre-release tag would become the
+          # `latest` release (Sparkle feed + cask) and share a CFBundleVersion
+          # with the final build.
+          if ! validate_release_version "$VERSION"; then
+            echo "::error::Tag '${GITHUB_REF_NAME}' is not a release version (expected vMAJOR.MINOR.PATCH, no suffix; minor and patch < 1000)."
             exit 1
           fi
-          source Scripts/version.sh
           BUILD="$(bundle_version_from_marketing "$VERSION")"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Resources/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" Resources/Info.plist
@@ -191,18 +209,19 @@ jobs:
         run: |
           # `gh release upload` needs the release to exist. Create it if a
           # maintainer didn't pre-create one, so a bare `git push --tags` is
-          # enough to ship (previously the upload failed with "release not found").
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 \
-            || gh release create "${GITHUB_REF_NAME}" \
-                 --title "${GITHUB_REF_NAME}" --generate-notes
-          gh release upload "${GITHUB_REF_NAME}" \
-            build/Decaffeinate-*.dmg build/SHA256SUMS.txt --clobber
-          # Upload the appcast only when it was generated; but if it exists, a
-          # real upload failure must surface as an error (never || true here —
-          # a silently missing appcast breaks every in-app updater).
-          if [ -f build/appcast.xml ]; then
-            gh release upload "${GITHUB_REF_NAME}" build/appcast.xml --clobber
+          # enough to ship. Create it as a DRAFT and publish only once the DMG,
+          # checksums and appcast are all up: a public release without its
+          # appcast makes latest/download/appcast.xml a 404 for every installed
+          # copy. A failed upload leaves a draft, which the guard job rebuilds.
+          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release create "${GITHUB_REF_NAME}" --draft \
+              --title "${GITHUB_REF_NAME}" --generate-notes
           fi
+          # The preflight and the appcast step guarantee build/appcast.xml; if
+          # it is missing anyway this upload fails, and nothing is published.
+          gh release upload "${GITHUB_REF_NAME}" \
+            build/Decaffeinate-*.dmg build/SHA256SUMS.txt build/appcast.xml --clobber
+          gh release edit "${GITHUB_REF_NAME}" --draft=false
 
       - name: Mirror the cask into the Homebrew tap
         env:
@@ -240,8 +259,9 @@ jobs:
             echo "::warning::The tap's cask is at $CURRENT, newer than ${GITHUB_REF_NAME} — not downgrading it."
             exit 0
           fi
-          sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" "$TAP_DIR/Casks/decaffeinate.rb"
-          sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" "$TAP_DIR/Casks/decaffeinate.rb"
+          # Fails if the cask's version/sha256 lines no longer have the shape
+          # it edits, instead of reporting "already at" with nothing changed.
+          ./Scripts/bump-cask.sh "$TAP_DIR/Casks/decaffeinate.rb" "$VERSION" "$SHA"
           cd "$TAP_DIR"
           if git diff --quiet -- Casks/decaffeinate.rb; then
             echo "Tap cask already at $VERSION — nothing to commit."
@@ -254,6 +274,8 @@ jobs:
           tap_git push origin HEAD
 
       - name: Bump the canonical cask (this repo)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Keeps Casks/decaffeinate.rb from lagging the tag the way it did
           # through 1.13.0 → 1.20.0 (7 releases of manual-bump drift). This is
@@ -265,10 +287,22 @@ jobs:
           # retry if main moves again between the fetch and the push.
           VERSION="${GITHUB_REF_NAME#v}"
           SHA="$(shasum -a 256 build/Decaffeinate-*.dmg | awk '{print $1}')"
+          # Use this tag's copy of the bump script, whatever main holds.
+          BUMP="$RUNNER_TEMP/bump-cask.sh"
+          cp Scripts/bump-cask.sh "$BUMP"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # The checkout persisted no credentials: hand the job token to git
+          # through an env-reading helper for this step only (as the tap step
+          # does), never in a URL, argv or .git/config.
+          # shellcheck disable=SC2016 # $GH_TOKEN is expanded by git's helper shell
+          repo_git() {
+            git -c credential.helper= \
+                -c 'credential.helper=!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=${GH_TOKEN}"; }; f' \
+                "$@"
+          }
           for attempt in 1 2 3 4 5; do
-            git fetch --no-tags origin main
+            repo_git fetch --no-tags origin main
             # --discard-changes: the "Set version from tag" step edited the tracked
             # Resources/Info.plist, and a plain switch would abort if main touched it
             # too. Nothing tracked is needed any more (the SHA is already computed).
@@ -279,15 +313,14 @@ jobs:
               echo "::warning::main's cask is at $CURRENT, newer than ${GITHUB_REF_NAME} — not downgrading it."
               exit 0
             fi
-            sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" Casks/decaffeinate.rb
-            sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" Casks/decaffeinate.rb
+            "$BUMP" Casks/decaffeinate.rb "$VERSION" "$SHA"
             if git diff --quiet -- Casks/decaffeinate.rb; then
               echo "Cask already at $VERSION — nothing to commit."
               exit 0
             fi
             git add Casks/decaffeinate.rb
             git commit -m "chore: bump cask to ${GITHUB_REF_NAME} [skip ci]"
-            if git push origin HEAD:main; then
+            if repo_git push origin HEAD:main; then
               exit 0
             fi
             echo "::warning::Push to main was rejected (attempt $attempt) — main moved; retrying on the new tip."
