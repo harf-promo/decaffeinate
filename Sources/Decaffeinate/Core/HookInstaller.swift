@@ -30,7 +30,17 @@ enum HookInstaller {
     /// The installed executable to embed in the hook, e.g.
     /// `/Applications/Decaffeinate.app/Contents/MacOS/Decaffeinate`.
     static func binaryPath() -> String {
-        Bundle.main.executablePath ?? CommandLine.arguments.first ?? "Decaffeinate"
+        canonicalBinaryPath(
+            Bundle.main.executablePath ?? CommandLine.arguments.first ?? "Decaffeinate")
+    }
+
+    /// Resolves symlinks in an absolute executable path, so a binary launched
+    /// through a link with another name is embedded by its real name (and
+    /// recognized as ours on the next install or uninstall). A relative or bare
+    /// name is returned unchanged.
+    static func canonicalBinaryPath(_ raw: String) -> String {
+        guard raw.hasPrefix("/") else { return raw }
+        return URL(fileURLWithPath: raw).resolvingSymlinksInPath().path
     }
 
     static func claudeSettingsURL(
@@ -118,7 +128,7 @@ enum HookInstaller {
     // MARK: - Claude Code (~/.claude/settings.json, JSON)
 
     /// The Stop-hook command we manage. JSON has no comments, so our identity is
-    /// the command itself: it contains both `--sleep-if-idle` and `Decaffeinate`.
+    /// the command itself (see `isDecaffeinateHookCommand`).
     static func claudeHookCommand(binaryPath: String, seconds: Int) -> String {
         "\(shellQuote(binaryPath)) --sleep-if-idle \(seconds)"
     }
@@ -134,9 +144,79 @@ enum HookInstaller {
     }
 
     /// Path-tolerant so a moved `.app` is still recognized on uninstall/re-install.
-    /// Shared identity for Claude and Cursor: `--sleep-if-idle` + `Decaffeinate`.
+    /// Shared identity for Claude and Cursor: the command's executable (its first
+    /// shell word) is a file named `Decaffeinate`, its next word is the
+    /// `--sleep-if-idle` verb, and at most one argument (the seconds) follows.
+    /// A user's own wrapper that merely mentions both strings is not ours.
+    ///
+    /// Before v1.26 the path was written unquoted, so a path with spaces splits
+    /// into several words; that legacy shape is still ours when the words before
+    /// the verb rejoin into an absolute `….app/Contents/MacOS/Decaffeinate` path.
     static func isDecaffeinateHookCommand(_ command: String) -> Bool {
-        command.contains("--sleep-if-idle") && command.contains("Decaffeinate")
+        guard let words = shellWords(command),
+            let verb = words.firstIndex(of: "--sleep-if-idle"), verb >= 1,
+            words.count - verb <= 2
+        else { return false }
+        if verb == 1 {
+            return (words[0] as NSString).lastPathComponent == "Decaffeinate"
+        }
+        let joined = words[0..<verb].joined(separator: " ")
+        return joined.hasPrefix("/") && joined.hasSuffix(".app/Contents/MacOS/Decaffeinate")
+    }
+
+    /// Splits `command` into words the way a POSIX shell would for the simple
+    /// commands we write: whitespace separates words; single quotes, double
+    /// quotes and backslashes quote. Returns nil on an unterminated quote.
+    static func shellWords(_ command: String) -> [String]? {
+        var words: [String] = []
+        var current = ""
+        var inWord = false
+        var iterator = command.makeIterator()
+        while let c = iterator.next() {
+            switch c {
+            case " ", "\t", "\n":
+                if inWord { words.append(current) }
+                current = ""
+                inWord = false
+            case "'":
+                inWord = true
+                var closed = false
+                while let q = iterator.next() {
+                    if q == "'" {
+                        closed = true
+                        break
+                    }
+                    current.append(q)
+                }
+                if !closed { return nil }
+            case "\"":
+                inWord = true
+                var closed = false
+                while let q = iterator.next() {
+                    if q == "\"" {
+                        closed = true
+                        break
+                    }
+                    if q == "\\" {
+                        guard let next = iterator.next() else { return nil }
+                        if !"$`\"\\\n".contains(next) { current.append(q) }
+                        current.append(next)
+                        continue
+                    }
+                    current.append(q)
+                }
+                if !closed { return nil }
+            case "\\":
+                inWord = true
+                guard let next = iterator.next() else { return nil }
+                current.append(next)
+            default:
+                inWord = true
+                current.append(c)
+            }
+        }
+        if inWord { words.append(current) }
+        return words
     }
 
     static func isDecaffeinateClaudeCommand(_ command: String) -> Bool {
