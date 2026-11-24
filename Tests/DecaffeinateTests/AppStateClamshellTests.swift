@@ -32,6 +32,56 @@ private final class FakeSleepDisabledReader: SleepDisabledReading, @unchecked Se
     }
 }
 
+/// The harness never ticks, but a test added later might: every engine that
+/// could sleep the Mac, hold an assertion, post a notification or read real
+/// idle/power state is a fake, so a `tick()` here can never reach `pmset`.
+@MainActor private final class FakeSleeper: SystemSleeping {
+    private(set) var callCount = 0
+    func sleepNow() -> Result<Void, SleepController.SleepError> {
+        callCount += 1
+        return .success(())
+    }
+    func displayOffNow() -> Result<Void, SleepController.SleepError> {
+        callCount += 1
+        return .success(())
+    }
+}
+
+@MainActor private final class FakeCaffeine: KeepAwakeControlling {
+    private(set) var isActive = false
+    func update(keepSystemAwake: Bool, keepDisplayAwake: Bool, reason: String) {
+        isActive = keepSystemAwake || keepDisplayAwake
+    }
+    func releaseAll() { isActive = false }
+}
+
+@MainActor private final class FakeNotifier: BlockerNotifying {
+    func requestAuthorizationIfNeeded() {}
+    func notifyNewBlocker(appName: String, reason: String, holderKey: String) {}
+    func notifyNewBlockers(count: Int, sample: String) {}
+    func notifyForcedSleep(reason: String) {}
+    func notifySleepFailed(message: String) {}
+    func notifyAgentFinished(label: String) {}
+    func notifyRestartOverdue(uptimeLabel: String) {}
+    func refreshAuthorizationStatus(
+        _ completion: @escaping @MainActor (NotificationAuthorization) -> Void
+    ) {
+        completion(.unknown)
+    }
+}
+
+@MainActor private final class FakeScanner: PowerAssertionScanning {
+    func scan() -> [PowerAssertion] { [] }
+}
+
+@MainActor private final class FakeIdle: IdleReading {
+    func secondsSinceLastInput() -> TimeInterval { 0 }
+}
+
+@MainActor private final class FakePower: PowerReading {
+    func snapshot() -> PowerSnapshot { .unknown }
+}
+
 private final class TestClock: @unchecked Sendable {
     var date = Date(timeIntervalSince1970: 1_000_000)
     func advance(_ seconds: TimeInterval) { date += seconds }
@@ -52,6 +102,7 @@ final class AppStateClamshellTests: XCTestCase {
         let display: FakeDisplayTopologyReader
         let input: FakeInputProbe
         let sleepDisabled: FakeSleepDisabledReader
+        let sleeper: FakeSleeper
         let clock: TestClock
     }
 
@@ -63,12 +114,20 @@ final class AppStateClamshellTests: XCTestCase {
         let input = FakeInputProbe()
         let sleepDisabled = FakeSleepDisabledReader()
         let clock = TestClock()
+        let sleeper = FakeSleeper()
         let state = AppState(
             settingsStore: SettingsStore(defaults: defaults),
             rulesEngine: RulesEngine(defaults: defaults),
             history: SleepHistoryStore(defaults: defaults),
             restHistory: RestHistoryStore(defaults: defaults),
             awakeTime: AwakeTimeStore(defaults: defaults),
+            telemetry: FakeScanner(),
+            idleMonitor: FakeIdle(),
+            powerReader: FakePower(),
+            caffeine: FakeCaffeine(),
+            notifier: FakeNotifier(),
+            sleepController: sleeper,
+            thermalProvider: { .nominal },
             lidReader: lid,
             displayReader: display,
             inputProbe: input,
@@ -77,7 +136,7 @@ final class AppStateClamshellTests: XCTestCase {
         )
         return Harness(
             state: state, lid: lid, display: display, input: input, sleepDisabled: sleepDisabled,
-            clock: clock)
+            sleeper: sleeper, clock: clock)
     }
 
     func testNotApplicableOnADesktopMac() async {
