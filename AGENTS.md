@@ -98,11 +98,9 @@ swift run Decaffeinate --scan       # headless power-assertion scan — CI smoke
 
 ## Guardrails
 
-**Tier: unguarded** — absent from `~/.claude/hooks/billed_repos.json`, checked
-directly rather than assumed. Public repo, no branch protection on `main` (confirmed
-via `gh api repos/harf-promo/decaffeinate/branches/main/protection` → 404 "Branch not
-protected"; a ruleset on the default branch blocks only deletion and non-fast-forward). Direct push to `main` is technically fine on this repo; see Git & PR flow
-below for the convention this session is following anyway.
+**Tier: unguarded.** Public repo, no branch protection on `main` (a ruleset on the
+default branch blocks only deletion and non-fast-forward). Direct push to `main` is
+technically fine; see Git & PR flow below for the usual convention.
 
 - **Never reintroduce `GITHUB_RUN_NUMBER` into the CFBundleVersion formula** —
   `Scripts/version.sh`'s own header comment forbids this explicitly; it was a real
@@ -121,20 +119,16 @@ below for the convention this session is following anyway.
   safety constraints.
 - No payment, auth, or RLS surface exists anywhere in this repo — it's a local
   menu-bar utility with no backend. The one path that matters operationally is the
-  signing/notarization/auto-update chain covered above. There is no
-  `.orchestration/lanes.yml` in this repo (confirmed by listing, not assumed) — so
-  there are no `hot_files`/`deploy_on_merge` entries to duplicate here.
+  signing/notarization/auto-update chain covered above.
+- Changes under `.claude/` (a SessionStart hook that runs `git fetch` for anyone who
+  opens the repo in Claude Code) are code, not config: review them like a script.
 
 ## Git & PR flow
 
-Public repo, not in the guarded-repo map, no branch protection on `main` — direct
-push is fine and has been this repo's standing convention (CI runs the same
-`ci.yml` gate either way; Actions minutes are unlimited on a public repo). No
-repo-specific shipper exists for `decaffeinate`. This session opened a PR anyway for
-reviewability rather than pushing straight to `main`, matching this fleet's general
-preference for a checkable diff on anything beyond a trivial one-line fix — use
-`/ship` for a future change if a branch → PR → squash-merge flow is wanted, or push
-directly when a PR would add no real review value (e.g. a version-bump-only commit).
+Public repo, no branch protection on `main` — direct push is allowed (CI runs the
+same `ci.yml` gate either way). Prefer a branch → PR → squash merge for anything
+beyond a trivial one-line fix, so there is a checkable diff; push directly only when a
+PR would add no review value (e.g. a version-bump-only commit).
 
 ## Host boundaries — VPS vs Mac
 
@@ -148,24 +142,17 @@ notarization chain additionally need `codesign`, `xcrun notarytool`, and a real
 Developer ID keychain — Apple-only tooling with no Linux equivalent, not even
 emulated.
 
-This repo is **also** being cloned to the VPS, at
-`/opt/codeagents/projects/decaffeinate` (`codeagents` user on `wikiclaw-1`) — but that
-clone is for **docs/read-only work only**, mirroring Harf Media's existing
-split-scope pattern (`fleet-command/PORTFOLIO.md`): reading source to answer
-questions, and editing docs/`AGENTS.md`/`CHANGELOG.md`/`README.md`, are fine there. A
-VPS-side agent working in this repo should **never** attempt `swift build`,
-`swift test`, `swift run`, or any `Scripts/*.sh` invocation — expect those to fail
-informatively (no Xcode toolchain on Linux), and route any real build/test/run/
-release need back to the Mac rather than trying to work around the gap.
+A checkout on a Linux host is for **docs/read-only work only**: reading source, and
+editing docs/`AGENTS.md`/`CHANGELOG.md`/`README.md`, are fine there. Never attempt
+`swift build`, `swift test`, `swift run`, or any `Scripts/*.sh` invocation on Linux —
+expect those to fail (no Xcode toolchain) — and route any real build/test/run/release
+need to a Mac rather than working around the gap.
 
 ## Orca conventions
 
-- Update the worktree comment at meaningful checkpoints:
-  `orca-ide worktree set --worktree active --comment "<status>" --json`
-- Set `--workspace-status in-review` when a PR opens on this repo's work.
-- A dispatched worker sends `worker_done` exactly once, with an explicit
-  `--outcome`, when finishing supervised orchestration work here — see
-  fleet-command's `ORCHESTRATION.md` for the full coordinator recipe.
+Maintainer-internal agent orchestration; its conventions live outside this repo and
+are not needed to contribute. A dispatched agent follows the instructions it was
+dispatched with.
 
 ## Where to find more
 
@@ -183,8 +170,6 @@ release need back to the Mac rather than trying to work around the gap.
 | homebrew/cask-core submission readiness | `docs/HOMEBREW-CORE.md` |
 | Widget spike (historical) | `docs/WIDGET-SPIKE.md` |
 | Current short-term plan | `docs/PLAN-NEXT.md` |
-| Fleet-wide guarded-repo tier map | `~/.claude/hooks/billed_repos.json` |
-| Fleet sweep / doctor reporting | `fleet-command/PORTFOLIO.md`, `fleet-command/SWEEP.md` |
 
 No nested `AGENTS.md`/`CLAUDE.md` files exist elsewhere in this repo — confirmed by a
 direct listing. Root `CLAUDE.md` stays the 11-byte `@AGENTS.md` stub; only Claude Code
@@ -193,8 +178,6 @@ Antigravity read directly.
 
 ## Fleet context
 
-This file follows the fleet-wide template
-(`fleet-kit/templates/AGENT-CONTEXT-TEMPLATE.md`, stamped above). Config drift between
-this file and the template is caught automatically by `fleet-doctor.sh`, which runs as
-part of fleet-command's daily sweep — see that repo's `PORTFOLIO.md` and `SWEEP.md` for
-what gets reported and what (if anything) gets auto-dispatched.
+This file follows a shared agent-context template (stamped on line 1) that the
+maintainer uses across projects; drift from it is checked by maintainer-internal
+tooling. Not needed to contribute.
