@@ -6,8 +6,9 @@ import XCTest
 ///
 /// `AppState`'s default `sleepController` is the real `SleepController`, which
 /// runs `pmset sleepnow`. Two layers keep the suite safe: every `AppState(...)`
-/// construction under `Tests/` must inject `sleepController:`, and the real
-/// controller refuses the system `pmset` while XCTest is loaded.
+/// construction under `Tests/` must inject `sleepController:` (checked here),
+/// and the real controller refuses the system `pmset` while XCTest is loaded
+/// (`SleepControllerTests`).
 final class TestSleepSafetyTests: XCTestCase {
 
     /// `<repo>/Tests` — this file is `Tests/DecaffeinateTests/<this>.swift`.
@@ -85,20 +86,5 @@ final class TestSleepSafetyTests: XCTestCase {
         XCTAssertEqual(
             offenders, [],
             "AppState built without sleepController: — a tick() could run the real pmset sleepnow")
-    }
-
-    func testRealControllerRefusesSystemPmsetUnderXCTest() {
-        // Check the detector first: if it were false, the call below would
-        // really sleep this machine, so stop before making it.
-        guard SleepController.isRunningUnderTests else {
-            return XCTFail("XCTest detection failed; not calling the real controller")
-        }
-        XCTAssertEqual(SleepController().pmsetURL, SleepController.systemPmsetURL)
-        guard case .failure(.launchFailed) = SleepController().sleepNow() else {
-            return XCTFail("the real controller launched pmset under XCTest")
-        }
-        guard case .failure(.launchFailed) = SleepController().displayOffNow() else {
-            return XCTFail("the real controller launched pmset under XCTest")
-        }
     }
 }

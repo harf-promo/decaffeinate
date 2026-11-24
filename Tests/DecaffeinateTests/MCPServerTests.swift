@@ -47,9 +47,23 @@ final class MCPServerTests: XCTestCase {
             .keepAwake(minutes: 30))
     }
 
-    func testParseKeepAwakeWithoutMinutesIsNil() {
-        XCTAssertNil(MCPServer.parseAction(name: "keep_awake", arguments: nil))
-        XCTAssertNil(MCPServer.parseAction(name: "keep_awake", arguments: [:]))
+    /// L4: a known tool with a missing argument is not an "Unknown tool".
+    func testParseKeepAwakeWithoutMinutesIsNotAnUnknownTool() {
+        XCTAssertNotNil(MCPServer.parseAction(name: "keep_awake", arguments: nil))
+        XCTAssertNotNil(MCPServer.parseAction(name: "keep_awake", arguments: [:]))
+        XCTAssertNotEqual(
+            MCPServer.parseAction(name: "keep_awake", arguments: [:]), .keepAwake(minutes: 0))
+    }
+
+    /// L3: a zero or negative threshold must not make the idle gate always pass.
+    func testParseSleepIfIdleRaisesZeroAndNegativeToTheFloor() {
+        for raw in [0, -1, 29] {
+            guard
+                case .sleepIfIdle(let seconds) = MCPServer.parseAction(
+                    name: "sleep_if_idle", arguments: ["seconds": .int(raw)])
+            else { return XCTFail("sleep_if_idle must parse") }
+            XCTAssertEqual(seconds, 30, "seconds: \(raw)")
+        }
     }
 
     func testParseSleepIfIdleDefaultsAndReadsSeconds() {

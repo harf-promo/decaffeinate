@@ -15,6 +15,9 @@ struct StatusReport: Codable, Equatable {
     var uptimeSeconds: Int?
     var holdingSystemSleep: Int
     var blockers: [Blocker]
+    /// MCP only: why a safety rail ended this server's `keep_awake` hold early.
+    /// Nil (and absent from the JSON) otherwise, so `--status --json` is unchanged.
+    var keepAwakeReleasedReason: String? = nil
 
     struct Blocker: Codable, Equatable {
         var app: String

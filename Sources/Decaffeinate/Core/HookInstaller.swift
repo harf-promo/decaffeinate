@@ -25,6 +25,16 @@ enum HookInstaller {
 
     static let defaultIdleSeconds = 300
 
+    /// The lowest idle threshold `--sleep-if-idle` and MCP `sleep_if_idle`
+    /// accept. Zero or a negative value would make the idle gate always pass,
+    /// turning an end-of-turn hook into an unconditional sleep.
+    static let minimumIdleSeconds = 30
+
+    /// `seconds` raised to `minimumIdleSeconds` when it is below it.
+    static func clampedIdleSeconds(_ seconds: Int) -> Int {
+        max(seconds, minimumIdleSeconds)
+    }
+
     // MARK: - Paths & identity (impure)
 
     /// The installed executable to embed in the hook, e.g.

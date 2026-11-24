@@ -537,12 +537,13 @@ enum CLI {
     /// token after the flag, else `fallback`. This tolerates the trailing JSON blob
     /// Codex appends to its `notify` program (a non-numeric arg → fallback), so the
     /// same verb works for Claude (`--sleep-if-idle 300`) and Codex without parsing
-    /// JSON.
+    /// JSON. A value below `HookInstaller.minimumIdleSeconds` (zero, negative) is
+    /// raised to it; the printed reply shows the threshold actually used.
     static func idleThreshold(after index: Int, in args: [String], default fallback: Int) -> Int {
         guard args.indices.contains(index + 1), let n = Int(args[index + 1]) else {
             return fallback
         }
-        return n
+        return HookInstaller.clampedIdleSeconds(n)
     }
 
     /// Which agent(s) an `--install-hook` / `--uninstall-hook` targets; defaults to
