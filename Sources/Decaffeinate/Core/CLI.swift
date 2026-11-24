@@ -374,7 +374,8 @@ enum CLI {
     /// the user is hands-off. It must not sleep through the user's keep-awake hold
     /// or another agent session's work either (the app's own engine suppresses
     /// force-sleep for both). A keep-awake hold only counts while the safety rails
-    /// still permit it (`dropKeepAwakeReasons` empty), exactly as in the engine.
+    /// still permit it (`dropKeepAwakeReasons` empty), exactly as in the engine,
+    /// and the Keep Awake setting only while the app's own hold is in the scan.
     /// Pure so both entry points are unit-testable.
     static func sleepIfIdleVerdict(
         idleSeconds: TimeInterval,
@@ -400,7 +401,15 @@ enum CLI {
             return .leaveAwake(reason: reason)
         }
         guard !decision.shouldDropKeepAwake else { return .sleep }
-        if settings.caffeinateEnabled {
+        // The Keep Awake setting persists in UserDefaults after the app quits or
+        // crashes, so it only counts while the running app actually holds its own
+        // assertion. Otherwise a stale setting would make this hook refuse to sleep
+        // the Mac for as long as the app stays closed (DC-3).
+        let appHolds = assertions.contains {
+            $0.kind != .other && $0.processName.lowercased() == "decaffeinate"
+                && $0.name == appHoldReason && !ownSessionHolders.contains($0.pid)
+        }
+        if settings.caffeinateEnabled, appHolds {
             return .leaveAwake(reason: "Keep Awake is on")
         }
         // Strict takeover keeps the GUI's own assertion up permanently (it is how

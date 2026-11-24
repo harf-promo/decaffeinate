@@ -132,11 +132,42 @@ final class CLITests: XCTestCase {
     }
 
     func testSleepIfIdleLeavesAwakeWhenTheKeepAwakeSettingIsOn() {
+        // The running app holds its own assertion while Keep Awake is on.
         var keepAwake = DecaffeinateSettings()
         keepAwake.caffeinateEnabled = true
-        guard case .leaveAwake = verdict(settings: keepAwake) else {
+        let appHold = Fixtures.assertion(
+            pid: 700, process: "Decaffeinate", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, name: CLI.appHoldReason)
+        guard case .leaveAwake = verdict(assertions: [appHold], settings: keepAwake) else {
             return XCTFail("Keep Awake is on in Settings; the hook must not sleep the Mac")
         }
+    }
+
+    // MARK: a stale Keep Awake setting is not a hold (DC-3)
+
+    func testSleepIfIdleIgnoresAStaleKeepAwakeSettingWithNoAppHold() {
+        // Keep Awake was left on and the app quit (or crashed): the setting persists
+        // in UserDefaults, but nothing holds the Mac awake any more. The hook must not
+        // answer "Keep Awake is on" and refuse to sleep for as long as the app is gone.
+        var stale = DecaffeinateSettings()
+        stale.caffeinateEnabled = true
+        XCTAssertEqual(verdict(settings: stale), .sleep)
+    }
+
+    func testSleepIfIdleHonorsKeepAwakeUnderStrictTakeoverWhileTheAppHolds() {
+        // Under strict takeover the app's hold alone carries no intent (it is always
+        // up), so the Keep Awake setting is what says the user wants the Mac awake.
+        var settings = DecaffeinateSettings()
+        settings.caffeinateEnabled = true
+        settings.strictTakeoverMode = true
+        let appHold = Fixtures.assertion(
+            pid: 700, process: "Decaffeinate", bundle: nil,
+            type: AssertionType.preventUserIdleSystemSleep, name: CLI.appHoldReason)
+        guard case .leaveAwake(let reason) = verdict(assertions: [appHold], settings: settings)
+        else {
+            return XCTFail("Keep Awake is on and the app holds; the hook must not sleep the Mac")
+        }
+        XCTAssertEqual(reason, "Keep Awake is on")
     }
 
     func testSleepIfIdleStillSleepsWhenASafetyRailDropsTheKeepAwakeHold() {
