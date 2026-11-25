@@ -1,4 +1,4 @@
-<!-- fleet-template: v1 | reconciled-against: fleet-kit/templates/AGENT-CONTEXT-TEMPLATE.md @ 08dbc79 2026-09-19 -->
+<!-- fleet-template: v1 | public -->
 # AGENTS.md — Decaffeinate
 
 ## What this repo is

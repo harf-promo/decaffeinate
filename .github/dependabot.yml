@@ -1,4 +1,4 @@
-# Generated from fleet-kit templates/github/dependabot (base + swift /).
+# Generated from the fleet Dependabot templates (base + swift /).
 version: 2
 
 updates:
