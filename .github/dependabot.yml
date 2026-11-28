@@ -9,7 +9,7 @@ updates:
       day: monday
       time: "06:00"
       timezone: Asia/Baghdad
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     labels: [dependencies]
     groups:
       github-actions:
@@ -23,7 +23,7 @@ updates:
       day: monday
       time: "06:00"
       timezone: Asia/Baghdad
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     labels: [dependencies]
     groups:
       swift-minor-patch:
